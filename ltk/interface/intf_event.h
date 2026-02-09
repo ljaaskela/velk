@@ -35,6 +35,4 @@ public:
     return ReturnValue::INVALID_ARGUMENT;
 }
 
-#define DEFINE_EVENT(Name) virtual IEvent::Ptr Name() const = 0;
-
 #endif // INTF_EVENT_H

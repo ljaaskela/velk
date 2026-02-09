@@ -17,7 +17,7 @@ public:
     /**
      * @brief Invoked when the data changes externally
      */
-    DEFINE_EVENT(OnDataChanged)
+    virtual IEvent::Ptr OnDataChanged() const = 0;
 };
 
 #endif // INTF_EXTERNAL_ANY_H

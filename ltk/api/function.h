@@ -1,6 +1,7 @@
 #ifndef API_FUNCTION_H
 #define API_FUNCTION_H
 
+#include <api/ltk.h>
 #include <common.h>
 #include <ext/object.h>
 #include <interface/intf_function.h>

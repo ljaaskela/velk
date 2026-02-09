@@ -4,7 +4,6 @@
 #include <api/function.h>
 #include <api/property.h>
 #include <ext/any.h>
-#include <ext/event.h>
 #include <interface/intf_external_any.h>
 #include <interface/intf_property.h>
 #include <interface/intf_registry.h>

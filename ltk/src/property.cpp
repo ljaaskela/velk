@@ -7,7 +7,7 @@ ReturnValue PropertyImpl::SetValue(const IAny &from)
     if (data_) {
         ret = data_->CopyFrom(from);
         if (ret == ReturnValue::SUCCESS) {
-            return InvokeEvent(ACCESS_EVENT(OnChanged), data_.get());
+            return InvokeEvent(OnChanged(), data_.get());
         }
     }
     return ret;
@@ -26,9 +26,9 @@ bool PropertyImpl::SetAny(const IAny::Ptr &value)
     if (auto external = data_->GetInterface<IExternalAny>()) {
         // If the any type can be edited externally, connect any's OnDataChanged to
         // our OnChanged
-        external->OnDataChanged()->AddHandler(ACCESS_EVENT(OnChanged)->GetInvocable());
+        external->OnDataChanged()->AddHandler(OnChanged()->GetInvocable());
     }
-    return Succeeded(InvokeEvent(ACCESS_EVENT(OnChanged), data_.get()));
+    return Succeeded(InvokeEvent(OnChanged(), data_.get()));
 }
 IAny::Ptr PropertyImpl::GetAny() const
 {

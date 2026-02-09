@@ -16,7 +16,7 @@ public:
 protected: // IProperty
     ReturnValue SetValue(const IAny &from) override;
     const IAny::ConstPtr GetValue() const override;
-    IMPLEMENT_EVENT(OnChanged)
+    IEvent::Ptr OnChanged() const override { return onChanged_; }
 
 protected: // IPropertyInternal
     bool SetAny(const IAny::Ptr &value) override;
@@ -24,6 +24,7 @@ protected: // IPropertyInternal
 
 private:
     IAny::Ptr data_;
+    LazyEvent onChanged_;
 };
 
 #endif // PROPERTY_H

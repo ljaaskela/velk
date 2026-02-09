@@ -23,7 +23,7 @@ public:
      * @brief Invoked when value of the property changes as a response to
      *        SetValue being called.
      */
-    DEFINE_EVENT(OnChanged)
+    virtual IEvent::Ptr OnChanged() const = 0;
 };
 
 class IPropertyInternal : public InterfaceBase<IPropertyInternal>

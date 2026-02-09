@@ -2,16 +2,18 @@
 #define EXT_EVENT_H
 
 #include <api/ltk.h>
-#include <common.h>
 #include <interface/intf_event.h>
-#include <interface/intf_registry.h>
+#include <interface/types.h>
 
-#define ACCESS_EVENT(Name) event##Name_
-#define IMPLEMENT_EVENT(Name) \
-protected: \
-    IEvent::Ptr Name() const override { return event##Name_; } \
-\
-private: \
-    IEvent::Ptr event##Name_ = GetRegistry().Create<IEvent>(ClassId::Event);
+class LazyEvent {
+    mutable IEvent::Ptr event_;
+public:
+    operator IEvent::Ptr() const {
+        if (!event_) {
+            event_ = GetRegistry().Create<IEvent>(ClassId::Event);
+        }
+        return event_;
+    }
+};
 
 #endif // EXT_EVENT_H
