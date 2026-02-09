@@ -9,6 +9,7 @@
 
 class IMetaData;
 
+/** @brief A shared_ptr to IMetaData that also holds a reference to the underlying property. */
 class property_ptr : public std::shared_ptr<IMetaData>
 {
     explicit property_ptr(IProperty *p) : prop_(p) {}
@@ -18,9 +19,11 @@ protected:
     IProperty *prop_{};
 };
 
+/** @brief Interface for querying object properties by name. */
 class IMetaData : public Interface<IMetaData>
 {
 public:
+    /** @brief Returns a property_ptr for the named property, or empty if not found. */
     virtual property_ptr GetProperty(const std::string_view name) = 0;
 };
 

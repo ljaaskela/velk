@@ -7,7 +7,7 @@
 #include <interface/intf_any.h>
 #include <interface/intf_registry.h>
 
-// Wrapper for IAny::Ptrs
+/** @brief Read-only wrapper around an IAny pointer with reference-counted ownership. */
 class ConstAny
 {
 public:
@@ -28,6 +28,7 @@ protected:
     refcnt_ptr<IAny> any_;
 };
 
+/** @brief Read-write wrapper around an IAny pointer. */
 class Any : public ConstAny
 {
 public:
@@ -39,6 +40,13 @@ protected:
     Any() = default;
 };
 
+/**
+ * @brief Typed wrapper for IAny that provides Get/Set accessors for type T.
+ *
+ * Can be constructed from an existing IAny or will create a new one from the registry.
+ *
+ * @tparam T The value type. Use const T for read-only access.
+ */
 template<class T>
 class AnyT final : public Any
 {

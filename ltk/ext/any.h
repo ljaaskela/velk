@@ -8,6 +8,11 @@
 
 #include <algorithm>
 
+/**
+ * @brief Base class for IAny implementations built on the Object system.
+ * @tparam FinalClass The final derived class (CRTP parameter).
+ * @tparam Interfaces Additional interfaces beyond IAny.
+ */
 template<class FinalClass, class... Interfaces>
 class BaseAny : public Object<FinalClass, IAny, Interfaces...>
 {
@@ -16,8 +21,11 @@ public:
     static constexpr Uid GetClassUid() { return {}; }
 };
 
-// Base Any implementation for a single type anys, can be inherited directly for custom any implementatiosn
-// or by using SimpleAny for basic types
+/**
+ * @brief BaseAny specialization that declares compatibility with one or more types.
+ * @tparam FinalClass The final derived class (CRTP parameter).
+ * @tparam Types The data types this any is compatible with.
+ */
 template<class FinalClass, class... Types>
 class BaseAnyT : public BaseAny<FinalClass>
 {

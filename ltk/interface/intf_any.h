@@ -6,6 +6,11 @@
 #include <interface/intf_interface.h>
 #include <interface/types.h>
 
+/**
+ * @brief Type-erased value container interface.
+ *
+ * Supports querying compatible types, and getting/setting data by type UID.
+ */
 class IAny : public Interface<IAny>
 {
 public:
@@ -59,17 +64,22 @@ inline bool IsCompatible(const IAny &any, Uid type)
     return false;
 }
 
+/** @copydoc IsCompatible(const IAny&, Uid) */
 inline bool IsCompatible(const IAny::ConstPtr &any, Uid type)
 {
     return any && IsCompatible(*(any.get()), type);
 }
 
+/** @brief Returns true if the any is compatible with type T. */
 template<class T>
 inline bool IsCompatible(const IAny::ConstPtr &any)
 {
     return IsCompatible(any, TypeUid<T>());
 }
 
+/**
+ * @brief Returns the first type UID that both any objects are compatible with, or 0 if none.
+ */
 inline Uid GetCompatibleType(const IAny::ConstPtr &any, const IAny::ConstPtr &with)
 {
     if (any && with) {
@@ -82,6 +92,7 @@ inline Uid GetCompatibleType(const IAny::ConstPtr &any, const IAny::ConstPtr &wi
     return {};
 }
 
+/** @brief Returns true if two any objects share at least one compatible type. */
 inline bool IsCompatible(const IAny::ConstPtr &any, const IAny::ConstPtr &with)
 {
     return GetCompatibleType(any, with) != Uid{};

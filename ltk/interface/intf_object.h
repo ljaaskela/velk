@@ -5,18 +5,32 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
+/** @brief Base interface for all LTK objects. */
 class IObject : public Interface<IObject>
 {
 public:
 };
 
+/**
+ * @brief Interface for objects that can retrieve a shared_ptr to themselves.
+ *
+ * Similar to std::enable_shared_from_this, but integrated with the LTK interface system.
+ */
 class ISharedFromObject : public Interface<ISharedFromObject>
 {
 public:
+    /** @brief Stores the owning shared_ptr. Called by the factory after creation. */
     virtual void SetSelf(const IObject::Ptr &self) = 0;
+    /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
     virtual IObject::Ptr GetSelf() const = 0;
 };
 
+/**
+ * @brief Casts a raw IObject pointer to a shared_ptr of the target interface type.
+ * @tparam T The target interface type.
+ * @param obj The raw object pointer.
+ * @return A shared_ptr<T> if the cast succeeds, empty shared_ptr otherwise.
+ */
 template<class T>
 typename T::Ptr interface_pointer_cast(IObject *obj)
 {

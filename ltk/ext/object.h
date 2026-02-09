@@ -8,6 +8,13 @@
 #include <interface/intf_object_factory.h>
 #include <interface/intf_registry.h>
 
+/**
+ * @brief Base implementation of IObject that supports multiple interfaces.
+ *
+ * Provides GetInterface dispatching, and intrusive reference counting.
+ *
+ * @tparam Interfaces The additional interfaces this object implements.
+ */
 template<class... Interfaces>
 class BaseObject : public IObject, public Interfaces...
 {
@@ -80,6 +87,13 @@ private:
     ObjectData data_;
 };
 
+/**
+ * @brief Default IObjectFactory implementation that creates instances of FinalClass.
+ *
+ * Created objects are wrapped in a shared_ptr with a custom deleter that calls UnRef().
+ *
+ * @tparam FinalClass The concrete class to instantiate.
+ */
 template<class FinalClass>
 class ObjectFactory : public IObjectFactory
 {
@@ -113,7 +127,15 @@ public:
     }
 };
 
-// Base class for objects which implement interfaces
+/**
+ * @brief CRTP base for concrete LTK objects.
+ *
+ * Provides automatic class name/UID generation, self-pointer management,
+ * and a static factory for registry integration.
+ *
+ * @tparam FinalClass The final derived class (CRTP parameter).
+ * @tparam Interfaces Additional interfaces the object implements.
+ */
 template<class FinalClass, class... Interfaces>
 class Object : public BaseObject<Interfaces..., ISharedFromObject>
 {
