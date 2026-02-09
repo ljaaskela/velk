@@ -21,6 +21,8 @@ add_library(ltk SHARED
     src/ltk_export.h
     array_view.h
     common.h
+    src/metadata_container.cpp
+    src/metadata_container.h
     src/registry.cpp
     src/registry.h
     src/plugin.cpp
@@ -46,3 +48,5 @@ add_library(ltk SHARED
     ext/meta_object.h
     ext/event.h
     )
+
+target_compile_definitions(ltk PRIVATE LTK_EXPORTS)

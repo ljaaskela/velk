@@ -42,11 +42,11 @@ constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* in
 }
 
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
-class IMetaData : public Interface<IMetaData>
+class IMetadata : public Interface<IMetadata>
 {
 public:
     /** @brief Returns the static metadata descriptors for this object's class. */
-    virtual array_view<MemberDesc> GetMembers() const = 0;
+    virtual array_view<MemberDesc> GetStaticMetadata() const = 0;
 
     /** @brief Returns the runtime property instance for the named member, or nullptr. */
     virtual IProperty::Ptr GetProperty(std::string_view name) const = 0;
@@ -54,6 +54,18 @@ public:
     virtual IEvent::Ptr GetEvent(std::string_view name) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
     virtual IFunction::Ptr GetFunction(std::string_view name) const = 0;
+};
+
+/**
+ * @brief Abstract interface for runtime metadata storage.
+ */
+class IMetadataContainer : public Interface<IMetadataContainer>
+{
+public:
+    /**
+     * @brief Set metadata container. Called internally by the library.
+     */
+    virtual void SetMetadataContainer(IMetadata *metadata) = 0;
 };
 
 // --- Preprocessor FOR_EACH machinery ---
@@ -126,17 +138,17 @@ public:
 
 #define _LTK_ACC_PROP(Type, Name) \
     PropertyT<Type> Name() const { \
-        auto* meta_ = this->template GetInterface<IMetaData>(); \
+        auto* meta_ = this->template GetInterface<IMetadata>(); \
         return PropertyT<Type>(meta_ ? meta_->GetProperty(#Name) : nullptr); \
     }
 #define _LTK_ACC_EVT(Name) \
     IEvent::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<IMetaData>(); \
+        auto* meta_ = this->template GetInterface<IMetadata>(); \
         return meta_ ? meta_->GetEvent(#Name) : nullptr; \
     }
 #define _LTK_ACC_FN(Name) \
     IFunction::Ptr Name() const { \
-        auto* meta_ = this->template GetInterface<IMetaData>(); \
+        auto* meta_ = this->template GetInterface<IMetadata>(); \
         return meta_ ? meta_->GetFunction(#Name) : nullptr; \
     }
 #define _LTK_ACC(Tag, ...) _LTK_EXPAND(_LTK_CAT(_LTK_ACC_, Tag)(__VA_ARGS__))
@@ -165,7 +177,7 @@ public:
  *    - @c FN   &rarr; <tt>IFunction::Ptr Name() const</tt>
  *
  *    Each accessor obtains the runtime instance by querying the object's
- *    @c IMetaData interface, so it works on any @c MetaObject that implements
+ *    @c IMetadata interface, so it works on any @c MetaObject that implements
  *    this interface.
  *
  * @par Example: defining an interface
@@ -184,7 +196,7 @@ public:
  *
  * @par Example: implementing the interface
  * Concrete classes inherit from @c MetaObject, which automatically collects
- * metadata from all listed interfaces and provides the @c IMetaData
+ * metadata from all listed interfaces and provides the @c IMetadata
  * implementation. No additional code is needed in the concrete class.
  * @code
  * class MyWidget : public MetaObject<MyWidget, IMyWidget> {};
@@ -214,7 +226,7 @@ public:
  *
  * @see LTK_METADATA For generating only the metadata array without accessors.
  * @see MetaObject    For the CRTP base that collects metadata from interfaces.
- * @see IMetaData     For the runtime metadata query interface.
+ * @see IMetadata     For the runtime metadata query interface.
  */
 #define LTK_INTERFACE(...) \
     LTK_METADATA(__VA_ARGS__) \
