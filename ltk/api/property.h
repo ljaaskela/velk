@@ -10,7 +10,7 @@
 #include <interface/types.h>
 #include <iostream>
 
-// Base property holder for an IProperty::Ptr
+/** @brief Convenience wrapper around an IProperty::Ptr with event subscription helpers. */
 class Property
 {
 public:
@@ -63,7 +63,10 @@ protected:
     IPropertyInternal *internal_{};
 };
 
-// Typed holder for an IProperty::Ptr
+/**
+ * @brief Typed property wrapper with Get/Set accessors for type T.
+ * @tparam T The value type stored by the property.
+ */
 template<class T>
 class PropertyT final : public Property
 {
@@ -98,6 +101,10 @@ public:
     }
 };
 
+/**
+ * @brief Typed property_ptr with Get/Set accessors for type T.
+ * @tparam T The value type of the property.
+ */
 template<class T>
 class property_ptr_t : public property_ptr
 {

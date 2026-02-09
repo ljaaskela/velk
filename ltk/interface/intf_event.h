@@ -5,6 +5,11 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
+/**
+ * @brief Interface for an event that supports multiple handler functions.
+ *
+ * Handlers can be added/removed, and the event can be invoked through its invocable.
+ */
 class IEvent : public Interface<IEvent>
 {
 public:

@@ -11,10 +11,16 @@
 using std::array;
 using std::vector;
 
+/** @brief Unique identifier type used for type and interface identification. */
 using Uid = uint64_t;
 
 using std::vector;
 
+/**
+ * @brief Computes a compile-time FNV-1a 64-bit hash of a string.
+ * @param toHash The string to hash.
+ * @return The computed hash value.
+ */
 constexpr Uid make_hash(const std::string_view toHash)
 {
     static_assert(sizeof(Uid) == 8);
@@ -66,6 +72,10 @@ struct type_name_holder
     static inline constexpr auto value = type_name_array<T>();
 };
 
+/**
+ * @brief Returns the compile-time name of type T as a string_view.
+ * @tparam T The type whose name to retrieve.
+ */
 template<typename T>
 constexpr std::string_view GetName()
 {
@@ -73,6 +83,10 @@ constexpr std::string_view GetName()
     return std::string_view{value.data(), value.size()};
 }
 
+/**
+ * @brief Returns a unique compile-time identifier for type T, derived from its name.
+ * @tparam T The type to identify.
+ */
 template<class... T>
 constexpr Uid TypeUid()
 {

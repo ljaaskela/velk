@@ -6,6 +6,7 @@
 #include <ext/object.h>
 #include <interface/intf_function.h>
 
+/** @brief Convenience wrapper that creates and owns an IFunction with a callback. */
 class Function : public Object<Function>
 {
 public:

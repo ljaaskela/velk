@@ -3,6 +3,14 @@
 
 #include <interface/intf_interface.h>
 
+/**
+ * @brief Intrusive reference-counting smart pointer for IInterface-derived types.
+ *
+ * Calls Ref() on acquisition and UnRef() on release. Unlike std::shared_ptr,
+ * the reference count is stored in the object itself.
+ *
+ * @tparam T An IInterface-derived type.
+ */
 template<class T>
 class refcnt_ptr
 {
@@ -27,6 +35,7 @@ public:
     const T *operator->() const noexcept { return ptr_; }
     T *get() noexcept { return ptr_; }
     const T *get() const noexcept { return ptr_; }
+    /** @brief Releases the current pointer and optionally acquires a new one. */
     constexpr void reset(T *ptr = nullptr) noexcept
     {
         release();
