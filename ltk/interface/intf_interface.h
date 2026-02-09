@@ -3,30 +3,27 @@
 
 #include <common.h>
 
-struct NoCopyMove
+struct NoCopy
+{
+    NoCopy() = default;
+    ~NoCopy() = default;
+    NoCopy(const NoCopy &) = delete;
+    NoCopy &operator=(const NoCopy &) = delete;
+};
+
+struct NoMove
+{
+    NoMove() = default;
+    ~NoMove() = default;
+    NoMove(NoMove &&) = delete;
+    NoMove &operator=(NoMove &&) = delete;
+};
+
+struct NoCopyMove : public NoCopy, public NoMove
 {
     NoCopyMove() = default;
     ~NoCopyMove() = default;
-    NoCopyMove(const NoCopyMove &) = delete;
-    NoCopyMove &operator=(const NoCopyMove &) = delete;
-    NoCopyMove(NoCopyMove &&) = delete;
-    NoCopyMove &operator=(NoCopyMove &&) = delete;
 };
-
-#define INTERFACE(name) \
-public: \
-    static constexpr Uid UID{MakeInterfaceUid(name)}; \
-    using Ptr = std::shared_ptr<name>; \
-    using ConstPtr = std::shared_ptr<const name>; \
-    using WeakPtr = std::weak_ptr<name>; \
-    using ConstWeakPtr = std::weak_ptr<const name>; \
-    using IInterface::GetInterface; \
-\
-protected: \
-    name() = default; \
-    virtual ~name() = default; \
-\
-private:
 
 class IInterface : NoCopyMove
 {
@@ -56,6 +53,22 @@ public:
 protected:
     IInterface() = default;
     virtual ~IInterface() = default;
+};
+
+template<typename T>
+class InterfaceBase : public IInterface
+{
+public:
+    static constexpr Uid UID = TypeUid<T>();
+    using Ptr = std::shared_ptr<T>;
+    using ConstPtr = std::shared_ptr<const T>;
+    using WeakPtr = std::weak_ptr<T>;
+    using ConstWeakPtr = std::weak_ptr<const T>;
+    using IInterface::GetInterface;
+
+protected:
+    InterfaceBase() = default;
+    ~InterfaceBase() override = default;
 };
 
 template<class T, class = std::enable_if_t<std::is_convertible_v<std::decay_t<T *>, IInterface *>>>

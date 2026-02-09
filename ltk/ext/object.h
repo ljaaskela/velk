@@ -121,6 +121,10 @@ public:
     Object() = default;
     ~Object() override = default;
 
+public:
+    static constexpr std::string_view GetClassName() noexcept { return GetName<FinalClass>(); }
+    static constexpr Uid GetClassUid() noexcept { return TypeUid<FinalClass>(); }
+
     void SetSelf(const IObject::Ptr &self) override { self_ = self; }
     IObject::Ptr GetSelf() const override { return self_.lock(); }
 
@@ -128,6 +132,13 @@ public:
     typename T::Ptr GetSelf() const
     {
         return interface_pointer_cast<T>(self_.lock());
+    }
+
+public:
+    static const IObjectFactory &GetFactory()
+    {
+        static Factory factory_;
+        return factory_;
     }
 
 private:
@@ -141,27 +152,6 @@ private:
             return info;
         }
     };
-
-public:
-    static const IObjectFactory &GetFactory()
-    {
-        static Factory factory_;
-        return factory_;
-    }
 };
-
-#define IMPLEMENT_CLASS_GENERATE_INFO(Name) \
-public: \
-    static constexpr const std::string_view GetClassName() { return #Name; } \
-    static constexpr Uid GetClassUid() { return make_hash(#Name); } \
-\
-private:
-
-#define IMPLEMENT_CLASS(ClsInfo) \
-public: \
-    static constexpr const std::string_view GetClassName() { return ClsInfo.name; } \
-    static constexpr Uid GetClassUid() { return ClsInfo.uid; } \
-\
-private:
 
 #endif // EXT_OBJECT_H

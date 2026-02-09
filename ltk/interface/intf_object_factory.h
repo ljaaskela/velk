@@ -4,9 +4,8 @@
 #include <interface/intf_object.h>
 #include <interface/types.h>
 
-class IObjectFactory : public IInterface
+class IObjectFactory : public InterfaceBase<IObjectFactory>
 {
-    INTERFACE(IObjectFactory)
 public:
     virtual IObject::Ptr CreateInstance() const = 0;
     virtual const ClassInfo &GetClassInfo() const = 0;

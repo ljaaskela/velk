@@ -8,7 +8,6 @@
 
 class Registry final : public Object<Registry, IRegistry>
 {
-    IMPLEMENT_CLASS_GENERATE_INFO(Registry)
 public:
     Registry();
 

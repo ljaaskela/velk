@@ -5,9 +5,8 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
-class IEvent : public IInterface
+class IEvent : public InterfaceBase<IEvent>
 {
-    INTERFACE(IEvent)
 public:
     /**
      * @brief Returns an invocable which can be used to invoke the event.

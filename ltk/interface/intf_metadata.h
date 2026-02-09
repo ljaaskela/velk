@@ -18,9 +18,8 @@ protected:
     IProperty *prop_{};
 };
 
-class IMetaData : public IInterface
+class IMetaData : public InterfaceBase<IMetaData>
 {
-    INTERFACE(IMetaData)
 public:
     virtual property_ptr GetProperty(const std::string_view name) = 0;
 };

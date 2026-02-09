@@ -6,9 +6,8 @@
 #include <interface/intf_interface.h>
 #include <interface/types.h>
 
-class IAny : public IInterface
+class IAny : public InterfaceBase<IAny>
 {
-    INTERFACE(IAny)
 public:
     /**
      * @brief Returns a list of types this IAny is compatible with.

@@ -10,7 +10,6 @@
 
 class PropertyImpl final : public Object<PropertyImpl, IProperty, IPropertyInternal>
 {
-    IMPLEMENT_CLASS(ClassId::Property)
 public:
     PropertyImpl() = default;
 

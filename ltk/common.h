@@ -79,7 +79,4 @@ constexpr Uid TypeUid()
     return make_hash(GetName<T...>());
 }
 
-#define MakeInterfaceUid(type) make_hash(#type)
-#define MakeClassUid(className) make_hash(#className)
-
 #endif // COMMON_H

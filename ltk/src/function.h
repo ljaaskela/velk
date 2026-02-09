@@ -9,7 +9,6 @@
 
 class FunctionImpl final : public Object<FunctionImpl, IFunction, IFunctionInternal>
 {
-    IMPLEMENT_CLASS(ClassId::Function)
 public:
     FunctionImpl() = default;
     ReturnValue Invoke(const IAny *args) const override;

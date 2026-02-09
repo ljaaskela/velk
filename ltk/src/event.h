@@ -10,7 +10,6 @@
 
 class EventImpl final : public Object<EventImpl, IEvent, IFunction>
 {
-    IMPLEMENT_CLASS(ClassId::Event)
 public:
     EventImpl() = default;
 

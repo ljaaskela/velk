@@ -10,15 +10,16 @@ struct ClassInfo
     const std::string_view name;
 };
 
-#define DECLARE_CLASS(Name) \
-    namespace ClassId { \
-    [[maybe_unused]] static constexpr ClassInfo Name{make_hash(#Name), #Name}; \
-    }
+// Forward declarations for built-in class UIDs
+class PropertyImpl;
+class EventImpl;
+class FunctionImpl;
 
-// Built-in classes
-DECLARE_CLASS(Property)
-DECLARE_CLASS(Event)
-DECLARE_CLASS(Function)
+namespace ClassId {
+    inline constexpr Uid Property = TypeUid<PropertyImpl>();
+    inline constexpr Uid Event = TypeUid<EventImpl>();
+    inline constexpr Uid Function = TypeUid<FunctionImpl>();
+}
 
 // interface cast helper
 template <class T>

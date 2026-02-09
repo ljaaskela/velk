@@ -4,9 +4,8 @@
 #include <interface/intf_any.h>
 #include <interface/intf_event.h>
 
-class IProperty : public IInterface
+class IProperty : public InterfaceBase<IProperty>
 {
-    INTERFACE(IProperty)
 public:
     /**
      * @brief SetValue to a given value
@@ -27,9 +26,8 @@ public:
     DEFINE_EVENT(OnChanged)
 };
 
-class IPropertyInternal : public IInterface
+class IPropertyInternal : public InterfaceBase<IPropertyInternal>
 {
-    INTERFACE(IPropertyInternal)
 public:
     /**
      * @brief Sets the internal any object for a property instance.

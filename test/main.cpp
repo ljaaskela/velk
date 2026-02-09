@@ -29,12 +29,9 @@ struct Data
 
 Data globalData_;
 
-DECLARE_CLASS(MyDataAny)
-
 // Custom any type which accesses global data
 class MyDataAny final : public SingleTypeAny<MyDataAny, Data, IExternalAny>
 {
-    IMPLEMENT_CLASS(ClassId::MyDataAny)
 public:
     Data &Get() const override { return globalData_; }
     ReturnValue Set(const Data &value) override

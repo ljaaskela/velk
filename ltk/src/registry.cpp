@@ -64,7 +64,7 @@ IAny::Ptr Registry::CreateAny(Uid type) const
 
 IProperty::Ptr Registry::CreateProperty(Uid type, const IAny::Ptr &value) const
 {
-    if (auto property = interface_pointer_cast<IProperty>(Create(ClassId::Property.uid))) {
+    if (auto property = interface_pointer_cast<IProperty>(Create(ClassId::Property))) {
         if (auto pi = property->GetInterface<IPropertyInternal>()) {
             if (value && IsCompatible(value, type)) {
                 if (pi->SetAny(value)) {

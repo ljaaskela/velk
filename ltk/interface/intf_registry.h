@@ -9,9 +9,8 @@
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
-class IRegistry : public IInterface
+class IRegistry : public InterfaceBase<IRegistry>
 {
-    INTERFACE(IRegistry)
 public:
     using TypeCreateFn = std::function<IObject::Ptr()>;
 
@@ -34,11 +33,6 @@ public:
     typename T::Ptr Create(Uid uid) const
     {
         return interface_pointer_cast<T>(Create(uid));
-    }
-    template<class T>
-    typename T::Ptr Create(const ClassInfo &info) const
-    {
-        return interface_pointer_cast<T>(Create(info.uid));
     }
 
     template<class T>

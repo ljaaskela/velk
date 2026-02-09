@@ -7,7 +7,6 @@
 
 class Function : public Object<Function>
 {
-    IMPLEMENT_CLASS(ClassId::Function)
 public:
     using CallbackFn = IFunction::CallableFn;
 
