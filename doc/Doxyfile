@@ -1,0 +1,46 @@
+# Doxyfile for LTK
+
+PROJECT_NAME           = "LTK"
+PROJECT_BRIEF          = "C++17 component object model with typed properties, events, and compile-time metadata"
+OUTPUT_DIRECTORY       = .
+
+# Input
+INPUT                  = ../ltk
+RECURSIVE              = YES
+FILE_PATTERNS          = *.h *.cpp
+EXCLUDE_PATTERNS       = */build/*
+
+# Parsing
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = YES
+EXPAND_ONLY_PREDEF     = NO
+PREDEFINED             = LTK_EXPORT=
+
+# Extraction
+EXTRACT_ALL            = YES
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = YES
+SORT_MEMBER_DOCS       = NO
+
+# Source browsing
+SOURCE_BROWSER         = YES
+INLINE_SOURCES         = NO
+REFERENCED_BY_RELATION = YES
+REFERENCES_RELATION    = YES
+
+# Output
+GENERATE_HTML          = YES
+HTML_OUTPUT            = html
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+
+# Diagrams
+HAVE_DOT               = NO
+CLASS_GRAPH            = YES
+COLLABORATION_GRAPH    = NO
+
+# Warnings
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = NO

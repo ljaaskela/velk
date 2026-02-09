@@ -1,3 +1,4 @@
 *.user
 build/
 .claude/
+doc/html/
