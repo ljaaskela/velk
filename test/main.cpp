@@ -4,6 +4,7 @@
 #include <api/function.h>
 #include <api/property.h>
 #include <ext/any.h>
+#include <ext/event.h>
 #include <ext/meta_object.h>
 #include <interface/intf_external_any.h>
 #include <interface/intf_property.h>
@@ -24,7 +25,7 @@ struct Data
         return value != other.value && name != other.name;
     }
 
-    IEvent::Ptr onChanged;
+    LazyEvent onChanged;
 };
 
 Data globalData_;
@@ -47,9 +48,6 @@ public:
 
     IEvent::Ptr OnDataChanged() const override
     {
-        if (!globalData_.onChanged) {
-            globalData_.onChanged = GetRegistry().Create<IEvent>(ClassId::Event);
-        }
         return globalData_.onChanged;
     }
 
@@ -150,11 +148,11 @@ int main()
         }
     }
 
-    // --- Runtime metadata via IMetaData ---
+    // --- Runtime metadata via IMetadata ---
     std::cout << "\n--- MyWidget instance metadata ---" << std::endl;
     auto widget = r.Create<IObject>(MyWidget::GetClassUid());
-    if (auto* meta = interface_cast<IMetaData>(widget)) {
-        for (auto& m : meta->GetMembers()) {
+    if (auto* meta = interface_cast<IMetadata>(widget)) {
+        for (auto &m : meta->GetStaticMetadata()) {
             std::cout << "  member: " << m.name << std::endl;
         }
         if (auto p = meta->GetProperty("Width")) {

@@ -1,3 +1,4 @@
+#include "metadata_container.h"
 #include "registry.h"
 #include "event.h"
 #include "function.h"
@@ -50,6 +51,13 @@ IInterface::Ptr Registry::Create(Uid uid) const
         if (auto object = fac->second->CreateInstance()) {
             if (auto shared = object->GetInterface<ISharedFromObject>()) {
                 shared->SetSelf(object);
+            }
+            auto& info = fac->second->GetClassInfo();
+            if (!info.members.empty()) {
+                if (auto *meta = interface_cast<IMetadataContainer>(object)) {
+                    // Object takes ownership
+                    meta->SetMetadataContainer(new MetadataContainer(info.members, *this));
+                }
             }
             return object;
         }

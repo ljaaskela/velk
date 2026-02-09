@@ -6,18 +6,16 @@
 #include <ext/object.h>
 
 /**
- * @brief CRTP base for LTK objects with static metadata.
+ * @brief CRTP base for LTK objects with metadata.
  *
- * Extends Object with IMetaData support. Metadata is automatically collected
- * from all Interfaces that declare a `static constexpr metadata` member.
- * FinalClass may also define its own `metadata` member to override.
+ * Extends Object with IMetadata support. Metadata is automatically collected
+ * from all Interfaces that declare metadata through LTK_INTERFACE.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class MetaObject : public Object<FinalClass, IMetaData, Interfaces...>,
-                   private MetaDataMixin<FinalClass>
+class MetaObject : public Object<FinalClass, IMetadata, IMetadataContainer, Interfaces...>
 {
 public:
     /** @brief Collected metadata from all Interfaces. */
@@ -26,11 +24,32 @@ public:
     MetaObject() = default;
     ~MetaObject() override = default;
 
-    // IMetaData implementation
-    array_view<MemberDesc> GetMembers() const override { return this->GetMembersImpl(); }
-    IProperty::Ptr GetProperty(std::string_view name) const override { return this->GetPropertyImpl(name); }
-    IEvent::Ptr GetEvent(std::string_view name) const override { return this->GetEventImpl(name); }
-    IFunction::Ptr GetFunction(std::string_view name) const override { return this->GetFunctionImpl(name); }
+public: // IMetadata
+    array_view<MemberDesc> GetStaticMetadata() const override
+    {
+        return meta_ ? meta_->GetStaticMetadata() : array_view<MemberDesc>{};
+    }
+    IProperty::Ptr GetProperty(std::string_view name) const override
+    {
+        return meta_ ? meta_->GetProperty(name) : nullptr;
+    }
+    IEvent::Ptr GetEvent(std::string_view name) const override
+    {
+        return meta_ ? meta_->GetEvent(name) : nullptr;
+    }
+    IFunction::Ptr GetFunction(std::string_view name) const override
+    {
+        return meta_ ? meta_->GetFunction(name) : nullptr;
+    }
+
+public: // IMetadataContainer
+    void SetMetadataContainer(IMetadata *metadata) override
+    {
+        // Allow one set (called by registry at construction)
+        if (!meta_) {
+            meta_.reset(metadata);
+        }
+    }
 
 public:
     static const IObjectFactory &GetFactory()
@@ -52,6 +71,8 @@ private:
             return info;
         }
     };
+
+    refcnt_ptr<IMetadata> meta_;
 };
 
 #endif // EXT_META_OBJECT_H
