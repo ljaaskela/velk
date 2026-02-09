@@ -5,7 +5,7 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
-class IEvent : public InterfaceBase<IEvent>
+class IEvent : public Interface<IEvent>
 {
 public:
     /**

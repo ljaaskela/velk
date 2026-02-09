@@ -4,7 +4,7 @@
 #include <interface/intf_any.h>
 #include <interface/intf_event.h>
 
-class IProperty : public InterfaceBase<IProperty>
+class IProperty : public Interface<IProperty>
 {
 public:
     /**
@@ -26,7 +26,7 @@ public:
     virtual IEvent::Ptr OnChanged() const = 0;
 };
 
-class IPropertyInternal : public InterfaceBase<IPropertyInternal>
+class IPropertyInternal : public Interface<IPropertyInternal>
 {
 public:
     /**

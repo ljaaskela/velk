@@ -23,6 +23,7 @@ add_library(ltk SHARED
     interface/intf_external_any.h
     interface/intf_object.h
     interface/intf_interface.h
+    interface/refcnt_ptr.h
     interface/intf_function.h
     interface/intf_event.h
     interface/intf_property.h

@@ -9,7 +9,7 @@
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
-class IRegistry : public InterfaceBase<IRegistry>
+class IRegistry : public Interface<IRegistry>
 {
 public:
     using TypeCreateFn = std::function<IObject::Ptr()>;

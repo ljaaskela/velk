@@ -11,7 +11,7 @@
  *        The default property implementation will check for IExternalAny and invoke
  *        IProperty::OnChanged when IExternalAny::OnDataChanged is invoked.
  */
-class IExternalAny : public InterfaceBase<IExternalAny>
+class IExternalAny : public Interface<IExternalAny>
 {
 public:
     /**

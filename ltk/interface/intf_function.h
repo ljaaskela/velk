@@ -5,7 +5,7 @@
 #include <interface/intf_any.h>
 #include <interface/intf_interface.h>
 
-class IFunction : public InterfaceBase<IFunction>
+class IFunction : public Interface<IFunction>
 {
 public:
     using CallableFn = ReturnValue(const IAny *);
@@ -17,7 +17,7 @@ public:
     virtual ReturnValue Invoke(const IAny *args) const = 0;
 };
 
-class IFunctionInternal : public InterfaceBase<IFunctionInternal>
+class IFunctionInternal : public Interface<IFunctionInternal>
 {
 public:
     virtual void SetInvokeCallback(IFunction::CallableFn *fn) = 0;

@@ -4,7 +4,7 @@
 #include <interface/intf_object.h>
 #include <interface/types.h>
 
-class IObjectFactory : public InterfaceBase<IObjectFactory>
+class IObjectFactory : public Interface<IObjectFactory>
 {
 public:
     virtual IObject::Ptr CreateInstance() const = 0;

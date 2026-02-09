@@ -6,7 +6,7 @@
 #include <interface/intf_interface.h>
 #include <interface/types.h>
 
-class IAny : public InterfaceBase<IAny>
+class IAny : public Interface<IAny>
 {
 public:
     /**

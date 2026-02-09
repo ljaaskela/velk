@@ -5,12 +5,12 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
-class IObject : public InterfaceBase<IObject>
+class IObject : public Interface<IObject>
 {
 public:
 };
 
-class ISharedFromObject : public InterfaceBase<ISharedFromObject>
+class ISharedFromObject : public Interface<ISharedFromObject>
 {
 public:
     virtual void SetSelf(const IObject::Ptr &self) = 0;
