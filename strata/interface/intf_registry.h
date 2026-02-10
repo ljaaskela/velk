@@ -10,7 +10,7 @@
 #include <interface/types.h>
 
 /**
- * @brief Central registry for creating and managing LTK object types.
+ * @brief Central registry for creating and managing Strata object types.
  *
  * Types are registered via IObjectFactory instances and can be created by UID.
  */

@@ -1,7 +1,7 @@
 #ifndef EXT_EVENT_H
 #define EXT_EVENT_H
 
-#include <api/ltk.h>
+#include <api/strata.h>
 #include <interface/intf_event.h>
 #include <interface/types.h>
 

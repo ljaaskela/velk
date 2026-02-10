@@ -10,6 +10,6 @@ include_directories(${CMAKE_SOURCE_DIR})
 # Place the dll + exe in the same place
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 
-add_subdirectory(ltk)
+add_subdirectory(strata)
 add_subdirectory(test)
 

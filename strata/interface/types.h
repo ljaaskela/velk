@@ -94,7 +94,7 @@ const T *interface_cast(const std::shared_ptr<U> &obj)
     return obj ? obj->template GetInterface<T>() : nullptr;
 }
 
-/** @brief Standard return codes for LTK operations. Non-negative values indicate success. */
+/** @brief Standard return codes for Strata operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t {
     SUCCESS = 0,         ///< Operation succeeded.
     NOTHING_TO_DO = 1,   ///< Operation succeeded but had no effect (e.g. value unchanged).

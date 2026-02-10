@@ -128,7 +128,7 @@ public:
 };
 
 /**
- * @brief CRTP base for concrete LTK objects.
+ * @brief CRTP base for concrete Strata objects.
  *
  * Provides automatic class name/UID generation, self-pointer management,
  * and a static factory for registry integration.
