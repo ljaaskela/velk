@@ -187,7 +187,9 @@ strata/
 
 | Header | Description |
 |---|---|
-| `core_object.h` | `RefCountedDispatch<Interfaces...>` dispatch + ref-counting; `CoreObject<T, Interfaces...>` with factory |
+| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `GetInterface` dispatching across a pack of interfaces |
+| `refcounted_dispatch.h` | `RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
+| `core_object.h` | `ObjectFactory<T>` singleton factory; `CoreObject<T, Interfaces...>` CRTP with factory, self-pointer |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
 | `metadata.h` | `collected_metadata<Interfaces...>` constexpr array concatenation |
 | `any.h` | `BaseAny`, `SingleTypeAny<T>`, `SimpleAny<T>` |
@@ -219,7 +221,9 @@ strata/
 |---|---|
 | `Uid` | 64-bit FNV-1a hash identifying types and interfaces |
 | `Interface<T>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases |
-| `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, ref-counting |
+| `InterfaceDispatch<Interfaces...>` | Implements `GetInterface` dispatching across a pack of interfaces |
+| `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`Ref`/`UnRef`) |
+| `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, self-pointer |
 | `Object<T, Interfaces...>` | Extends `CoreObject` with metadata from all interfaces |
 | `PropertyT<T>` | Typed property with `Get()`/`Set()` and change events |
 | `AnyT<T>` | Typed view over `IAny` |
