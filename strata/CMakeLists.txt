@@ -19,6 +19,7 @@ add_library(strata SHARED
     src/strata_export.h
     include/array_view.h
     include/common.h
+    include/uid.h
     src/metadata_container.cpp
     src/metadata_container.h
     src/strata_impl.cpp

@@ -36,7 +36,7 @@ public:
 
     const std::vector<Uid> &GetCompatibleTypes() const override
     {
-        static vector<Uid> uids = {(TypeUid<Types>())...};
+        static std::vector<Uid> uids = {(TypeUid<Types>())...};
         return uids;
     }
 
@@ -58,7 +58,7 @@ public:
 
     const std::vector<Uid> &GetCompatibleTypes() const override
     {
-        static vector<Uid> uids = {TYPE_UID};
+        static std::vector<Uid> uids = {TYPE_UID};
         return uids;
     }
     size_t GetDataSize(Uid type) const override final
