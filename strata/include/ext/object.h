@@ -80,7 +80,7 @@ private:
         }
     };
 
-    refcnt_ptr<IMetadata> meta_;
+    std::unique_ptr<IMetadata> meta_;
 };
 
 } // namespace strata
