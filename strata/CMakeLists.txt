@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(ltk LANGUAGES CXX)
+project(strata LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,14 +11,14 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
-add_library(ltk SHARED
+add_library(strata SHARED
     src/property.cpp
     src/property.h
     src/event.cpp
     src/event.h
     src/function.cpp
     src/function.h
-    src/ltk_export.h
+    src/strata_export.h
     array_view.h
     common.h
     src/metadata_container.cpp
@@ -41,7 +41,7 @@ add_library(ltk SHARED
     api/any.h
     api/property.h
     api/function.h
-    api/ltk.h
+    api/strata.h
     ext/any.h
     ext/object.h
     ext/metadata.h
@@ -49,4 +49,4 @@ add_library(ltk SHARED
     ext/event.h
     )
 
-target_compile_definitions(ltk PRIVATE LTK_EXPORTS)
+target_compile_definitions(strata PRIVATE STRATA_EXPORTS)

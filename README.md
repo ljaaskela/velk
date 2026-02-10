@@ -1,4 +1,4 @@
-# LTK
+# Strata
 
 A C++17 component object model with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
 
@@ -8,7 +8,7 @@ A C++17 component object model with interface-based polymorphism, typed properti
 - **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
 - **Events** -- observable multi-handler events
 - **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
-- **Compile-time metadata** -- declare members with `LTK_INTERFACE`, query them at compile time or runtime
+- **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
 - **Central registry** -- register types, create instances by UID, query class info without instantiation
 - **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
 
@@ -22,13 +22,13 @@ cmake ..
 cmake --build .
 ```
 
-Output: `build/bin/ltk.dll` (shared library) and `build/bin/test.exe` (demo).
+Output: `build/bin/strata.dll` (shared library) and `build/bin/test.exe` (demo).
 
 ## Quick start
 
 ### Define an interface
 
-Use `LTK_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods.
+Use `STRATA_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods.
 
 ```cpp
 #include <interface/intf_metadata.h>
@@ -36,7 +36,7 @@ Use `LTK_INTERFACE` to declare properties, events, and functions. This generates
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    LTK_INTERFACE(
+    STRATA_INTERFACE(
         (PROP, float, Width),
         (PROP, float, Height),
         (EVT, OnClicked),
@@ -62,7 +62,7 @@ Multiple interfaces are supported:
 class ISerializable : public Interface<ISerializable>
 {
 public:
-    LTK_INTERFACE(
+    STRATA_INTERFACE(
         (PROP, std::string, Name),
         (FN, Serialize)
     )
@@ -155,7 +155,7 @@ public:
 The library is organized in four layers:
 
 ```
-ltk/
+strata/
   interface/   Abstract interfaces (pure virtual)
   ext/         CRTP helpers and template implementations
   api/         User-facing typed wrappers
@@ -168,7 +168,7 @@ ltk/
 |---|---|
 | `intf_interface.h` | `IInterface` root with UID-based `GetInterface()` and ref-counting; `Interface<T>` CRTP with auto UID |
 | `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
-| `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `LTK_INTERFACE` macro |
+| `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and OnChanged |
 | `intf_event.h` | `IEvent` with add/remove handler |
 | `intf_function.h` | `IFunction` invocable callback |
@@ -192,7 +192,7 @@ ltk/
 
 | Header | Description |
 |---|---|
-| `ltk.h` | `GetRegistry()` singleton access |
+| `strata.h` | `GetRegistry()` singleton access |
 | `property.h` | `PropertyT<T>` typed property wrapper |
 | `any.h` | `AnyT<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support |
@@ -222,10 +222,10 @@ ltk/
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
 
-## LTK_INTERFACE reference
+## STRATA_INTERFACE reference
 
 ```cpp
-LTK_INTERFACE(
+STRATA_INTERFACE(
     (PROP, Type, Name),   // generates PropertyT<Type> Name() const
     (EVT, Name),          // generates IEvent::Ptr Name() const
     (FN, Name)            // generates IFunction::Ptr Name() const
@@ -240,7 +240,7 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 property-test/
   CMakeLists.txt
   README.md
-  ltk/
+  strata/
     CMakeLists.txt
     common.h              Uid, TypeUid<T>(), GetName<T>()
     array_view.h          Lightweight constexpr span-like view

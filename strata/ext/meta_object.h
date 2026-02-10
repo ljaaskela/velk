@@ -6,10 +6,10 @@
 #include <ext/object.h>
 
 /**
- * @brief CRTP base for LTK objects with metadata.
+ * @brief CRTP base for Strata objects with metadata.
  *
  * Extends Object with IMetadata support. Metadata is automatically collected
- * from all Interfaces that declare metadata through LTK_INTERFACE.
+ * from all Interfaces that declare metadata through STRATA_INTERFACE.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.

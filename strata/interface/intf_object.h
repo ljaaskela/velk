@@ -5,7 +5,7 @@
 #include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
-/** @brief Base interface for all LTK objects. */
+/** @brief Base interface for all Strata objects. */
 class IObject : public Interface<IObject>
 {
 public:
@@ -14,7 +14,7 @@ public:
 /**
  * @brief Interface for objects that can retrieve a shared_ptr to themselves.
  *
- * Similar to std::enable_shared_from_this, but integrated with the LTK interface system.
+ * Similar to std::enable_shared_from_this, but integrated with the Strata interface system.
  */
 class ISharedFromObject : public Interface<ISharedFromObject>
 {

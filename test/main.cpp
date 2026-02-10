@@ -1,4 +1,4 @@
-#include <api/ltk.h>
+#include <api/strata.h>
 
 #include <api/any.h>
 #include <api/function.h>
@@ -57,7 +57,7 @@ private:
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    LTK_INTERFACE(
+    STRATA_INTERFACE(
         (PROP, float, Width),
         (PROP, float, Height),
         (EVT, OnClicked),
@@ -68,7 +68,7 @@ public:
 class ISerializable : public Interface<ISerializable>
 {
 public:
-    LTK_INTERFACE(
+    STRATA_INTERFACE(
         (PROP, std::string, Name),
         (FN, Serialize)
     )

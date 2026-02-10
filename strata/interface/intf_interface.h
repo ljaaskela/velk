@@ -35,7 +35,7 @@ struct InterfaceInfo {
 };
 
 /**
- * @brief Root interface for all LTK interfaces.
+ * @brief Root interface for all Strata interfaces.
  *
  * Provides UID-based interface querying and manual reference counting.
  * All concrete interfaces derive from this through the Interface<T> CRTP template.
@@ -84,7 +84,7 @@ protected:
 #include <interface/refcnt_ptr.h>
 
 /**
- * @brief CRTP base template for defining concrete LTK interfaces.
+ * @brief CRTP base template for defining concrete Strata interfaces.
  *
  * Provides automatic UID generation from the type name, and standard smart pointer
  * type aliases (Ptr, ConstPtr, WeakPtr, ConstWeakPtr, RefPtr).
