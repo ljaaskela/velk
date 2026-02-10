@@ -4,6 +4,7 @@
 #include <ext/refcounted_dispatch.h>
 #include <interface/intf_metadata.h>
 #include <interface/intf_strata.h>
+#include <memory>
 #include <vector>
 
 namespace strata {
@@ -22,9 +23,20 @@ public: // IMetadata
 private:
     array_view<MemberDesc> members_;
     const IStrata &instance_;
-    mutable std::vector<std::pair<std::string_view, IProperty::Ptr>> properties_;
-    mutable std::vector<std::pair<std::string_view, IEvent::Ptr>> events_;
-    mutable std::vector<std::pair<std::string_view, IFunction::Ptr>> functions_;
+
+    // Static members: lazily populated as accessed. Each entry maps
+    // a metadata index to its runtime instance.
+    mutable std::vector<std::pair<size_t, IInterface::Ptr>> instances_;
+
+    // Future: dynamically added members
+    struct DynamicMembers {
+        std::vector<MemberDesc> descriptors;
+        std::vector<IInterface::Ptr> instances;
+    };
+    mutable std::unique_ptr<DynamicMembers> dynamic_;
+
+    // Helper: find static member by name+kind, lazily create if needed
+    IInterface::Ptr find_or_create(std::string_view name, MemberKind kind) const;
 };
 
 } // namespace strata

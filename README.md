@@ -231,6 +231,46 @@ strata/
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
 
+## Object memory layout
+
+An `Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
+
+### Per-object data
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| InterfaceDispatch | vptr | 8 |
+| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| RefCountedDispatch | flags (`int32_t`) | 4 |
+| CoreObject | `self_` (`weak_ptr`) | 16 |
+| Object | `meta_` (`refcnt_ptr<IMetadata>`) | 8 |
+| **Total** | | **40 bytes** |
+
+`refcnt_ptr` is a single raw pointer (8 bytes) because the reference count lives in the object itself (intrusive ref-counting), unlike `shared_ptr` which carries both an object pointer and a control block pointer (16 bytes).
+
+### MetadataContainer (heap-allocated, one per object)
+
+| Member | Size |
+|---|---|
+| vptr + refCount + flags | 16 |
+| `members_` (`array_view`) | 16 |
+| `instance_` (reference) | 8 |
+| `instances_` (vector, initially empty) | 24 |
+| `dynamic_` (`unique_ptr`, initially null) | 8 |
+| **Total (baseline)** | **72 bytes** |
+
+Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`. Members are created lazily — only when first accessed via `get_property()`, `get_event()`, or `get_function()`.
+
+Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shared across all instances at zero per-object cost.
+
+### Example: MyWidget with 6 members
+
+| Scenario | Object | MetadataContainer | Cached members | Total |
+|---|---|---|---|---|
+| No members accessed | 40 | 72 | 0 | **112 bytes** |
+| 3 members accessed | 40 | 72 | 3 × 24 = 72 | **184 bytes** |
+| All 6 members accessed | 40 | 72 | 6 × 24 = 144 | **256 bytes** |
+
 ## STRATA_INTERFACE reference
 
 ```cpp
