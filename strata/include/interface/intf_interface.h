@@ -45,7 +45,7 @@ struct InterfaceInfo {
 class IInterface : NoCopyMove
 {
 public:
-    static constexpr Uid UID = 0;
+    static constexpr Uid UID{};
     using Ptr = std::shared_ptr<IInterface>;
     using ConstPtr = std::shared_ptr<const IInterface>;
     using WeakPtr = std::weak_ptr<IInterface>;

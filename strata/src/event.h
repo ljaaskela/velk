@@ -24,7 +24,7 @@ protected: // IEvent
     ReturnValue RemoveHandler(const IFunction::ConstPtr &fn) const override;
 
 private:
-    mutable vector<IFunction::ConstPtr> handlers_;
+    mutable std::vector<IFunction::ConstPtr> handlers_;
 };
 
 } // namespace strata

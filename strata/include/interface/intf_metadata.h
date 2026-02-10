@@ -34,13 +34,13 @@ constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* in
 /** @brief Creates an Event MemberDesc. */
 constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info = nullptr)
 {
-    return {name, MemberKind::Event, 0, info};
+    return {name, MemberKind::Event, {}, info};
 }
 
 /** @brief Creates a Function MemberDesc. */
 constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr)
 {
-    return {name, MemberKind::Function, 0, info};
+    return {name, MemberKind::Function, {}, info};
 }
 
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */

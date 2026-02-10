@@ -2,40 +2,11 @@
 #define COMMON_H
 
 #include <memory>
-#include <string_view>
-#include <iostream>
-
-#include <array>
 #include <vector>
 
+#include <uid.h>
+
 namespace strata {
-
-using std::array;
-using std::vector;
-
-/** @brief Unique identifier type used for type and interface identification. */
-using Uid = uint64_t;
-
-using std::vector;
-
-/**
- * @brief Computes a compile-time FNV-1a 64-bit hash of a string.
- * @param toHash The string to hash.
- * @return The computed hash value.
- */
-constexpr Uid make_hash(const std::string_view toHash)
-{
-    static_assert(sizeof(Uid) == 8);
-    // FNV-1a 64 bit algorithm
-    size_t result = 0xcbf29ce484222325; // FNV offset basis
-
-    for (char c : toHash) {
-        result ^= c;
-        result *= 1099511628211; // FNV prime
-    }
-
-    return result;
-}
 
 template<std::size_t... Idxs>
 constexpr auto substring_as_array(std::string_view str, std::index_sequence<Idxs...>)
