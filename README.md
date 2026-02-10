@@ -1,8 +1,36 @@
 # Strata
 
-A C++17 component object model with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
+Strata is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
+
+Strata is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
 
 The name *Strata* (plural of *stratum*, meaning layers) reflects the library's layered architecture: abstract interfaces at the bottom, CRTP helpers and template implementations in the middle, and user-facing typed wrappers on top.
+
+## Table of contents
+
+- [Features](#features)
+- [Building](#building)
+- [Quick start](#quick-start)
+  - [Define an interface](#define-an-interface)
+  - [Implement with Object](#implement-with-object)
+  - [Register and create](#register-and-create)
+  - [Use typed accessors](#use-typed-accessors)
+  - [Query metadata](#query-metadata)
+  - [Properties with change notifications](#properties-with-change-notifications)
+  - [Custom Any types](#custom-any-types)
+- [Architecture](#architecture)
+  - [interface/ -- Contracts](#interface----contracts)
+  - [ext/ -- CRTP helpers](#ext----crtp-helpers)
+  - [api/ -- User wrappers](#api----user-wrappers)
+  - [src/ -- Internal implementations](#src----internal-implementations)
+- [Key types](#key-types)
+- [Object memory layout](#object-memory-layout)
+  - [Per-object data](#per-object-data)
+  - [MetadataContainer](#metadatacontainer-heap-allocated-one-per-object)
+  - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
+- [STRATA_INTERFACE reference](#strata_interface-reference)
+  - [Manual metadata and accessors](#manual-metadata-and-accessors)
+- [Project structure](#project-structure)
 
 ## Features
 
