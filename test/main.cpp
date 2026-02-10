@@ -182,6 +182,28 @@ int main()
         std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
     }
 
+    // --- Uid from string ---
+    std::cout << "\n--- Uid from string ---" << std::endl;
+    constexpr Uid a(0xcc262192d151941f, 0xd542d4c622b50b09);
+    constexpr Uid b("cc262192-d151-941f-d542-d4c622b50b09");
+    static_assert(a == b, "Uid string parsing mismatch");
+    static_assert(is_valid_uid_format("cc262192-d151-941f-d542-d4c622b50b09"));
+    static_assert(!is_valid_uid_format("not-a-uid"));
+    static_assert(!is_valid_uid_format("cc262192-d151-941f-d542-d4c622b50b0")); // too short
+    static_assert(!is_valid_uid_format("cc262192Xd151-941f-d542-d4c622b50b09")); // wrong dash
+    static_assert(!is_valid_uid_format("gg262192-d151-941f-d542-d4c622b50b09")); // bad hex
+    // constexpr Uid bad("not-a-uid"); // would fail to compile
+    std::cout << "  from ints:   " << a << std::endl;
+    std::cout << "  from string: " << b << std::endl;
+
+    // Verify STRATA_UID macro on Interface template
+    static_assert(ISerializable::UID == type_uid<ISerializable>(), "auto UID should match type_uid");
+    constexpr Uid customUid("a0b1c2d3-e4f5-6789-abcd-ef0123456789");
+    // A hypothetical interface with a fixed UID:
+    // class IFixed : public Interface<IFixed, STRATA_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")> {};
+    // would have IFixed::UID == customUid
+    std::cout << "  STRATA_UID:  " << customUid << std::endl;
+
     // --- Typed access via ISerializable interface ---
     std::cout << "\n--- MyWidget via ISerializable interface ---" << std::endl;
     if (auto* is = interface_cast<ISerializable>(widget)) {

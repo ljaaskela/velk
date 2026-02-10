@@ -302,7 +302,7 @@ public:
 };
 ```
 
-The string names passed to `PropertyDesc` / `get_property` (etc.) must match exactly -- they are used for runtime lookup. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
+The string names passed to `PropertyDesc` / `get_property` (etc.) are used for runtime lookup, so they must match exactly. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
 
 You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods, then write the accessors yourself.
 

@@ -9,10 +9,50 @@
 
 namespace strata {
 
+/** @brief Returns true if @p c is a valid hexadecimal digit. */
+constexpr bool is_hex_digit(char c)
+{
+    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+}
+
+/** @brief Returns true if @p str is a valid UUID string (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). */
+constexpr bool is_valid_uid_format(std::string_view str)
+{
+    if (str.size() != 36) return false;
+    for (size_t i = 0; i < 36; ++i) {
+        if (i == 8 || i == 13 || i == 18 || i == 23) {
+            if (str[i] != '-') return false;
+        } else {
+            if (!is_hex_digit(str[i])) return false;
+        }
+    }
+    return true;
+}
+
 /** @brief 128-bit unique identifier used for type and interface identification. */
 struct Uid {
     uint64_t hi = 0;
     uint64_t lo = 0;
+
+    constexpr Uid() = default;
+    constexpr Uid(uint64_t h, uint64_t l) : hi(h), lo(l) {}
+
+    /** @brief Constructs a Uid from a UUID string (e.g. "cc262192-d151-941f-d542-d4c622b50b09").
+     *  In constexpr context, a malformed string produces a compile error. */
+    constexpr Uid(std::string_view str) : hi(0), lo(0)
+    {
+        if (!is_valid_uid_format(str)) {
+            throw "Uid: invalid UUID format (expected xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)";
+        }
+        for (auto c : str) {
+            if (c == '-') continue;
+            uint64_t nibble = (c >= '0' && c <= '9') ? uint64_t(c - '0') :
+                              (c >= 'a' && c <= 'f') ? uint64_t(c - 'a' + 10) :
+                              (c >= 'A' && c <= 'F') ? uint64_t(c - 'A' + 10) : 0;
+            hi = (hi << 4) | (lo >> 60);
+            lo = (lo << 4) | nibble;
+        }
+    }
 
     constexpr bool operator==(const Uid& o) const { return hi == o.hi && lo == o.lo; }
     constexpr bool operator!=(const Uid& o) const { return !(*this == o); }
@@ -98,5 +138,8 @@ constexpr Uid make_hash(const std::string_view toHash)
 }
 
 } // namespace strata
+
+/** @brief Expands a UUID string literal into two uint64_t template arguments (hi, lo). */
+#define STRATA_UID(str) ::strata::Uid(str).hi, ::strata::Uid(str).lo
 
 #endif // UID_H

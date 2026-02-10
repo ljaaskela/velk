@@ -5,31 +5,6 @@
 
 namespace strata {
 
-/** @brief Mixin (inherit to add behavior) that deletes copy constructor and copy assignment operator. */
-struct NoCopy
-{
-    NoCopy() = default;
-    ~NoCopy() = default;
-    NoCopy(const NoCopy &) = delete;
-    NoCopy &operator=(const NoCopy &) = delete;
-};
-
-/** @brief Mixin (inherit to add behavior) that deletes move constructor and move assignment operator. */
-struct NoMove
-{
-    NoMove() = default;
-    ~NoMove() = default;
-    NoMove(NoMove &&) = delete;
-    NoMove &operator=(NoMove &&) = delete;
-};
-
-/** @brief Mixin (inherit to add behavior) that prevents both copying and moving. */
-struct NoCopyMove : public NoCopy, public NoMove
-{
-    NoCopyMove() = default;
-    ~NoCopyMove() = default;
-};
-
 /** @brief Static descriptor for an interface type, providing its UID and name. */
 struct InterfaceInfo {
     Uid uid;
@@ -96,16 +71,40 @@ protected:
  * Provides automatic UID generation from the type name, and standard smart pointer
  * type aliases (Ptr, ConstPtr, WeakPtr, ConstWeakPtr, RefPtr).
  *
+ * By default the UID is derived from the type name at compile time. To assign a
+ * stable, user-defined UID instead, pass the high and low 64-bit halves as template
+ * parameters. The @c STRATA_UID macro parses a UUID string into the two values:
+ *
+ * @code
+ * // Auto-generated UID (default):
+ * class IMyWidget : public Interface<IMyWidget> {};
+ *
+ * // User-specified UID:
+ * class IMyWidget : public Interface<IMyWidget,
+ *     STRATA_UID("cc262192-d151-941f-d542-d4c622b50b09")> {};
+ * @endcode
+ *
  * @tparam T The derived interface type (CRTP parameter).
+ * @tparam UidHi High 64 bits of a user-specified UID (0 = auto-generate from type name).
+ * @tparam UidLo Low 64 bits of a user-specified UID (0 = auto-generate from type name).
  */
-template<typename T>
+template<typename T, uint64_t UidHi = 0, uint64_t UidLo = 0>
 class Interface : public IInterface
 {
+    static constexpr Uid compute_uid()
+    {
+        if constexpr (UidHi == 0 && UidLo == 0) {
+            return type_uid<T>();
+        } else {
+            return Uid(UidHi, UidLo);
+        }
+    }
+
 public:
     /** @brief Compile-time unique identifier for this interface type. */
-    static constexpr Uid UID = type_uid<T>();
+    static constexpr Uid UID = compute_uid();
     /** @brief Static descriptor containing the UID and human-readable name. */
-    static constexpr InterfaceInfo INFO { type_uid<T>(), get_name<T>() };
+    static constexpr InterfaceInfo INFO { compute_uid(), get_name<T>() };
     /** @brief Shared pointer to a mutable T. */
     using Ptr = std::shared_ptr<T>;
     /** @brief Shared pointer to a const T. */

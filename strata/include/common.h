@@ -69,6 +69,31 @@ constexpr Uid type_uid()
     return make_hash(get_name<T...>());
 }
 
+/** @brief Mixin (inherit to add behavior) that deletes copy constructor and copy assignment operator. */
+struct NoCopy
+{
+    NoCopy() = default;
+    ~NoCopy() = default;
+    NoCopy(const NoCopy &) = delete;
+    NoCopy &operator=(const NoCopy &) = delete;
+};
+
+/** @brief Mixin (inherit to add behavior) that deletes move constructor and move assignment operator. */
+struct NoMove
+{
+    NoMove() = default;
+    ~NoMove() = default;
+    NoMove(NoMove &&) = delete;
+    NoMove &operator=(NoMove &&) = delete;
+};
+
+/** @brief Mixin (inherit to add behavior) that prevents both copying and moving. */
+struct NoCopyMove : public NoCopy, public NoMove
+{
+    NoCopyMove() = default;
+    ~NoCopyMove() = default;
+};
+
 } // namespace strata
 
 #endif // COMMON_H
