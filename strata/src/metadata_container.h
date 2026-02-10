@@ -1,14 +1,14 @@
 #ifndef METADATA_CONTAINER_H
 #define METADATA_CONTAINER_H
 
-#include <ext/core_object.h>
+#include <ext/refcounted_dispatch.h>
 #include <interface/intf_metadata.h>
 #include <interface/intf_strata.h>
 #include <vector>
 
 namespace strata {
 
-class MetadataContainer final : public BaseObject<IMetadata>
+class MetadataContainer final : public RefCountedDispatch<IMetadata>
 {
 public:
     explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance);

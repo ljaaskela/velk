@@ -1,97 +1,15 @@
 #ifndef EXT_CORE_OBJECT_H
 #define EXT_CORE_OBJECT_H
 
-#include <atomic>
 #include <common.h>
+#include <ext/interface_dispatch.h>
+#include <ext/refcounted_dispatch.h>
 #include <interface/intf_any.h>
 #include <interface/intf_object.h>
 #include <interface/intf_object_factory.h>
 #include <interface/intf_strata.h>
 
 namespace strata {
-
-/**
- * @brief Base implementation of IObject that supports multiple interfaces.
- *
- * Provides GetInterface dispatching, and intrusive reference counting.
- *
- * @tparam Interfaces The additional interfaces this object implements.
- */
-template<class... Interfaces>
-class BaseObject : public IObject, public Interfaces...
-{
-private:
-    template<class T>
-    constexpr void FindInterface(Uid uid, void **interface)
-    {
-        if (uid == T::UID) {
-            *interface = static_cast<T *>(this);
-        }
-        // Note that we don't support interface hierarchies here..
-    }
-
-    template<class... B, class = std::enable_if_t<sizeof...(B) == 0>>
-    constexpr void FindSiblings(Uid, void **)
-    {}
-    template<class A, class... B>
-    constexpr void FindSiblings(Uid uid, void **interface)
-    {
-        FindInterface<A>(uid, interface);
-        if (*interface == nullptr) {
-            FindSiblings<B...>(uid, interface);
-        }
-    }
-
-public:
-    /** @brief Dispatches an interface query across IObject and all Interfaces by UID. */
-    IInterface *GetInterface(Uid uid) override
-    {
-        void *interface = nullptr;
-        if (uid == IInterface::UID) {
-            interface = static_cast<IObject *>(this);
-        } else if (uid == IObject::UID) {
-            interface = static_cast<IObject *>(this);
-        } else {
-            FindSiblings<Interfaces...>(uid, &interface);
-        }
-        return static_cast<IInterface *>(interface);
-    }
-    /** @copydoc GetInterface(Uid) */
-    const IInterface *GetInterface(Uid uid) const override
-    {
-        return const_cast<BaseObject *>(this)->GetInterface(uid);
-    }
-
-    template<class T>
-    T *GetInterface()
-    {
-        return static_cast<T *>(GetInterface(T::UID));
-    }
-
-    /** @brief Atomically increments the reference count. */
-    void Ref() override { data_.refCount++; }
-    /** @brief Atomically decrements the reference count; deletes the object at zero. */
-    void UnRef() override
-    {
-        if (--data_.refCount == 0) {
-            delete this;
-        }
-    }
-
-public:
-    BaseObject() = default;
-    ~BaseObject() override = default;
-
-protected:
-    struct ObjectData
-    {
-        alignas(4) std::atomic<int32_t> refCount{1};
-        alignas(4) int32_t flags{};
-    };
-
-private:
-    ObjectData data_;
-};
 
 /**
  * @brief Default IObjectFactory implementation that creates instances of FinalClass.
@@ -101,29 +19,11 @@ private:
  * @tparam FinalClass The concrete class to instantiate.
  */
 template<class FinalClass>
-class ObjectFactory : public IObjectFactory
+class ObjectFactory : public InterfaceDispatch<IObjectFactory>
 {
 public:
     ObjectFactory() = default;
     ~ObjectFactory() override = default;
-
-    IInterface *GetInterface(Uid uid) override
-    {
-        void *interface = nullptr;
-        if (uid == IInterface::UID) {
-            interface = static_cast<IObjectFactory *>(this);
-        } else if (uid == IObjectFactory::UID) {
-            interface = static_cast<IObjectFactory *>(this);
-        }
-        return static_cast<IInterface *>(interface);
-    }
-    const IInterface *GetInterface(Uid uid) const override
-    {
-        return const_cast<ObjectFactory *>(this)->GetInterface(uid);
-    }
-
-    void Ref() override{};
-    virtual void UnRef() override{};
 
 public:
     IObject::Ptr CreateInstance() const override
@@ -143,7 +43,7 @@ public:
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class CoreObject : public BaseObject<Interfaces..., ISharedFromObject>
+class CoreObject : public RefCountedDispatch<IObject, Interfaces..., ISharedFromObject>
 {
 public:
     CoreObject() = default;

@@ -46,6 +46,8 @@ add_library(strata SHARED
     include/ext/metadata.h
     include/ext/object.h
     include/ext/event.h
+    include/ext/interface_dispatch.h
+    include/ext/refcounted_dispatch.h
     )
 
 target_include_directories(strata

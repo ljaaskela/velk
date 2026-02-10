@@ -187,7 +187,7 @@ strata/
 
 | Header | Description |
 |---|---|
-| `core_object.h` | `BaseObject<Interfaces...>` dispatch + ref-counting; `CoreObject<T, Interfaces...>` with factory |
+| `core_object.h` | `RefCountedDispatch<Interfaces...>` dispatch + ref-counting; `CoreObject<T, Interfaces...>` with factory |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
 | `metadata.h` | `collected_metadata<Interfaces...>` constexpr array concatenation |
 | `any.h` | `BaseAny`, `SingleTypeAny<T>`, `SimpleAny<T>` |
