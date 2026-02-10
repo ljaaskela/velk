@@ -158,10 +158,13 @@ The library is organized in four layers:
 
 ```
 strata/
-  interface/   Abstract interfaces (pure virtual)
-  ext/         CRTP helpers and template implementations
-  api/         User-facing typed wrappers
-  src/         Internal runtime implementations (compiled into DLL)
+  include/               Public headers (available to DLL consumers)
+    interface/           Abstract interfaces (pure virtual)
+    ext/                 CRTP helpers and template implementations
+    api/                 User-facing typed wrappers
+    common.h             Uid, TypeUid<T>(), GetName<T>()
+    array_view.h         Lightweight constexpr span-like view
+  src/                   Internal runtime implementations (compiled into DLL)
 ```
 
 ### interface/ -- Contracts
@@ -239,16 +242,17 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 ## Project structure
 
 ```
-property-test/
+strata/
   CMakeLists.txt
   README.md
   strata/
     CMakeLists.txt
-    common.h              Uid, TypeUid<T>(), GetName<T>()
-    array_view.h          Lightweight constexpr span-like view
-    interface/            Abstract interfaces
-    ext/                  CRTP helpers
-    api/                  User-facing wrappers
+    include/              Public headers
+      common.h            Uid, TypeUid<T>(), GetName<T>()
+      array_view.h        Lightweight constexpr span-like view
+      interface/          Abstract interfaces
+      ext/                CRTP helpers
+      api/                User-facing wrappers
     src/                  Internal implementations
   test/
     CMakeLists.txt

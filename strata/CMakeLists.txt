@@ -9,8 +9,6 @@ if(MSVC)
     add_compile_options(/Zc:preprocessor)
 endif()
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 add_library(strata SHARED
     src/property.cpp
     src/property.h
@@ -19,34 +17,39 @@ add_library(strata SHARED
     src/function.cpp
     src/function.h
     src/strata_export.h
-    array_view.h
-    common.h
+    include/array_view.h
+    include/common.h
     src/metadata_container.cpp
     src/metadata_container.h
     src/strata_impl.cpp
     src/strata_impl.h
     src/strata.cpp
-    interface/intf_any.h
-    interface/intf_external_any.h
-    interface/intf_object.h
-    interface/intf_interface.h
-    interface/refcnt_ptr.h
-    interface/intf_function.h
-    interface/intf_event.h
-    interface/intf_property.h
-    interface/intf_object_factory.h
-    interface/intf_strata.h
-    interface/intf_metadata.h
-    interface/types.h
-    api/any.h
-    api/property.h
-    api/function.h
-    api/strata.h
-    ext/any.h
-    ext/core_object.h
-    ext/metadata.h
-    ext/object.h
-    ext/event.h
+    include/interface/intf_any.h
+    include/interface/intf_external_any.h
+    include/interface/intf_object.h
+    include/interface/intf_interface.h
+    include/interface/refcnt_ptr.h
+    include/interface/intf_function.h
+    include/interface/intf_event.h
+    include/interface/intf_property.h
+    include/interface/intf_object_factory.h
+    include/interface/intf_strata.h
+    include/interface/intf_metadata.h
+    include/interface/types.h
+    include/api/any.h
+    include/api/property.h
+    include/api/function.h
+    include/api/strata.h
+    include/ext/any.h
+    include/ext/core_object.h
+    include/ext/metadata.h
+    include/ext/object.h
+    include/ext/event.h
     )
+
+target_include_directories(strata
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
+)
 
 target_compile_definitions(strata PRIVATE STRATA_EXPORTS)
