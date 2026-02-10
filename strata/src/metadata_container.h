@@ -9,7 +9,7 @@
 
 namespace strata {
 
-class MetadataContainer final : public RefCountedDispatch<IMetadata>
+class MetadataContainer final : public InterfaceDispatch<IMetadata>
 {
 public:
     explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance);
