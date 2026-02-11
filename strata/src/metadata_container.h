@@ -3,7 +3,6 @@
 
 #include <ext/refcounted_dispatch.h>
 #include <interface/intf_metadata.h>
-#include <interface/intf_strata.h>
 #include <memory>
 #include <vector>
 
@@ -12,8 +11,7 @@ namespace strata {
 class MetadataContainer final : public InterfaceDispatch<IMetadata>
 {
 public:
-    explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance,
-        IInterface* owner = nullptr);
+    explicit MetadataContainer(array_view<MemberDesc> members, IInterface* owner = nullptr);
 
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
@@ -23,7 +21,6 @@ public: // IMetadata
 
 private:
     array_view<MemberDesc> members_;
-    const IStrata &instance_;
     IInterface* owner_{};
 
     // Static members: lazily populated as accessed. Each entry maps
@@ -39,6 +36,7 @@ private:
 
     // Helper: find static member by name+kind, lazily create if needed
     IInterface::Ptr find_or_create(std::string_view name, MemberKind kind) const;
+    IInterface::Ptr create(MemberDesc desc) const;
 };
 
 } // namespace strata

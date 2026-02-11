@@ -44,6 +44,26 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Central type system** -- register types, create instances by UID, query class info without instantiation
 - **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
 
+## Project structure
+
+```
+strata/
+  CMakeLists.txt
+  README.md
+  strata/
+    CMakeLists.txt
+    include/              Public headers
+      common.h            Uid, type_uid<T>(), get_name<T>()
+      array_view.h        Lightweight constexpr span-like view
+      interface/          Abstract interfaces
+      ext/                CRTP helpers
+      api/                User-facing wrappers
+    src/                  Internal implementations
+  test/
+    CMakeLists.txt
+    main.cpp              Feature demonstration
+```
+
 ## Building
 
 Requires CMake 3.5+ and a C++17 compiler. Tested with MSVC 2022.
@@ -321,11 +341,10 @@ An `Object<T, Interfaces...>` instance carries minimal per-object data. The meta
 |---|---|
 | vptr | 8 |
 | `members_` (`array_view`) | 16 |
-| `instance_` (reference) | 8 |
 | `owner_` (pointer to owning object) | 8 |
 | `instances_` (vector, initially empty) | 24 |
 | `dynamic_` (`unique_ptr`, initially null) | 8 |
-| **Total (baseline)** | **72 bytes** |
+| **Total (baseline)** | **64 bytes** |
 
 Each accessed member adds a **24-byte** entry to the `instances_` vector:
 * an 8-byte metadata index (`size_t`) plus 
@@ -339,9 +358,9 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 40 | 72 | 0 | **112 bytes** |
-| 3 members accessed | 40 | 72 | 3 × 24 = 72 | **184 bytes** |
-| All 6 members accessed | 40 | 72 | 6 × 24 = 144 | **256 bytes** |
+| No members accessed | 40 | 64 | 0 | **104 bytes** |
+| 3 members accessed | 40 | 64 | 3 × 24 = 72 | **176 bytes** |
+| All 6 members accessed | 40 | 64 | 6 × 24 = 144 | **248 bytes** |
 
 ## STRATA_INTERFACE reference
 
@@ -438,22 +457,3 @@ The string names passed to `PropertyDesc` / `get_property` (etc.) are used for r
 
 You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods or virtual methods, then write them yourself.
 
-## Project structure
-
-```
-strata/
-  CMakeLists.txt
-  README.md
-  strata/
-    CMakeLists.txt
-    include/              Public headers
-      common.h            Uid, type_uid<T>(), get_name<T>()
-      array_view.h        Lightweight constexpr span-like view
-      interface/          Abstract interfaces
-      ext/                CRTP helpers
-      api/                User-facing wrappers
-    src/                  Internal implementations
-  test/
-    CMakeLists.txt
-    main.cpp              Feature demonstration
-```

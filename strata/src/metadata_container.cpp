@@ -1,13 +1,30 @@
 #include "metadata_container.h"
+#include "event.h"
+#include "function.h"
+#include "property.h"
 
+#include <api/strata.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
 namespace strata {
 
-MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IStrata &instance,
-    IInterface* owner)
-    : members_(members), instance_(instance), owner_(owner)
+namespace {
+
+template<class T>
+IObject::Ptr make_shared_impl()
+{
+    IObject::Ptr obj(new T, [](IObject* p) { p->unref(); });
+    if (auto* s = obj->template get_interface<ISharedFromObject>()) {
+        s->set_self(obj);
+    }
+    return obj;
+}
+
+} // namespace
+
+MetadataContainer::MetadataContainer(array_view<MemberDesc> members, IInterface* owner)
+    : members_(members), owner_(owner)
 {}
 
 array_view<MemberDesc> MetadataContainer::get_static_metadata() const
@@ -15,44 +32,63 @@ array_view<MemberDesc> MetadataContainer::get_static_metadata() const
     return members_;
 }
 
+IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
+{
+    // instantiate directly to avoid factory lookups
+    IInterface::Ptr created;
+    switch (desc.kind) {
+    case MemberKind::Property: {
+        created = make_shared_impl<PropertyImpl>();
+        if (auto *pi = created->get_interface<IPropertyInternal>()) {
+            if (auto any = instance().create_any(desc.typeUid)) {
+                pi->set_any(any);
+            }
+        }
+        break;
+    }
+    case MemberKind::Event:
+        created = make_shared_impl<EventImpl>();
+        break;
+    case MemberKind::Function:
+        created = make_shared_impl<FunctionImpl>();
+        break;
+    }
+    return created;
+}
+
 IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberKind kind) const
 {
     for (size_t i = 0; i < members_.size(); ++i) {
         auto &member = members_[i];
         if (member.kind != kind || member.name != name) {
+            // Not a match
             continue;
         }
-
         // Check cache
         for (auto& [idx, ptr] : instances_) {
             if (idx == i) return ptr;
         }
-
         // Create and cache
-        IInterface::Ptr created;
-        switch (kind) {
-        case MemberKind::Property:
-            created = instance_.create_property(member.typeUid, {});
-            break;
-        case MemberKind::Event:
-            created = instance_.create<IEvent>(ClassId::Event);
-            break;
-        case MemberKind::Function:
-            created = instance_.create<IFunction>(ClassId::Function);
-            break;
-        }
-        if (created) {
+        if (auto created = create(member)) {
+            // Wire virtual dispatch: if the interface declared a fn_Name()
+            // virtual (via STRATA_INTERFACE), bind the FunctionImpl so that
+            // invoke() routes through the static trampoline to the virtual
+            // method on the owning object's interface subobject.
             if (kind == MemberKind::Function && member.fnTrampoline && owner_) {
                 if (auto* fi = interface_cast<IFunctionInternal>(created)) {
+                    // Resolve the interface pointer that declared this function.
+                    // This is the 'self' the trampoline will static_cast back to
+                    // the concrete interface type (e.g. IMyWidget*).
                     void* intf_ptr = owner_->get_interface(member.interfaceInfo->uid);
                     if (intf_ptr) {
                         fi->bind(intf_ptr, member.fnTrampoline);
                     }
                 }
             }
+            // Add to metadata
             instances_.emplace_back(i, created);
+            return created;
         }
-        return created;
     }
     return {};
 }
