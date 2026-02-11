@@ -88,6 +88,12 @@ class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
         }
         return ReturnValue::SUCCESS;
     }
+
+    ReturnValue fn_serialize(const IAny *) override
+    {
+        std::cout << "  MyWidget::fn_serialize called!" << std::endl;
+        return ReturnValue::SUCCESS;
+    }
 };
 
 int main()

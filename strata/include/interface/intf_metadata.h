@@ -215,7 +215,7 @@ public:
 #define _STRATA_TRAMPOLINE_PROP(Type, Name)
 #define _STRATA_TRAMPOLINE_EVT(Name)
 #define _STRATA_TRAMPOLINE_FN(Name) \
-    virtual ::strata::ReturnValue fn_##Name(const ::strata::IAny*) { return ::strata::ReturnValue::NOTHING_TO_DO; } \
+    virtual ::strata::ReturnValue fn_##Name(const ::strata::IAny*) = 0; \
     static ::strata::ReturnValue _strata_trampoline_##Name(void* self, const ::strata::IAny* args) { \
         return static_cast<_strata_intf_type*>(self)->fn_##Name(args); \
     }
