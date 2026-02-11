@@ -2,7 +2,6 @@
 #define INTF_OBJECT_H
 
 #include <common.h>
-#include <interface/intf_function.h>
 #include <interface/intf_interface.h>
 
 namespace strata {

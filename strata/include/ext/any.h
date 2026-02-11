@@ -11,18 +11,38 @@
 namespace strata {
 
 /**
- * @brief Base class for IAny implementations built on the Object system.
+ * @brief Base class for IAny implementations.
+ *
+ * Inherits RefCountedDispatch directly with IObject (no ISharedFromObject or self-pointer).
+ *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template<class FinalClass, class... Interfaces>
-class BaseAny : public CoreObject<FinalClass, IAny, Interfaces...>
+class BaseAny : public RefCountedDispatch<IAny, Interfaces...>
 {
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr const std::string_view get_class_name() { return get_name<FinalClass>(); }
+    static constexpr std::string_view get_class_name() { return get_name<FinalClass>(); }
     /** @brief Returns a default UID (overridden by typed subclasses). */
     static constexpr Uid get_class_uid() { return {}; }
+
+    /** @brief Returns the singleton factory for creating instances of FinalClass. */
+    static const IObjectFactory &get_factory()
+    {
+        static Factory factory_;
+        return factory_;
+    }
+
+private:
+    class Factory : public ObjectFactory<FinalClass>
+    {
+        const ClassInfo &get_class_info() const override
+        {
+            static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
+            return info;
+        }
+    };
 };
 
 /**

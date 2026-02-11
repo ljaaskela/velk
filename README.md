@@ -26,7 +26,8 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [src/ -- Internal implementations](#src----internal-implementations)
 - [Key types](#key-types)
 - [Object memory layout](#object-memory-layout)
-  - [Per-object data](#per-object-data)
+  - [Per-object data (CoreObject / Object)](#per-object-data-coreobject--object)
+  - [Per-object data (BaseAny)](#per-object-data-baseany)
   - [MetadataContainer](#metadatacontainer-heap-allocated-one-per-object)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
 - [STRATA_INTERFACE reference](#strata_interface-reference)
@@ -324,7 +325,7 @@ strata/
 
 An `Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
-### Per-object data
+### Per-object data (CoreObject / Object)
 
 | Layer | Member | Size (x64) |
 |---|---|---|
@@ -334,6 +335,24 @@ An `Object<T, Interfaces...>` instance carries minimal per-object data. The meta
 | CoreObject | `self_` (`weak_ptr`) | 16 |
 | Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
 | **Total** | | **40 bytes** |
+
+### Per-object data (BaseAny)
+
+`BaseAny` types inherit `RefCountedDispatch<IAny>` directly — `IAny` inherits `IObject` (for factory compatibility) but skips `ISharedFromObject` and the `self_` weak pointer. The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. CoreObject.
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| InterfaceDispatch | vptr | 8 |
+| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| RefCountedDispatch | flags (`int32_t`) | 4 |
+| **BaseAny total** | | **16 bytes** |
+
+Measured sizes (MSVC x64):
+
+| Type | Size |
+|---|---|
+| `SimpleAny<float>` | 32 bytes |
+| `MyDataAny` (with `IExternalAny`) | 48 bytes |
 
 ### MetadataContainer (heap-allocated, one per object)
 

@@ -85,11 +85,12 @@ protected:
  * @endcode
  *
  * @tparam T The derived interface type (CRTP parameter).
+ * @tparam Base The parent interface to inherit from (default: IInterface).
  * @tparam UidHi High 64 bits of a user-specified UID (0 = auto-generate from type name).
  * @tparam UidLo Low 64 bits of a user-specified UID (0 = auto-generate from type name).
  */
-template<typename T, uint64_t UidHi = 0, uint64_t UidLo = 0>
-class Interface : public IInterface
+template<typename T, typename Base = IInterface, uint64_t UidHi = 0, uint64_t UidLo = 0>
+class Interface : public Base
 {
     static constexpr Uid compute_uid()
     {

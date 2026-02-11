@@ -2,8 +2,7 @@
 #define INTF_ANY_H
 
 #include <common.h>
-//#include <interface/intf_event.h>
-#include <interface/intf_interface.h>
+#include <interface/intf_object.h>
 #include <interface/types.h>
 
 namespace strata {
@@ -11,9 +10,12 @@ namespace strata {
 /**
  * @brief Type-erased value container interface.
  *
+ * Inherits IObject so that Any types are factory-compatible without
+ * needing the full CoreObject machinery (ISharedFromObject, self-pointer).
+ *
  * Supports querying compatible types, and getting/setting data by type UID.
  */
-class IAny : public Interface<IAny>
+class IAny : public Interface<IAny, IObject>
 {
 public:
     /**
