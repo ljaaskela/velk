@@ -93,6 +93,59 @@ public:
     virtual void set_metadata_container(IMetadata *metadata) = 0;
 };
 
+/**
+ * @brief Invoke a function from target object metadata.
+ * @param o The object to query for the function.
+ * @param name Name of the function to query.
+ * @param args Function arguments.
+ */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface *o,
+                                                    std::string_view name,
+                                                    const IAny *args = nullptr)
+{
+    auto meta = interface_cast<IMetadata>(o);
+    return meta ? invoke_function(meta->get_function(name), args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @copydoc invoke_function */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface::Ptr &o,
+                                                    std::string_view name,
+                                                    const IAny *args = nullptr)
+{
+    return invoke_function(o.get(), name, args);
+}
+
+/** @copydoc invoke_function */
+[[maybe_unused]] static ReturnValue invoke_function(const IInterface::ConstPtr &o,
+                                                    std::string_view name,
+                                                    const IAny *args = nullptr)
+{
+    return invoke_function(o.get(), name, args);
+}
+
+/**
+ * @brief Invoke a event from target object metadata.
+ * @param o The object to query for the event.
+ * @param name Name of the event to query.
+ * @param args Event arguments.
+ */
+[[maybe_unused]] static ReturnValue invoke_event(const IInterface::Ptr &o,
+                                                 std::string_view name,
+                                                 const IAny *args = nullptr)
+{
+    auto meta = interface_cast<IMetadata>(o);
+    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @copydoc invoke_event */
+[[maybe_unused]] static ReturnValue invoke_event(const IInterface::ConstPtr &o,
+                                                 std::string_view name,
+                                                 const IAny *args = nullptr)
+{
+    auto meta = interface_cast<IMetadata>(o);
+    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
+}
+
 } // namespace strata
 
 // --- Preprocessor FOR_EACH machinery ---

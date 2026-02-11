@@ -77,8 +77,15 @@ public:
 
 class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset(const IAny*) override {
-        std::cout << "  MyWidget::fn_reset called!" << std::endl;
+    ReturnValue fn_reset(const IAny *args) override
+    {
+        AnyT<int> value(args);
+        if (value) {
+            std::cout << "  MyWidget::fn_reset called with value " << value.get_value()
+                      << std::endl;
+        } else {
+            std::cout << "  MyWidget::fn_reset called!" << std::endl;
+        }
         return ReturnValue::SUCCESS;
     }
 };
@@ -186,7 +193,10 @@ int main()
         std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
 
         std::cout << "  Invoking reset()..." << std::endl;
-        invoke_function(iw->reset());
+
+        invoke_function(iw->reset()); // Invoke by interface accessor
+        invoke_function(iw, "reset"); // Invoke by name
+        invoke_function(iw, "reset", AnyT<int>(42));
     }
 
     // --- Uid from string ---

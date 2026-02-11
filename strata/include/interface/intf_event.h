@@ -34,6 +34,12 @@ public:
  * @param event Event to invoke
  * @param args Arguments for invocation
  */
+[[maybe_unused]] static ReturnValue invoke_event(const IEvent::Ptr &event, const IAny *args)
+{
+    return event ? event->get_invocable()->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+}
+
+/** @copydoc invoke_event */
 [[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *args)
 {
     return event ? event->get_invocable()->invoke(args) : ReturnValue::INVALID_ARGUMENT;

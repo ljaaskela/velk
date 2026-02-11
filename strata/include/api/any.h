@@ -85,6 +85,13 @@ public:
     constexpr AnyT(const IAny::ConstPtr &any) noexcept { set_any(any, TYPE_UID); }
     /** @brief Wraps a const IAny reference. */
     constexpr AnyT(const IAny &any) noexcept { set_any(any, TYPE_UID); }
+    /** @brief Wraps an existing const IAny pointer. */
+    constexpr AnyT(const IAny *any) noexcept
+    {
+        if (any) {
+            set_any(*any, TYPE_UID);
+        }
+    }
     /** @brief Move-constructs from an IAny rvalue. */
     constexpr AnyT(IAny &&any) noexcept
     {
