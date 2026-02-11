@@ -16,6 +16,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Register and create](#register-and-create)
   - [Use typed accessors](#use-typed-accessors)
   - [Query metadata](#query-metadata)
+  - [Virtual function dispatch](#virtual-function-dispatch)
   - [Properties with change notifications](#properties-with-change-notifications)
   - [Custom Any types](#custom-any-types)
 - [Architecture](#architecture)
@@ -36,6 +37,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 
 - **Interface-based architecture** -- define abstract interfaces with properties, events, and functions
 - **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
+- **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
 - **Events** -- observable multi-handler events
 - **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
 - **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
@@ -77,13 +79,18 @@ public:
 
 ### Implement with Object
 
-`Object` automatically collects metadata from all listed interfaces and provides the `IMetadata` implementation. No boilerplate needed.
+`Object` automatically collects metadata from all listed interfaces and provides the `IMetadata` implementation. Override `fn_<Name>` to provide function logic.
 
 ```cpp
 #include <ext/object.h>
 
 class MyWidget : public Object<MyWidget, IMyWidget>
-{};
+{
+    ReturnValue fn_reset(const IAny*) override {
+        // implementation with access to 'this'
+        return ReturnValue::SUCCESS;
+    }
+};
 ```
 
 Multiple interfaces are supported:
@@ -99,7 +106,10 @@ public:
 };
 
 class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
-{};
+{
+    ReturnValue fn_reset(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
+    ReturnValue fn_serialize(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
+};
 ```
 
 ### Register and create
@@ -122,6 +132,37 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
     IFunction::Ptr reset = iw->reset();
 }
 ```
+
+### Virtual function dispatch
+
+`(FN, Name)` in `STRATA_INTERFACE` generates a virtual method `fn_Name(const IAny*)` on the interface. Implementing classes override this virtual to provide logic. The override is automatically wired so that calling `invoke()` on the runtime `IFunction` routes to the virtual method.
+
+```cpp
+class IMyWidget : public Interface<IMyWidget>
+{
+public:
+    STRATA_INTERFACE(
+        (PROP, float, width),
+        (FN, reset)          // generates: virtual fn_reset(const IAny*)
+    )
+};
+
+class MyWidget : public Object<MyWidget, IMyWidget>
+{
+    ReturnValue fn_reset(const IAny*) override {
+        std::cout << "reset!" << std::endl;
+        return ReturnValue::SUCCESS;
+    }
+};
+
+// Calling invoke() routes to fn_reset()
+auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+if (auto* iw = interface_cast<IMyWidget>(widget)) {
+    invoke_function(iw->reset());  // prints "reset!"
+}
+```
+
+If a class doesn't override `fn_Name`, the default returns `NOTHING_TO_DO`. An explicit `set_invoke_callback()` takes priority over the virtual.
 
 ### Query metadata
 
@@ -281,9 +322,10 @@ An `Object<T, Interfaces...>` instance carries minimal per-object data. The meta
 | vptr | 8 |
 | `members_` (`array_view`) | 16 |
 | `instance_` (reference) | 8 |
+| `owner_` (pointer to owning object) | 8 |
 | `instances_` (vector, initially empty) | 24 |
 | `dynamic_` (`unique_ptr`, initially null) | 8 |
-| **Total (baseline)** | **64 bytes** |
+| **Total (baseline)** | **72 bytes** |
 
 Each accessed member adds a **24-byte** entry to the `instances_` vector:
 * an 8-byte metadata index (`size_t`) plus 
@@ -297,9 +339,9 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 40 | 64 | 0 | **104 bytes** |
-| 3 members accessed | 40 | 64 | 3 × 24 = 72 | **176 bytes** |
-| All 6 members accessed | 40 | 64 | 6 × 24 = 144 | **248 bytes** |
+| No members accessed | 40 | 72 | 0 | **112 bytes** |
+| 3 members accessed | 40 | 72 | 3 × 24 = 72 | **184 bytes** |
+| All 6 members accessed | 40 | 72 | 6 × 24 = 144 | **256 bytes** |
 
 ## STRATA_INTERFACE reference
 
@@ -307,31 +349,40 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 STRATA_INTERFACE(
     (PROP, Type, Name),   // generates PropertyT<Type> Name() const
     (EVT, Name),          // generates IEvent::Ptr Name() const
-    (FN, Name)            // generates IFunction::Ptr Name() const
+    (FN, Name)            // generates virtual fn_Name(const IAny*),
+                          //          IFunction::Ptr Name() const
 )
+```
 
-// A practical example of an interface which defines 3 members in its static metadata:
+For each `(FN, Name)` entry the macro generates:
+1. A `virtual ReturnValue fn_Name(const IAny*)` method (default returns `NOTHING_TO_DO`)
+2. A static trampoline that routes `IFunction::invoke()` to `fn_Name()`
+3. A `MemberDesc` with the trampoline pointer in the metadata array
+4. An accessor `IFunction::Ptr Name() const`
 
+A practical example:
+
+```cpp
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
         (PROP, float, width),
         (EVT, on_clicked),
-        (FN, reset)
+        (FN, reset)         // virtual fn_reset + accessor reset()
     )
 };
-
 ```
 
 Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Members track which interface declared them via `InterfaceInfo`.
 
 ### Manual metadata and accessors
 
-This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write the metadata array and accessor methods by hand. The macro generates two things:
+This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write the virtual methods, metadata array, and accessor methods by hand. The macro generates three things:
 
-1. A `static constexpr std::array metadata` containing `MemberDesc` entries.
-2. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+1. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
+2. A `static constexpr std::array metadata` containing `MemberDesc` entries (with trampoline pointers for `FN` members).
+3. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
 
 Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface above:
 
@@ -339,17 +390,28 @@ Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface ab
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    // 1. Static metadata array
+    // 1. Virtual method and trampoline for FN members
+    //    The virtual provides the override point for implementing classes.
+    //    The static trampoline casts the void* context back to the interface
+    //    type and calls the virtual. _strata_intf_type is a protected alias
+    //    for T provided by Interface<T>.
+    virtual ReturnValue fn_reset(const IAny*) { return ReturnValue::NOTHING_TO_DO; }
+    static ReturnValue _strata_trampoline_reset(void* self, const IAny* args) {
+        return static_cast<_strata_intf_type*>(self)->fn_reset(args);
+    }
+
+    // 2. Static metadata array
     //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
     //    Pass &INFO so each member knows which interface declared it.
     //    INFO is provided by Interface<IMyWidget> automatically.
+    //    FunctionDesc accepts an optional trampoline pointer as the third argument.
     static constexpr std::array metadata = {
         PropertyDesc<float>("width", &INFO),
         EventDesc("on_clicked", &INFO),
-        FunctionDesc("reset", &INFO),
+        FunctionDesc("reset", &INFO, &_strata_trampoline_reset),
     };
 
-    // 2. Typed accessor methods
+    // 3. Typed accessor methods
     //    Each accessor queries IMetadata on the concrete object (via get_interface)
     //    and returns the runtime property/event/function by name.
     //    The free functions get_property(), get_event(), get_function() handle
@@ -374,7 +436,7 @@ public:
 
 The string names passed to `PropertyDesc` / `get_property` (etc.) are used for runtime lookup, so they must match exactly. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
 
-You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods, then write the accessors yourself.
+You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods or virtual methods, then write them yourself.
 
 ## Project structure
 

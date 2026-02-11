@@ -1,11 +1,13 @@
 #include "metadata_container.h"
 
+#include <interface/intf_function.h>
 #include <interface/types.h>
 
 namespace strata {
 
-MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IStrata &instance)
-    : members_(members), instance_(instance)
+MetadataContainer::MetadataContainer(array_view<MemberDesc> members, const IStrata &instance,
+    IInterface* owner)
+    : members_(members), instance_(instance), owner_(owner)
 {}
 
 array_view<MemberDesc> MetadataContainer::get_static_metadata() const
@@ -40,6 +42,14 @@ IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberK
             break;
         }
         if (created) {
+            if (kind == MemberKind::Function && member.fnTrampoline && owner_) {
+                if (auto* fi = interface_cast<IFunctionInternal>(created)) {
+                    void* intf_ptr = owner_->get_interface(member.interfaceInfo->uid);
+                    if (intf_ptr) {
+                        fi->bind(intf_ptr, member.fnTrampoline);
+                    }
+                }
+            }
             instances_.emplace_back(i, created);
         }
         return created;

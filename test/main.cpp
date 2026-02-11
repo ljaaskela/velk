@@ -77,6 +77,10 @@ public:
 
 class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 {
+    ReturnValue fn_reset(const IAny*) override {
+        std::cout << "  MyWidget::fn_reset called!" << std::endl;
+        return ReturnValue::SUCCESS;
+    }
 };
 
 int main()
@@ -180,6 +184,9 @@ int main()
         std::cout << "  height() ok: " << (iw->height() ? "yes" : "no") << std::endl;
         std::cout << "  on_clicked() ok: " << (iw->on_clicked() ? "yes" : "no") << std::endl;
         std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
+
+        std::cout << "  Invoking reset()..." << std::endl;
+        invoke_function(iw->reset());
     }
 
     // --- Uid from string ---

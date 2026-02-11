@@ -118,6 +118,8 @@ public:
     using IInterface::get_interface;
 
 protected:
+    /** @brief Alias for the derived interface type, used by STRATA_INTERFACE trampoline macros. */
+    using _strata_intf_type = T;
     Interface() = default;
     ~Interface() override = default;
 };

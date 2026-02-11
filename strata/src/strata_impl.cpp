@@ -58,7 +58,7 @@ IInterface::Ptr StrataImpl::create(Uid uid) const
             if (!info.members.empty()) {
                 if (auto *meta = interface_cast<IMetadataContainer>(object)) {
                     // Object takes ownership
-                    meta->set_metadata_container(new MetadataContainer(info.members, *this));
+                    meta->set_metadata_container(new MetadataContainer(info.members, *this, object.get()));
                 }
             }
             return object;

@@ -36,10 +36,7 @@ public:
  */
 [[maybe_unused]] static ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *args)
 {
-    if (event) {
-        return event->get_invocable()->invoke(args);
-    }
-    return ReturnValue::INVALID_ARGUMENT;
+    return event ? event->get_invocable()->invoke(args) : ReturnValue::INVALID_ARGUMENT;
 }
 
 } // namespace strata

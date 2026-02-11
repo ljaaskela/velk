@@ -16,12 +16,16 @@ namespace strata {
 /** @brief Discriminator for the kind of member described by a MemberDesc. */
 enum class MemberKind : uint8_t { Property, Event, Function };
 
+/** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
+using FnTrampoline = ReturnValue(*)(void* self, const IAny* args);
+
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
 struct MemberDesc {
     std::string_view name;
     MemberKind kind;
     Uid typeUid;                        // only meaningful for Property
     const InterfaceInfo* interfaceInfo; // interface where this member was declared
+    FnTrampoline fnTrampoline{};        // non-null for FN members with trampolines
 };
 
 /** @brief Creates a Property MemberDesc for type T. */
@@ -38,9 +42,10 @@ constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info 
 }
 
 /** @brief Creates a Function MemberDesc. */
-constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr)
+constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr,
+    FnTrampoline trampoline = nullptr)
 {
-    return {name, MemberKind::Function, {}, info};
+    return {name, MemberKind::Function, {}, info, trampoline};
 }
 
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
@@ -149,8 +154,19 @@ public:
 
 #define _STRATA_META_PROP(Type, Name) ::strata::PropertyDesc<Type>(#Name, &INFO),
 #define _STRATA_META_EVT(Name)        ::strata::EventDesc(#Name, &INFO),
-#define _STRATA_META_FN(Name)         ::strata::FunctionDesc(#Name, &INFO),
+#define _STRATA_META_FN(Name)         ::strata::FunctionDesc(#Name, &INFO, &_strata_trampoline_##Name),
 #define _STRATA_META(Tag, ...)        _STRATA_EXPAND(_STRATA_CAT(_STRATA_META_, Tag)(__VA_ARGS__))
+
+// --- Trampoline dispatch: tag -> virtual method + static trampoline for FN, no-op for PROP/EVT ---
+
+#define _STRATA_TRAMPOLINE_PROP(Type, Name)
+#define _STRATA_TRAMPOLINE_EVT(Name)
+#define _STRATA_TRAMPOLINE_FN(Name) \
+    virtual ::strata::ReturnValue fn_##Name(const ::strata::IAny*) { return ::strata::ReturnValue::NOTHING_TO_DO; } \
+    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, const ::strata::IAny* args) { \
+        return static_cast<_strata_intf_type*>(self)->fn_##Name(args); \
+    }
+#define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
 /** @brief Generates a static constexpr metadata array from STRATA_P/STRATA_E/STRATA_F entries. */
 #define STRATA_METADATA(...) \
@@ -176,8 +192,8 @@ public:
 #define _STRATA_ACC(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_ACC_, Tag)(__VA_ARGS__))
 
 /**
- * @brief Declares interface members: generates both a static constexpr metadata
- *        array and typed accessor methods from a list of member descriptors.
+ * @brief Declares interface members: generates virtual methods for functions,
+ *        a static constexpr metadata array, and typed accessor methods.
  *
  * Place this macro in the @c public section of an interface class that inherits
  * from @c Interface<T>. Each argument is a parenthesized tuple describing one
@@ -191,8 +207,14 @@ public:
  *
  * @par What the macro generates
  * For each member entry the macro produces:
+ * -# For @c FN members only: a @c virtual method <tt>fn_Name(const IAny*)</tt>
+ *    with a default implementation returning @c NOTHING_TO_DO, plus a static
+ *    trampoline function that routes @c IFunction::invoke() calls to the
+ *    virtual method. Implementing classes can @c override the virtual to
+ *    provide function logic.
  * -# A @c MemberDesc initializer in a @c static @c constexpr @c std::array
  *    named @c metadata, used for compile-time and runtime introspection.
+ *    For @c FN members the descriptor includes a pointer to the trampoline.
  * -# A non-virtual @c const accessor method on the interface:
  *    - @c PROP &rarr; <tt>PropertyT\<Type\> Name() const</tt>
  *    - @c EVT  &rarr; <tt>IEvent::Ptr Name() const</tt>
@@ -211,25 +233,40 @@ public:
  *         (PROP, float, width),
  *         (PROP, float, height),
  *         (EVT, on_clicked),
- *         (FN, reset)
+ *         (FN, reset)          // generates: virtual fn_reset(const IAny*)
  *     )
  * };
  * @endcode
  *
- * @par Example: implementing the interface
- * Concrete classes inherit from @c Object, which automatically collects
- * metadata from all listed interfaces and provides the @c IMetadata
- * implementation. No additional code is needed in the concrete class.
+ * @par Example: implementing the interface with a function override
+ * Concrete classes inherit from @c Object and can override @c fn_Name
+ * to provide function logic. The override is automatically wired so that
+ * calling @c IFunction::invoke() on the metadata function routes to the
+ * virtual method.
  * @code
- * class MyWidget : public Object<MyWidget, IMyWidget> {};
+ * class MyWidget : public Object<MyWidget, IMyWidget>
+ * {
+ *     ReturnValue fn_reset(const IAny* args) override {
+ *         // implementation with access to 'this'
+ *         return ReturnValue::SUCCESS;
+ *     }
+ * };
+ * @endcode
+ *
+ * @par Example: invoking a function
+ * @code
+ * auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+ * if (auto* iw = interface_cast<IMyWidget>(widget)) {
+ *     invoke_function(iw->reset());  // calls MyWidget::fn_reset
+ * }
  * @endcode
  *
  * @par Example: using accessors on an instance
  * @code
  * auto widget = instance().create<IObject>(MyWidget::get_class_uid());
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
- *     iw->width().Set(42.f);
- *     float w = iw->width().Get();   // 42.f
+ *     iw->width().set_value(42.f);
+ *     float w = iw->width().get_value();   // 42.f
  *     IEvent::Ptr clicked = iw->on_clicked();
  *     IFunction::Ptr reset = iw->reset();
  * }
@@ -244,13 +281,20 @@ public:
  * }
  * @endcode
  *
+ * @par Invoke priority
+ * When @c IFunction::invoke() is called, the runtime checks in order:
+ * -# An explicit callback set via @c set_invoke_callback() (highest priority).
+ * -# A bound trampoline from a @c fn_Name override (automatic wiring).
+ * -# Returns @c NOTHING_TO_DO if neither is set.
+ *
  * @note Up to 32 members are supported per interface.
  *
- * @see STRATA_METADATA For generating only the metadata array without accessors.
+ * @see STRATA_METADATA For generating only the metadata array without accessors or virtuals.
  * @see Object       For the CRTP base that collects metadata from interfaces.
  * @see IMetadata     For the runtime metadata query interface.
  */
 #define STRATA_INTERFACE(...) \
+    _STRATA_FOR_EACH(_STRATA_TRAMPOLINE, __VA_ARGS__) \
     STRATA_METADATA(__VA_ARGS__) \
     _STRATA_FOR_EACH(_STRATA_ACC, __VA_ARGS__)
 

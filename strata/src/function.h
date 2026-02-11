@@ -15,9 +15,12 @@ public:
     FunctionImpl() = default;
     ReturnValue invoke(const IAny *args) const override;
     void set_invoke_callback(IFunction::CallableFn *fn) override;
+    void bind(void* context, IFunctionInternal::BoundFn* fn) override;
 
 private:
     IFunction::CallableFn *fn_{};
+    void* bound_context_{};
+    IFunctionInternal::BoundFn* bound_fn_{};
 };
 
 } // namespace strata

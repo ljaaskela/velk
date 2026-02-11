@@ -12,7 +12,8 @@ namespace strata {
 class MetadataContainer final : public InterfaceDispatch<IMetadata>
 {
 public:
-    explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance);
+    explicit MetadataContainer(array_view<MemberDesc> members, const IStrata &instance,
+        IInterface* owner = nullptr);
 
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
@@ -23,6 +24,7 @@ public: // IMetadata
 private:
     array_view<MemberDesc> members_;
     const IStrata &instance_;
+    IInterface* owner_{};
 
     // Static members: lazily populated as accessed. Each entry maps
     // a metadata index to its runtime instance.
