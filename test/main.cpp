@@ -79,7 +79,7 @@ class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
 {
     ReturnValue fn_reset(const IAny *args) override
     {
-        AnyT<int> value(args);
+        AnyT<const int> value(args);
         if (value) {
             std::cout << "  MyWidget::fn_reset called with value " << value.get_value()
                       << std::endl;

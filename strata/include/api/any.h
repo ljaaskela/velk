@@ -70,22 +70,32 @@ template<class T>
 class AnyT final : public Any
 {
     static constexpr bool IsReadWrite = !std::is_const_v<T>;
+    static constexpr bool IsReadOnly = !IsReadWrite;
     static constexpr auto TYPE_SIZE = sizeof(T);
 
 public:
     static constexpr Uid TYPE_UID = type_uid<std::remove_const_t<T>>();
 
-    /** @brief Wraps an existing mutable IAny pointer (read-write only). */
+    /** @brief Wraps an existing mutable IAny pointer (read-write). */
     template<class Flag = std::enable_if_t<IsReadWrite>>
     constexpr AnyT(const IAny::Ptr &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
-    /** @brief Wraps an existing const IAny pointer. */
-    constexpr AnyT(const IAny::ConstPtr &any) noexcept { set_any(any, TYPE_UID); }
-    /** @brief Wraps a const IAny reference. */
-    constexpr AnyT(const IAny &any) noexcept { set_any(any, TYPE_UID); }
-    /** @brief Wraps an existing const IAny pointer. */
+    /** @brief Wraps an existing const IAny pointer (read-only). */
+    template<class Flag = std::enable_if_t<IsReadOnly>>
+    constexpr AnyT(const IAny::ConstPtr &any) noexcept
+    {
+        set_any(any, TYPE_UID);
+    }
+    /** @brief Wraps a const IAny reference (read-only). */
+    template<class Flag = std::enable_if_t<IsReadOnly>>
+    constexpr AnyT(const IAny &any) noexcept
+    {
+        set_any(any, TYPE_UID);
+    }
+    /** @brief Wraps an existing const IAny pointer (read-only). */
+    template<class Flag = std::enable_if_t<IsReadOnly>>
     constexpr AnyT(const IAny *any) noexcept
     {
         if (any) {
@@ -123,7 +133,8 @@ public:
         }
         return value;
     }
-    /** @brief Overwrites the stored value with @p value. */
+    /** @brief Overwrites the stored value with @p value (read-write only). */
+    template<class Flag = std::enable_if_t<IsReadWrite>>
     void set_value(const T &value) noexcept
     {
         if (any_) {
