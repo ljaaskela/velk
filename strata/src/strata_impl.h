@@ -21,6 +21,8 @@ public:
     const ClassInfo* get_class_info(Uid classUid) const override;
     IAny::Ptr create_any(Uid type) const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const override;
+    void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
+    void update() const override;
 
 private:
     struct Entry {
@@ -28,8 +30,10 @@ private:
         const IObjectFactory *factory;
         bool operator<(const Entry& o) const { return uid < o.uid; }
     };
+
     const IObjectFactory* find(Uid uid) const;
     std::vector<Entry> types_;
+    mutable std::vector<DeferredTask> deferred_queue_;
 };
 
 } // namespace strata

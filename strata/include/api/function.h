@@ -29,10 +29,13 @@ public:
     operator IFunction::Ptr() { return fn_; }
     operator const IFunction::ConstPtr() const { return fn_; }
 
-    /** @brief Invokes the function with no arguments. */
-    ReturnValue invoke() const { return invoke({}); }
-    /** @brief Invokes the function with the given @p args. */
-    ReturnValue invoke(const IAny *args) const { return fn_->invoke(args); }
+    /** @brief Invokes the function with no arguments.
+     *  @param type Immediate executes now; Deferred queues for the next update() call. */
+    ReturnValue invoke(InvokeType type = Immediate) const { return fn_->invoke(nullptr, type); }
+    /** @brief Invokes the function with the given @p args.
+     *  @param args Arguments for invocation.
+     *  @param type Immediate executes now; Deferred queues for the next update() call. */
+    ReturnValue invoke(const IAny *args, InvokeType type = Immediate) const { return fn_->invoke(args, type); }
 
 private:
     IFunction::Ptr fn_;

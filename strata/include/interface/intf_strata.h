@@ -34,6 +34,21 @@ public:
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
     virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const = 0;
+    /** @brief Deferred task */
+    struct DeferredTask
+    {
+        /** @brief The function to invoke. */
+        IFunction::ConstPtr fn;
+        /** @brief Function args. Typically should be cloned from any source args. */
+        IAny::Ptr args;
+    };
+    /**
+     * @brief Enqueues tasks to be executed on the next update() call.
+     * @param tasks The tasks to invoke.
+     */
+    virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
+    /** @brief Executes all queued deferred tasks. */
+    virtual void update() const = 0;
     /**
      * @brief Creates a property for type T with an optional initial value.
      * @tparam T The value type for the property.

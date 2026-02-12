@@ -27,6 +27,13 @@ public:
     /** @brief Returns a default UID (overridden by typed subclasses). */
     static constexpr Uid get_class_uid() { return {}; }
 
+    /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */
+    IAny::Ptr clone() const override
+    {
+        auto clone = FinalClass::get_factory().template create_instance<IAny>();
+        return clone && succeeded(clone->copy_from(*this)) ? clone : nullptr;
+    }
+
     /** @brief Returns the singleton factory for creating instances of FinalClass. */
     static const IObjectFactory &get_factory()
     {
