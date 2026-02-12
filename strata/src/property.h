@@ -22,11 +22,13 @@ protected: // IProperty
 
 protected: // IPropertyInternal
     bool set_any(const IAny::Ptr &value) override;
-    IAny::Ptr get_any() const override;
+    IAny::ConstPtr get_any() const override;
+    ReturnValue set_data(const void *data, size_t size, Uid type) override;
 
 private:
     IAny::Ptr data_;
     LazyEvent onChanged_;
+    bool external_{};  ///< True if data_ implements IExternalAny (on_data_changed fires on_changed automatically).
 };
 
 } // namespace strata

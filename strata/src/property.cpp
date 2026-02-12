@@ -5,14 +5,14 @@ namespace strata {
 
 ReturnValue PropertyImpl::set_value(const IAny &from)
 {
-    auto ret = ReturnValue::FAIL;
     if (data_) {
-        ret = data_->copy_from(from);
-        if (ret == ReturnValue::SUCCESS) {
+        auto ret = data_->copy_from(from);
+        if (ret == ReturnValue::SUCCESS && !external_) {
             return invoke_event(on_changed(), data_.get());
         }
+        return ret;
     }
-    return ret;
+    return ReturnValue::FAIL;
 }
 const IAny::ConstPtr PropertyImpl::get_value() const
 {
@@ -25,16 +25,30 @@ bool PropertyImpl::set_any(const IAny::Ptr &value)
         return false;
     }
     data_ = value;
-    if (auto external = interface_cast<IExternalAny>(data_)) {
-        // If the any type can be edited externally, connect any's on_data_changed to
-        // our on_changed
+    auto external = interface_cast<IExternalAny>(data_);
+    external_ = external != nullptr;
+    if (external) {
+        // External any fires on_data_changed when its data changes, so connect it to
+        // our on_changed. PropertyImpl skips its own explicit fire for external anys.
         external->on_data_changed()->add_handler(on_changed());
     }
     return succeeded(invoke_event(on_changed(), data_.get()));
 }
-IAny::Ptr PropertyImpl::get_any() const
+IAny::ConstPtr PropertyImpl::get_any() const
 {
     return data_;
+}
+ReturnValue PropertyImpl::set_data(const void *data, size_t size, Uid type)
+{
+    auto ret = ReturnValue::FAIL;
+    if (data_) {
+        ret = data_->set_data(data, size, type);
+        if (ret == ReturnValue::SUCCESS && !external_) {
+            // Ignore return value since data was successfully set
+            invoke_event(on_changed(), data_.get());
+        }
+    }
+    return ret;
 }
 
 } // namespace strata

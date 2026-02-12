@@ -1,6 +1,7 @@
 #ifndef INTF_ANY_H
 #define INTF_ANY_H
 
+#include <array_view.h>
 #include <common.h>
 #include <interface/intf_object.h>
 #include <interface/types.h>
@@ -21,7 +22,7 @@ public:
     /**
      * @brief Returns a list of types this IAny is compatible with.
      */
-    virtual const std::vector<Uid> &get_compatible_types() const = 0;
+    virtual array_view<Uid> get_compatible_types() const = 0;
     /**
      * @brief Returns the size of data contained within the any
      * @param type The type whose data size to query. Must be one of the values returned by get_compatible_types.
