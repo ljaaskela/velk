@@ -9,6 +9,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 ## Table of contents
 
 - [Features](#features)
+- [Project structure](#project-structure)
 - [Building](#building)
 - [Quick start](#quick-start)
   - [Define an interface](#define-an-interface)
@@ -19,7 +20,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Virtual function dispatch](#virtual-function-dispatch)
   - [Properties with change notifications](#properties-with-change-notifications)
   - [Custom Any types](#custom-any-types)
-- [Deferred invocation](#deferred-invocation)
+  - [Deferred invocation](#deferred-invocation)
 - [Architecture](#architecture)
   - [interface/ -- Contracts](#interface----contracts)
   - [ext/ -- CRTP helpers](#ext----crtp-helpers)
@@ -27,24 +28,24 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [src/ -- Internal implementations](#src----internal-implementations)
 - [Key types](#key-types)
 - [Object memory layout](#object-memory-layout)
-  - [Per-object data (CoreObject / Object)](#per-object-data-coreobject--object)
-  - [Per-object data (BaseAny)](#per-object-data-baseany)
-  - [MetadataContainer](#metadatacontainer-heap-allocated-one-per-object)
+  - [CoreObject](#coreobject)
+  - [MetadataContainer](#metadatacontainer)
+  - [Object](#object)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
+  - [Base types](#base-types)
 - [STRATA_INTERFACE reference](#strata_interface-reference)
   - [Manual metadata and accessors](#manual-metadata-and-accessors)
-- [Project structure](#project-structure)
 
 ## Features
 
 - **Interface-based architecture** -- define abstract interfaces with properties, events, and functions
-- **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
-- **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
-- **Events** -- observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
-- **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
-- **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
-- **Deferred invocation** -- functions and event handlers can be queued for execution during `update()`
 - **Central type system** -- register types, create instances by UID, query class info without instantiation
+- **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
+- **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
+- **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
+- **Events** -- observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
+- **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
+- **Deferred invocation** -- functions and event handlers can be queued for execution during `update()`
 - **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
 
 ## Project structure
@@ -246,17 +247,23 @@ public:
 
 ### Deferred invocation
 
-Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `update()` is called.
+Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::strata::instance().update()` is called.
 
-**Defer at the call site** -- pass `Deferred` to `invoke()` to queue the entire invocation:
+#### Defer at the call site
+
+Pass `Deferred` to `invoke()` to queue the entire invocation:
 
 ```cpp
 auto fn = iw->reset();
-invoke_function(fn, args);                        // executes now (default)
-invoke_function(fn, args, InvokeType::Deferred);  // queued for update()
+invoke_function(fn, args);                                // executes now (default)
+invoke_function(iw, "reset", args);                       // executes now (default)
+invoke_function(fn, args, InvokeType::Deferred);          // queued for update()
+invoke_function(iw, "reset", args, InvokeType::Deferred); // queued for update()
 ```
 
-**Deferred event handlers** -- register a handler as deferred so it is queued each time the event fires, while immediate handlers on the same event still execute synchronously:
+#### Deferred event handlers
+
+Register a handler as deferred so it is queued each time the event fires, while immediate handlers on the same event still execute synchronously:
 
 ```cpp
 auto event = iw->on_clicked();
@@ -267,7 +274,7 @@ invoke_event(event, args);  // immediateHandler runs now, deferredHandler is que
 instance().update();        // deferredHandler runs here
 ```
 
-Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and `update()` drains the queue in a loop until empty.
+Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and will be handled when `update()` is called the next time.
 
 ## Architecture
 
@@ -335,16 +342,19 @@ strata/
 
 | Type | Role |
 |---|---|
-| `Uid` | 64-bit FNV-1a hash identifying types and interfaces |
-| `Interface<T>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases |
-| `InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces |
+| `Uid` | 128-bit identifier for types and interfaces; constexpr FNV-1a from type names or user-specified |
+| `array_view<T>` | Lightweight constexpr span-like view over contiguous const data |
+| `Interface<T, Base>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases, `ParentInterface` typedef for dispatch chain walking |
+| `InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces and their parent interface chains |
 | `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
 | `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, self-pointer |
 | `Object<T, Interfaces...>` | Extends `CoreObject` with metadata from all interfaces |
-| `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
-| `AnyT<T>` | Typed view over `IAny` |
-| `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
 | `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
+| `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with cloned `IAny::Ptr` args |
+| `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
+| `AnyT<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
+| `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
+| `LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
 
@@ -352,7 +362,9 @@ strata/
 
 An `Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
-### Per-object data (CoreObject / Object)
+### CoreObject
+
+Interface infrastructure, reference counting and `ISharedFromObject` semantics.
 
 | Layer | Member | Size (x64) |
 |---|---|---|
@@ -360,28 +372,11 @@ An `Object<T, Interfaces...>` instance carries minimal per-object data. The meta
 | RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
 | RefCountedDispatch | flags (`int32_t`) | 4 |
 | CoreObject | `self_` (`weak_ptr`) | 16 |
-| Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
-| **Total** | | **40 bytes** |
+| **Total** | | **32 bytes** |
 
-### Per-object data (BaseAny)
+### MetadataContainer
 
-`BaseAny` types inherit `RefCountedDispatch<IAny>` directly — `IAny` inherits `IObject` (for factory compatibility) but skips `ISharedFromObject` and the `self_` weak pointer. The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. CoreObject.
-
-| Layer | Member | Size (x64) |
-|---|---|---|
-| InterfaceDispatch | vptr | 8 |
-| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
-| RefCountedDispatch | flags (`int32_t`) | 4 |
-| **BaseAny total** | | **16 bytes** |
-
-Measured sizes (MSVC x64):
-
-| Type | Size |
-|---|---|
-| `SimpleAny<float>` | 32 bytes |
-| `MyDataAny` (with `IExternalAny`) | 48 bytes |
-
-### MetadataContainer (heap-allocated, one per object)
+Storage for per-object metadata.
 
 | Member | Size |
 |---|---|
@@ -400,13 +395,95 @@ Members are created lazily, i.e. only when first accessed via `get_property()`, 
 
 Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shared across all instances at zero per-object cost.
 
+### Object
+
+Full object with CoreObject features and runtime metadata.
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| CoreObject | [CoreObject](#CoreObject) | 32 |
+| Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
+| MetadataContainer | [MetadataContainer](#MetadataContainer), heap-allocated | 64 |
+| **Total** | | **104 bytes** |
+
 ### Example: MyWidget with 6 members
+
+Metadata is instantiated from object's static metadata when accessed by the application.
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
 | No members accessed | 40 | 64 | 0 | **104 bytes** |
 | 3 members accessed | 40 | 64 | 3 × 24 = 72 | **176 bytes** |
 | All 6 members accessed | 40 | 64 | 6 × 24 = 144 | **248 bytes** |
+
+### Base types
+
+#### Any
+
+`BaseAny` types inherit `RefCountedDispatch<IAny>` directly
+* `IAny` inherits `IObject` (for factory compatibility) but skips `ISharedFromObject` and the `self_` weak pointer. 
+* The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. CoreObject.
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| InterfaceDispatch | vptr | 8 |
+| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| RefCountedDispatch | flags (`int32_t`) | 4 |
+| **BaseAny total** | | **16 bytes** |
+
+`SimpleAny<T>` adds the stored value on top of the BaseAny base. Measured sizes (MSVC x64):
+
+| Type | Size |
+|---|---|
+| `SimpleAny<float>` | 32 bytes |
+
+An example of a custom any with external data storage `MyDataAny` can be found from the demo application. 
+
+| Type | Size |
+|---|---|
+| `MyDataAny` (with `IExternalAny`) | 48 bytes |
+
+#### Function 
+
+`ClassId::Function` and `ClassId::Event` are implemented by the same class.
+
+`ClassId::Function` implements `IFunctionInternal` and `IEvent` (which inherits `IFunction`). 
+* The primary invoke target uses a unified context/function-pointer pair.
+* Plain callbacks go through a static trampoline.
+* Event handlers are stored in a single partitioned vector.
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| InterfaceDispatch | vptr | 8 |
+| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| RefCountedDispatch | flags (`int32_t`) | 4 |
+| CoreObject | `self_` (`weak_ptr`) | 16 |
+| FunctionImpl | `target_context_` (`void*`) | 8 |
+| FunctionImpl | `target_fn_` (`BoundFn*`) | 8 |
+| FunctionImpl | `handlers_` (`vector<ConstPtr>`) | 24 |
+| FunctionImpl | `deferred_begin_` (`uint32_t`) + padding | 8 |
+| **Total** | | **80 bytes** |
+
+The `handlers_` vector is partitioned: 
+* `[0, deferred_begin_)` holds immediate handlers
+* `[deferred_begin_, size())` holds deferred handlers.
+* When no handlers are registered the vector is empty (zero heap allocation).
+
+#### Property
+
+`ClassId::Property` implements `IProperty` and `IPropertyInternal`. It holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications.
+
+| Layer | Member | Size (x64) |
+|---|---|---|
+| InterfaceDispatch | vptr | 8 |
+| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| RefCountedDispatch | flags (`int32_t`) | 4 |
+| CoreObject | `self_` (`weak_ptr`) | 16 |
+| PropertyImpl | `data_` (`shared_ptr<IAny>`) | 16 |
+| PropertyImpl | `onChanged_` (`LazyEvent`) | 16 |
+| **Total** | | **64 bytes** |
+
+`LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.
 
 ## STRATA_INTERFACE reference
 
@@ -445,9 +522,9 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 
 This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write the virtual methods, metadata array, and accessor methods by hand. The macro generates three things:
 
-1. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
-2. A `static constexpr std::array metadata` containing `MemberDesc` entries (with trampoline pointers for `FN` members).
-3. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+1. A `static constexpr std::array metadata` containing `MemberDesc` entries (with trampoline pointers for `FN` members).
+2. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+3. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
 
 Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface above:
 
@@ -455,17 +532,7 @@ Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface ab
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    // 1. Virtual method and trampoline for FN members
-    //    The virtual provides the override point for implementing classes.
-    //    The static trampoline casts the void* context back to the interface
-    //    type and calls the virtual. _strata_intf_type is a protected alias
-    //    for T provided by Interface<T>.
-    virtual ReturnValue fn_reset(const IAny*) { return ReturnValue::NOTHING_TO_DO; }
-    static ReturnValue _strata_trampoline_reset(void* self, const IAny* args) {
-        return static_cast<_strata_intf_type*>(self)->fn_reset(args);
-    }
-
-    // 2. Static metadata array
+    // 1. Static metadata array
     //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
     //    Pass &INFO so each member knows which interface declared it.
     //    INFO is provided by Interface<IMyWidget> automatically.
@@ -476,7 +543,7 @@ public:
         FunctionDesc("reset", &INFO, &_strata_trampoline_reset),
     };
 
-    // 3. Typed accessor methods
+    // 2. Typed accessor methods
     //    Each accessor queries IMetadata on the concrete object (via get_interface)
     //    and returns the runtime property/event/function by name.
     //    The free functions get_property(), get_event(), get_function() handle
@@ -495,6 +562,16 @@ public:
     IFunction::Ptr reset() const {
         return ::strata::get_function(
             this->template get_interface<IMetadata>(), "reset");
+    }
+
+    // 3. Virtual method and trampoline for FN members
+    //    The virtual provides the override point for implementing classes.
+    //    The static trampoline casts the void* context back to the interface
+    //    type and calls the virtual. _strata_intf_type is a protected alias
+    //    for T provided by Interface<T>.
+    virtual ReturnValue fn_reset(const IAny*) { return ReturnValue::NOTHING_TO_DO; }
+    static ReturnValue _strata_trampoline_reset(void* self, const IAny* args) {
+        return static_cast<_strata_intf_type*>(self)->fn_reset(args);
     }
 };
 ```
