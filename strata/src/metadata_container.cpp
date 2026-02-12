@@ -46,6 +46,7 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
         break;
     }
     case MemberKind::Event:
+        [[fallthrough]];
     case MemberKind::Function:
         created = make_shared_impl<FunctionImpl>();
         break;

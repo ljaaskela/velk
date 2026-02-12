@@ -40,7 +40,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Interface-based architecture** -- define abstract interfaces with properties, events, and functions
 - **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
 - **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
-- **Events** -- observable multi-handler events with immediate or deferred dispatch
+- **Events** -- observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
 - **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
 - **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
 - **Deferred invocation** -- functions and event handlers can be queued for execution during `update()`
@@ -292,7 +292,7 @@ strata/
 | `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
-| `intf_event.h` | `IEvent` with add/remove handler (immediate or deferred) |
+| `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
 | `intf_function.h` | `IFunction` invocable callback with `InvokeType` support |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
@@ -304,7 +304,7 @@ strata/
 
 | Header | Description |
 |---|---|
-| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces |
+| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces (walks parent interface chain) |
 | `refcounted_dispatch.h` | `RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
 | `core_object.h` | `ObjectFactory<T>` singleton factory; `CoreObject<T, Interfaces...>` CRTP with factory, self-pointer |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
@@ -328,7 +328,7 @@ strata/
 | `strata_impl.cpp/h` | `StrataImpl` implementing `IStrata` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
-| `function.cpp/h` | `FunctionImpl` (implements both `IFunction` and `IEvent`) |
+| `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
 | `strata.cpp` | DLL entry point, exports `instance()` |
 
 ## Key types

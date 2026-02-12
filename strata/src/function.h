@@ -10,7 +10,7 @@
 
 namespace strata {
 
-class FunctionImpl final : public CoreObject<FunctionImpl, IFunction, IFunctionInternal, IEvent>
+class FunctionImpl final : public CoreObject<FunctionImpl, IFunctionInternal, IEvent>
 {
 public:
     FunctionImpl() = default;
@@ -19,7 +19,6 @@ public:
     void bind(void* context, IFunctionInternal::BoundFn* fn) override;
 
     // IEvent
-    const IFunction::ConstPtr get_invocable() const override;
     ReturnValue add_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const override;
     ReturnValue remove_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const override;
 

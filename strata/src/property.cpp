@@ -25,10 +25,10 @@ bool PropertyImpl::set_any(const IAny::Ptr &value)
         return false;
     }
     data_ = value;
-    if (auto external = data_->get_interface<IExternalAny>()) {
+    if (auto external = interface_cast<IExternalAny>(data_)) {
         // If the any type can be edited externally, connect any's on_data_changed to
         // our on_changed
-        external->on_data_changed()->add_handler(on_changed()->get_invocable());
+        external->on_data_changed()->add_handler(on_changed());
     }
     return succeeded(invoke_event(on_changed(), data_.get()));
 }

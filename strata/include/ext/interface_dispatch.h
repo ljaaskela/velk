@@ -19,12 +19,28 @@ template<class... Interfaces>
 class InterfaceDispatch : public Interfaces...
 {
 private:
-    /** @brief Sets *interface to a T* pointer if uid matches T::UID. */
+    /** @brief Walks the parent interface chain of T looking for a UID match. */
+    template<class T>
+    constexpr void check_parent_interface(Uid uid, void **interface)
+    {
+        if constexpr (!std::is_same_v<typename T::ParentInterface, IInterface>) {
+            using Parent = typename T::ParentInterface;
+            if (uid == Parent::UID) {
+                *interface = static_cast<Parent *>(static_cast<T *>(this));
+            } else {
+                check_parent_interface<Parent>(uid, interface);
+            }
+        }
+    }
+
+    /** @brief Sets *interface to a T* pointer if uid matches T::UID or any parent UID. */
     template<class T>
     constexpr void find_interface(Uid uid, void **interface)
     {
         if (uid == T::UID) {
             *interface = static_cast<T *>(this);
+        } else {
+            check_parent_interface<T>(uid, interface);
         }
     }
 

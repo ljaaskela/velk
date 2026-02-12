@@ -116,6 +116,8 @@ public:
     using ConstWeakPtr = std::weak_ptr<const T>;
     /** @brief Intrusive reference-counting pointer to T. */
     using RefPtr = refcnt_ptr<T>;
+    /** @brief The parent interface type (Base), used for interface dispatch walking. */
+    using ParentInterface = Base;
     using IInterface::get_interface;
 
 protected:

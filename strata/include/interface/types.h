@@ -23,8 +23,12 @@ class FunctionImpl;
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
-    inline constexpr Uid Property = type_uid<PropertyImpl>();
-    inline constexpr Uid Function = type_uid<FunctionImpl>();
+/** @brief Default property object implementation. */
+inline constexpr Uid Property = type_uid<PropertyImpl>();
+/** @brief Default function object implementation. */
+inline constexpr Uid Function = type_uid<FunctionImpl>();
+/** @brief Default event object implementation (same as Function). */
+inline constexpr Uid Event = Function;
 }
 
 /**

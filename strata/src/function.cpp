@@ -56,11 +56,6 @@ void FunctionImpl::bind(void* context, IFunctionInternal::BoundFn* fn)
     bound_fn_ = fn;
 }
 
-const IFunction::ConstPtr FunctionImpl::get_invocable() const
-{
-    return get_self<IFunction>();
-}
-
 ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr &fn, InvokeType type) const
 {
     if (!fn) {
