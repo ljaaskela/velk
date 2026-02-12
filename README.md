@@ -19,6 +19,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Virtual function dispatch](#virtual-function-dispatch)
   - [Properties with change notifications](#properties-with-change-notifications)
   - [Custom Any types](#custom-any-types)
+- [Deferred invocation](#deferred-invocation)
 - [Architecture](#architecture)
   - [interface/ -- Contracts](#interface----contracts)
   - [ext/ -- CRTP helpers](#ext----crtp-helpers)
@@ -39,9 +40,10 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Interface-based architecture** -- define abstract interfaces with properties, events, and functions
 - **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
 - **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
-- **Events** -- observable multi-handler events
+- **Events** -- observable multi-handler events with immediate or deferred dispatch
 - **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
 - **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
+- **Deferred invocation** -- functions and event handlers can be queued for execution during `update()`
 - **Central type system** -- register types, create instances by UID, query class info without instantiation
 - **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
 
@@ -242,6 +244,31 @@ public:
 };
 ```
 
+### Deferred invocation
+
+Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `update()` is called.
+
+**Defer at the call site** -- pass `Deferred` to `invoke()` to queue the entire invocation:
+
+```cpp
+auto fn = iw->reset();
+invoke_function(fn, args);                        // executes now (default)
+invoke_function(fn, args, InvokeType::Deferred);  // queued for update()
+```
+
+**Deferred event handlers** -- register a handler as deferred so it is queued each time the event fires, while immediate handlers on the same event still execute synchronously:
+
+```cpp
+auto event = iw->on_clicked();
+event->add_handler(immediateHandler);                        // fires synchronously
+event->add_handler(deferredHandler, InvokeType::Deferred);   // queued for update()
+
+invoke_event(event, args);  // immediateHandler runs now, deferredHandler is queued
+instance().update();        // deferredHandler runs here
+```
+
+Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and `update()` drains the queue in a loop until empty.
+
 ## Architecture
 
 The library is organized in four layers:
@@ -265,8 +292,8 @@ strata/
 | `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
-| `intf_event.h` | `IEvent` with add/remove handler |
-| `intf_function.h` | `IFunction` invocable callback |
+| `intf_event.h` | `IEvent` with add/remove handler (immediate or deferred) |
+| `intf_function.h` | `IFunction` invocable callback with `InvokeType` support |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
 | `intf_strata.h` | `IStrata` for type registration and object creation |
@@ -317,6 +344,7 @@ strata/
 | `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `AnyT<T>` | Typed view over `IAny` |
 | `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
+| `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
 

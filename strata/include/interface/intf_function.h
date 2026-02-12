@@ -7,6 +7,9 @@
 
 namespace strata {
 
+/** @brief Specifies whether an invocation should execute immediately or be deferred to update(). */
+enum InvokeType : uint8_t { Immediate = 0, Deferred = 1 };
+
 /** @brief Interface for an invocable function object. */
 class IFunction : public Interface<IFunction>
 {
@@ -14,11 +17,12 @@ public:
     /** @brief Function pointer type for invoke callbacks. */
     using CallableFn = ReturnValue(const IAny *);
     /**
-     * @brief Called to invoke the function
+     * @brief Called to invoke the function.
      * @param args Call args. Actual content dependent on the function implementation.
+     * @param type Immediate executes now; Deferred queues for the next update() call.
      * @return Function return value.
      */
-    virtual ReturnValue invoke(const IAny *args) const = 0;
+    virtual ReturnValue invoke(const IAny *args, InvokeType type = Immediate) const = 0;
 };
 
 /**
@@ -50,16 +54,17 @@ public:
  * @brief Invokes a function with null safety.
  * @param fn Function to invoke.
  * @param args Arguments for invocation.
+ * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, const IAny *args = nullptr)
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, const IAny *args = nullptr, InvokeType type = Immediate)
 {
-    return fn ? fn->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *args = nullptr)
+[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *args = nullptr, InvokeType type = Immediate)
 {
-    return fn ? fn->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
 }
 
 } // namespace strata

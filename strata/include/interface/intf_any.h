@@ -51,6 +51,11 @@ public:
      * @return SUCCESS if copy operation completed successfully, FAIL otherwise.
      */
     virtual ReturnValue copy_from(const IAny &other) = 0;
+    /**
+     * @brief Creates a new IAny of the same type and copies the contained value.
+     * @return A new IAny with the same data, or null if cloning fails.
+     */
+    virtual IAny::Ptr clone() const = 0;
 };
 
 /**
