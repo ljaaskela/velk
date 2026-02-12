@@ -5,6 +5,7 @@
 #include <ext/core_object.h>
 #include <interface/intf_strata.h>
 #include <algorithm>
+#include <mutex>
 #include <vector>
 
 namespace strata {
@@ -33,6 +34,7 @@ private:
 
     const IObjectFactory* find(Uid uid) const;
     std::vector<Entry> types_;
+    mutable std::mutex deferred_mutex_;
     mutable std::vector<DeferredTask> deferred_queue_;
 };
 

@@ -121,19 +121,21 @@ IProperty::Ptr StrataImpl::create_property(Uid type, const IAny::Ptr &value) con
 
 void StrataImpl::queue_deferred_tasks(array_view<DeferredTask> tasks) const
 {
+    std::lock_guard lock(deferred_mutex_);
     deferred_queue_.insert(deferred_queue_.end(), tasks.begin(), tasks.end());
 }
 
 void StrataImpl::update() const
 {
-    // Run tasks that are in the queue at the time of call.
-    // If new tasks are added to the queue during update(), those will be invoked at the next update().
-    if (!deferred_queue_.empty()) {
-        auto tasks = std::move(deferred_queue_);
-        deferred_queue_.clear();
-        for (auto &task : tasks) {
-            task.fn->invoke(task.args.get());
-        }
+    // Swap the queue under lock, then invoke outside the lock.
+    // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
+    std::vector<DeferredTask> tasks;
+    {
+        std::lock_guard lock(deferred_mutex_);
+        tasks.swap(deferred_queue_);
+    }
+    for (auto &task : tasks) {
+        task.fn->invoke(task.args.get());
     }
 }
 
