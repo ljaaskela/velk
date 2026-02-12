@@ -70,7 +70,7 @@ strata/
 
 ## Building
 
-Requires CMake 3.5+ and a C++17 compiler. Tested with MSVC 2022.
+Requires CMake 3.5+ and a C++17 compiler. Tested with MSVC 2019.
 
 ```bash
 mkdir build && cd build
@@ -186,7 +186,7 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 }
 ```
 
-If a class doesn't override `fn_Name`, the default returns `NOTHING_TO_DO`. An explicit `set_invoke_callback()` takes priority over the virtual.
+Each `fn_Name` is pure virtual, so implementing classes must override it. An explicit `set_invoke_callback()` takes priority over the virtual.
 
 ### Query metadata
 
@@ -256,9 +256,7 @@ Pass `Deferred` to `invoke()` to queue the entire invocation:
 ```cpp
 auto fn = iw->reset();
 invoke_function(fn, args);                                // executes now (default)
-invoke_function(iw, "reset", args);                       // executes now (default)
 invoke_function(fn, args, InvokeType::Deferred);          // queued for update()
-invoke_function(iw, "reset", args, InvokeType::Deferred); // queued for update()
 ```
 
 #### Deferred event handlers
@@ -481,7 +479,8 @@ The `handlers_` vector is partitioned:
 | CoreObject | `self_` (`weak_ptr`) | 16 |
 | PropertyImpl | `data_` (`shared_ptr<IAny>`) | 16 |
 | PropertyImpl | `onChanged_` (`LazyEvent`) | 16 |
-| **Total** | | **64 bytes** |
+| PropertyImpl | `external_` (`bool`) + padding | 8 |
+| **Total** | | **72 bytes** |
 
 `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.
 
@@ -497,7 +496,7 @@ STRATA_INTERFACE(
 ```
 
 For each `(FN, Name)` entry the macro generates:
-1. A `virtual ReturnValue fn_Name(const IAny*)` method (default returns `NOTHING_TO_DO`)
+1. A pure `virtual ReturnValue fn_Name(const IAny*) = 0` method
 2. A static trampoline that routes `IFunction::invoke()` to `fn_Name()`
 3. A `MemberDesc` with the trampoline pointer in the metadata array
 4. An accessor `IFunction::Ptr Name() const`
@@ -569,7 +568,7 @@ public:
     //    The static trampoline casts the void* context back to the interface
     //    type and calls the virtual. _strata_intf_type is a protected alias
     //    for T provided by Interface<T>.
-    virtual ReturnValue fn_reset(const IAny*) { return ReturnValue::NOTHING_TO_DO; }
+    virtual ReturnValue fn_reset(const IAny*) = 0;
     static ReturnValue _strata_trampoline_reset(void* self, const IAny* args) {
         return static_cast<_strata_intf_type*>(self)->fn_reset(args);
     }
