@@ -1,13 +1,11 @@
 #ifndef API_PROPERTY_H
 #define API_PROPERTY_H
 
-#include <api/any.h>
 #include <api/function.h>
 #include <common.h>
 #include <interface/intf_property.h>
 #include <interface/intf_strata.h>
 #include <interface/types.h>
-#include <iostream>
 
 namespace strata {
 
@@ -57,23 +55,13 @@ public:
     virtual Uid get_type_uid() const = 0;
 
 protected:
-    void create()
-    {
-        prop_ = instance().create_property(get_type_uid(), {});
-        if (prop_) {
-            internal_ = prop_->get_interface<IPropertyInternal>();
-        }
-    }
+    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
+    void create() { prop_ = instance().create_property(get_type_uid(), {}); }
 
     Property() = default;
-    explicit Property(IProperty::Ptr existing) : prop_(std::move(existing))
-    {
-        if (prop_) {
-            internal_ = prop_->get_interface<IPropertyInternal>();
-        }
-    }
+    explicit Property(IProperty::Ptr existing) : prop_(std::move(existing)) {}
+
     IProperty::Ptr prop_;
-    IPropertyInternal *internal_{};
 };
 
 /**
@@ -104,18 +92,18 @@ public:
     }
     /** @brief Returns the current value of the property. */
     T get_value() const {
-        if (internal_) {
-            // Typed accessor reference to property's any
-            return AnyT<T>(internal_->get_any()).get_value();
+        T value{};
+        if (auto internal = get_internal()) {
+            if (auto any = internal->get_any()) {
+                any->get_data(&value, sizeof(T), TYPE_UID);
+            }
         }
-        return {};
+        return value;
     }
     /** @brief Sets the property to @p value. */
     void set_value(const T& value) {
-        if (internal_) {
-            // This is a bit suboptimal as we create a new any object to wrap the value
-            auto v = AnyT<T>(value);
-            prop_->set_value(v);
+        if (auto internal = get_internal()) {
+            internal->set_data(&value, sizeof(T), TYPE_UID);
         }
     }
 };

@@ -45,7 +45,14 @@ public:
      * @note  Any changes through the direct any accessor will not lead to
      *        IProperty::on_changed being invoked.
      */
-    virtual IAny::Ptr get_any() const = 0;
+    virtual IAny::ConstPtr get_any() const = 0;
+    /**
+     * @brief Writes raw data directly into the backing IAny and fires on_changed if the value changed.
+     * @param data Pointer to the source data.
+     * @param size Size of the source data in bytes.
+     * @param type Type UID of the data.
+     */
+    virtual ReturnValue set_data(const void *data, size_t size, Uid type) = 0;
 };
 
 } // namespace strata

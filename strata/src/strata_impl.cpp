@@ -135,7 +135,9 @@ void StrataImpl::update() const
         tasks.swap(deferred_queue_);
     }
     for (auto &task : tasks) {
-        task.fn->invoke(task.args.get());
+        if (task.fn) {
+            task.fn->invoke(task.args.get());
+        }
     }
 }
 

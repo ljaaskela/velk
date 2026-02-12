@@ -6,7 +6,7 @@
 #include <interface/intf_any.h>
 #include <interface/intf_strata.h>
 
-#include <algorithm>
+#include <cstring>
 
 namespace strata {
 
@@ -64,10 +64,10 @@ public:
     static constexpr Uid TYPE_UID = type_uid<Types...>();
 
     /** @brief Returns the list of type UIDs this any is compatible with. */
-    const std::vector<Uid> &get_compatible_types() const override
+    array_view<Uid> get_compatible_types() const override
     {
-        static std::vector<Uid> uids = {(type_uid<Types>())...};
-        return uids;
+        static constexpr Uid uids[] = {(type_uid<Types>())...};
+        return {uids, sizeof...(Types)};
     }
 
     /** @brief Returns the UID for the combined type pack. */
@@ -91,17 +91,14 @@ public:
     static constexpr Uid get_class_uid() { return TYPE_UID; }
 
     /** @brief Returns a single-element list containing TYPE_UID. */
-    const std::vector<Uid> &get_compatible_types() const override
+    array_view<Uid> get_compatible_types() const override
     {
-        static std::vector<Uid> uids = {TYPE_UID};
-        return uids;
+        static constexpr Uid uid = TYPE_UID;
+        return {&uid, 1};
     }
-    size_t get_data_size(Uid type) const override final
+    size_t get_data_size(Uid type) const override
     {
-        if (type == TYPE_UID) {
-            return sizeof(T);
-        }
-        return 0;
+        return type == TYPE_UID ? sizeof(T) : 0;
     }
     ReturnValue get_data(void *to, size_t toSize, Uid type) const override
     {
@@ -111,7 +108,7 @@ public:
         }
         return ReturnValue::FAIL;
     }
-    ReturnValue set_data(void const *from, size_t fromSize, Uid type) override final
+    ReturnValue set_data(void const *from, size_t fromSize, Uid type) override
     {
         if (is_valid_args(from, fromSize, type)) {
             return set_value(*reinterpret_cast<const T *>(from));
@@ -137,26 +134,82 @@ private:
 };
 
 /**
- * @brief A basic Any implementation with a single supported data type which is stored in local storage
+ * @brief A basic Any implementation with a single supported data type which is stored in local storage.
+ *
+ * Overrides data operations to access storage directly, avoiding virtual get_value()/set_value() dispatch.
+ * For trivially copyable types, uses memcpy/memcmp instead of typed operations.
  */
 template<class T>
 class SimpleAny final : public SingleTypeAny<SimpleAny<T>, T>
 {
-    virtual ReturnValue set_value(const T &value)
+    using Base = SingleTypeAny<SimpleAny<T>, T>;
+
+public:
+    ReturnValue set_value(const T &value) override
     {
-        if (data_ != value) {
-            data_ = value;
-            return ReturnValue::SUCCESS;
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if (std::memcmp(&data_, &value, sizeof(T)) != 0) {
+                std::memcpy(&data_, &value, sizeof(T));
+                return ReturnValue::SUCCESS;
+            }
+        } else {
+            if (data_ != value) {
+                data_ = value;
+                return ReturnValue::SUCCESS;
+            }
         }
         return ReturnValue::NOTHING_TO_DO;
     }
-    virtual const T& get_value() const
+
+    const T& get_value() const override { return data_; }
+
+    size_t get_data_size(Uid type) const override
     {
-        return data_;
+        return type == Base::TYPE_UID ? sizeof(T) : 0;
+    }
+
+    ReturnValue get_data(void *to, size_t toSize, Uid type) const override
+    {
+        if (!valid_args(to, toSize, type)) {
+            return ReturnValue::FAIL;
+        }
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            std::memcpy(to, &data_, sizeof(T));
+        } else {
+            *reinterpret_cast<T *>(to) = data_;
+        }
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue set_data(const void *from, size_t fromSize, Uid type) override
+    {
+        return valid_args(from, fromSize, type)
+            ? set_value(*reinterpret_cast<const T *>(from))
+            : ReturnValue::FAIL;
+    }
+
+    ReturnValue copy_from(const IAny &other) override
+    {
+        if (!is_compatible(other, Base::TYPE_UID)) {
+            return ReturnValue::FAIL;
+        }
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            char buf[sizeof(T)];
+            return succeeded(other.get_data(buf, sizeof(T), Base::TYPE_UID))
+                ? set_value(*reinterpret_cast<const T *>(buf)) : ReturnValue::FAIL;
+        } else {
+            T value{};
+            return succeeded(other.get_data(&value, sizeof(T), Base::TYPE_UID))
+                ? set_value(value) : ReturnValue::FAIL;
+        }
     }
 
 private:
-    T data_;
+    static constexpr bool valid_args(const void *p, size_t size, Uid type)
+    {
+        return p && type == Base::TYPE_UID && size == sizeof(T);
+    }
+    T data_{};
 };
 
 } // namespace strata
