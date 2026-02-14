@@ -10,7 +10,7 @@
 
 namespace strata {
 
-class FunctionImpl final : public ObjectCore<FunctionImpl, IFunctionInternal, IEvent>
+class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal, IEvent>
 {
 public:
     FunctionImpl() = default;

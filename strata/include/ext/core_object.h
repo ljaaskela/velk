@@ -9,7 +9,7 @@
 #include <interface/intf_object_factory.h>
 #include <interface/intf_strata.h>
 
-namespace strata {
+namespace strata::ext {
 
 /**
  * @brief Default IObjectFactory implementation that creates instances of FinalClass.
@@ -92,6 +92,6 @@ private:
     };
 };
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // EXT_CORE_OBJECT_H

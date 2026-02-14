@@ -13,17 +13,17 @@ void RegisterTypes(IStrata &strata)
     strata.register_type<PropertyImpl>();
     strata.register_type<FunctionImpl>();
 
-    strata.register_type<AnyValue<float>>();
-    strata.register_type<AnyValue<double>>();
-    strata.register_type<AnyValue<uint8_t>>();
-    strata.register_type<AnyValue<uint16_t>>();
-    strata.register_type<AnyValue<uint32_t>>();
-    strata.register_type<AnyValue<uint64_t>>();
-    strata.register_type<AnyValue<int8_t>>();
-    strata.register_type<AnyValue<int16_t>>();
-    strata.register_type<AnyValue<int32_t>>();
-    strata.register_type<AnyValue<int64_t>>();
-    strata.register_type<AnyValue<std::string>>();
+    strata.register_type<ext::AnyValue<float>>();
+    strata.register_type<ext::AnyValue<double>>();
+    strata.register_type<ext::AnyValue<uint8_t>>();
+    strata.register_type<ext::AnyValue<uint16_t>>();
+    strata.register_type<ext::AnyValue<uint32_t>>();
+    strata.register_type<ext::AnyValue<uint64_t>>();
+    strata.register_type<ext::AnyValue<int8_t>>();
+    strata.register_type<ext::AnyValue<int16_t>>();
+    strata.register_type<ext::AnyValue<int32_t>>();
+    strata.register_type<ext::AnyValue<int64_t>>();
+    strata.register_type<ext::AnyValue<std::string>>();
 }
 
 StrataImpl::StrataImpl()

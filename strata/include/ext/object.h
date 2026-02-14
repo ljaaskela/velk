@@ -7,7 +7,7 @@
 
 #include <tuple>
 
-namespace strata {
+namespace strata::ext {
 
 /**
  * @brief CRTP base for Strata objects with metadata.
@@ -102,6 +102,6 @@ private:
     }
 };
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // EXT_OBJECT_H

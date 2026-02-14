@@ -10,7 +10,7 @@
 
 namespace strata {
 
-class StrataImpl final : public ObjectCore<StrataImpl, IStrata>
+class StrataImpl final : public ext::ObjectCore<StrataImpl, IStrata>
 {
 public:
     StrataImpl();

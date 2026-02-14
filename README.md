@@ -42,8 +42,8 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Interface-based architecture:** define abstract interfaces with properties, events, and functions
 - **Central type system:** register types, create instances by UID, query class info without instantiation
 - **Compile-time metadata:** declare members with `STRATA_INTERFACE`, query them at compile time or runtime
-- **Type-erased values:** `AnyT<T>` wrappers over a generic `IAny` container
-- **Typed properties:** `PropertyT<T>` wrappers with automatic change notification events
+- **Type-erased values:** `Any<T>` wrappers over a generic `IAny` container
+- **Typed properties:** `Property<T>` wrappers with automatic change notification events
 - **Events:** observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
 - **Virtual function dispatch:** `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
 - **Deferred invocation:** functions and event handlers can be queued for execution during `update()`
@@ -109,7 +109,7 @@ public:
 ```cpp
 #include <ext/object.h>
 
-class MyWidget : public Object<MyWidget, IMyWidget>
+class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
     ReturnValue fn_reset(const IAny*) override {
         // implementation with access to 'this'
@@ -130,7 +130,7 @@ public:
     )
 };
 
-class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
+class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     ReturnValue fn_reset(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
     ReturnValue fn_serialize(const IAny*) override { /* ... */ return ReturnValue::SUCCESS; }
@@ -172,7 +172,7 @@ public:
     )
 };
 
-class MyWidget : public Object<MyWidget, IMyWidget>
+class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
     ReturnValue fn_reset(const IAny*) override {
         std::cout << "reset!" << std::endl;
@@ -214,11 +214,11 @@ if (auto* meta = interface_cast<IMetadata>(widget)) {
 ### Properties with change notifications
 
 ```cpp
-auto prop = PropertyT<float>();
+auto prop = Property<float>();
 prop.set_value(5.f);
 
 Function onChange([](const IAny* any) -> ReturnValue {
-    if (auto v = AnyT<const float>(*any)) {
+    if (auto v = Any<const float>(*any)) {
         std::cout << "new value: " << v.get_value() << std::endl;
     }
     return ReturnValue::SUCCESS;
@@ -230,10 +230,10 @@ prop.set_value(10.f);  // triggers onChange
 
 ### Custom Any types
 
-Implement `AnyCore` to back a property with external or shared data:
+Implement `ext::AnyCore` to back a property with external or shared data:
 
 ```cpp
-class MyDataAny final : public AnyCore<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public ext::AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
     Data& get_value() const override { return globalData_; }
@@ -314,13 +314,13 @@ CRTP helpers and template implementations.
 
 | Header | Description |
 |---|---|
-| `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces (walks parent interface chain) |
-| `refcounted_dispatch.h` | `RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
-| `core_object.h` | `ObjectFactory<T>` singleton factory; `ObjectCore<T, Interfaces...>` CRTP with factory, self-pointer |
-| `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
-| `metadata.h` | `TypeMetadata<T>`, `CollectedMetadata<Interfaces...>` constexpr metadata collection |
-| `any.h` | `AnyBase`, `AnyMulti<Types...>`, `AnyCore<T>`, `AnyValue<T>` |
-| `event.h` | `LazyEvent` helper for deferred event creation |
+| `interface_dispatch.h` | `ext::InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces (walks parent interface chain) |
+| `refcounted_dispatch.h` | `ext::RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
+| `core_object.h` | `ext::ObjectFactory<T>` singleton factory; `ext::ObjectCore<T, Interfaces...>` CRTP with factory, self-pointer |
+| `object.h` | `ext::Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
+| `metadata.h` | `ext::TypeMetadata<T>`, `ext::CollectedMetadata<Interfaces...>` constexpr metadata collection |
+| `any.h` | `ext::AnyBase`, `ext::AnyMulti<Types...>`, `ext::AnyCore<T>`, `ext::AnyValue<T>` |
+| `event.h` | `ext::LazyEvent` helper for deferred event creation |
 
 ### api/
 
@@ -329,8 +329,8 @@ User-facing typed wrappers.
 | Header | Description |
 |---|---|
 | `strata.h` | `instance()` singleton access |
-| `property.h` | `PropertyT<T>` typed property wrapper |
-| `any.h` | `AnyT<T>` typed any wrapper |
+| `property.h` | `Property<T>` typed property wrapper |
+| `any.h` | `Any<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support |
 
 ### src/
@@ -356,31 +356,31 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 
 | Concept | interface/ | ext/ | api/ |
 |---------|-----------|------|------|
-| **Any** | `IAny` | `AnyBase` | `AnyT<T>` |
-| | | `AnyMulti<Types...>` | |
-| | | `AnyCore<Final, T>` | |
-| | | `AnyValue<T>` | |
-| **Object** | `IObject` | `ObjectCore<Final, Intf...>` | — |
-| | | `Object<Final, Intf...>` | |
-| **Property** | `IProperty` | — | `Property` → `PropertyT<T>` |
+| **Any** | `IAny` | `ext::AnyBase` | `Any<T>` |
+| | | `ext::AnyMulti<Types...>` | |
+| | | `ext::AnyCore<Final, T>` | |
+| | | `ext::AnyValue<T>` | |
+| **Object** | `IObject` | `ext::ObjectCore<Final, Intf...>` | — |
+| | | `ext::Object<Final, Intf...>` | |
+| **Property** | `IProperty` | — | `Property` → `Property<T>` |
 | **Function** | `IFunction` | — | `Function` |
-| **Event** | `IEvent` | `LazyEvent` | — |
+| **Event** | `IEvent` | `ext::LazyEvent` | — |
 
 **Any hierarchy** (ext/) — three levels for different extension points:
 
 | Class | Role | When to use |
 |-------|------|-------------|
-| `AnyBase<Final, Intf...>` | Internal base with ref-counting, clone, factory | Rarely used directly |
-| `AnyMulti<Final, Types...>` | Multi-type compatible any | When an any must expose multiple type UIDs |
-| `AnyCore<Final, T, Intf...>` | Single-type with virtual get/set | Extend for custom storage (external data, shared state) |
-| `AnyValue<T>` | Inline storage, ready to use | Default choice for simple typed values |
+| `ext::AnyBase<Final, Intf...>` | Internal base with ref-counting, clone, factory | Rarely used directly |
+| `ext::AnyMulti<Final, Types...>` | Multi-type compatible any | When an any must expose multiple type UIDs |
+| `ext::AnyCore<Final, T, Intf...>` | Single-type with virtual get/set | Extend for custom storage (external data, shared state) |
+| `ext::AnyValue<T>` | Inline storage, ready to use | Default choice for simple typed values |
 
 **Object hierarchy** (ext/) — two levels:
 
 | Class | Role | When to use |
 |-------|------|-------------|
-| `ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `StrataImpl`) |
-| `Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `STRATA_INTERFACE` |
+| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `StrataImpl`) |
+| `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `STRATA_INTERFACE` |
 
 ## Key types
 
@@ -389,22 +389,22 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | `Uid` | 128-bit identifier for types and interfaces; constexpr FNV-1a from type names or user-specified |
 | `array_view<T>` | Lightweight constexpr span-like view over contiguous const data |
 | `Interface<T, Base>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases, `ParentInterface` typedef for dispatch chain walking |
-| `InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces and their parent interface chains |
-| `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
-| `ObjectCore<T, Interfaces...>` | Minimal CRTP base for objects (without metadata); auto UID/name, factory, self-pointer |
-| `Object<T, Interfaces...>` | Full CRTP base; extends `ObjectCore` with metadata from all interfaces |
+| `ext::InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces and their parent interface chains |
+| `ext::RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
+| `ext::ObjectCore<T, Interfaces...>` | Minimal CRTP base for objects (without metadata); auto UID/name, factory, self-pointer |
+| `ext::Object<T, Interfaces...>` | Full CRTP base; extends `ObjectCore` with metadata from all interfaces |
 | `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
 | `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with cloned `IAny::Ptr` args |
-| `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
-| `AnyT<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
+| `Property<T>` | Typed property with `get_value()`/`set_value()` and change events |
+| `Any<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
 | `Function` | Wraps `ReturnValue(const IAny*)` callbacks |
-| `LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
+| `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
 
 ## Object memory layout
 
-An `Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
+An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
 ### ObjectCore
 
@@ -464,9 +464,9 @@ Metadata is instantiated from object's static metadata when accessed by the appl
 
 #### Any
 
-`AnyBase` types inherit `RefCountedDispatch<IAny>` directly
+`ext::AnyBase` types inherit `ext::RefCountedDispatch<IAny>` directly
 * `IAny` inherits `IObject` (for factory compatibility) but skips `ISharedFromObject` and the `self_` weak pointer. 
-* The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. ObjectCore.
+* The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. `ext::ObjectCore`.
 
 | Layer | Member | Size (x64) |
 |---|---|---|
@@ -475,11 +475,11 @@ Metadata is instantiated from object's static metadata when accessed by the appl
 | RefCountedDispatch | flags (`int32_t`) | 4 |
 | **AnyBase total** | | **16 bytes** |
 
-`AnyValue<T>` adds the stored value on top of the AnyBase base. Measured sizes (MSVC x64):
+`ext::AnyValue<T>` adds the stored value on top of the `ext::AnyBase` base. Measured sizes (MSVC x64):
 
 | Type | Size |
 |---|---|
-| `AnyValue<float>` | 32 bytes |
+| `ext::AnyValue<float>` | 32 bytes |
 
 An example of a custom any with external data storage `MyDataAny` can be found from the demo application. 
 
@@ -524,17 +524,17 @@ The `handlers_` vector is partitioned:
 | RefCountedDispatch | flags (`int32_t`) | 4 |
 | ObjectCore | `self_` (`weak_ptr`) | 16 |
 | PropertyImpl | `data_` (`shared_ptr<IAny>`) | 16 |
-| PropertyImpl | `onChanged_` (`LazyEvent`) | 16 |
+| PropertyImpl | `onChanged_` (`ext::LazyEvent`) | 16 |
 | PropertyImpl | `external_` (`bool`) + padding | 8 |
 | **Total** | | **72 bytes** |
 
-`LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.
+`ext::LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.
 
 ## STRATA_INTERFACE reference
 
 ```cpp
 STRATA_INTERFACE(
-    (PROP, Type, Name, Default),  // generates PropertyT<Type> Name() const
+    (PROP, Type, Name, Default),  // generates Property<Type> Name() const
     (EVT, Name),          // generates IEvent::Ptr Name() const
     (FN, Name)            // generates virtual fn_Name(const IAny*),
                           //          IFunction::Ptr Name() const
@@ -568,7 +568,7 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write everything by hand. The macro generates five things:
 
 1. A `State` struct containing one field per `PROP` member, initialized with its default value.
-2. Per-property statics: a `getDefault` function returning a pointer to a static `AnyValue<T>`, a `createRef` factory that creates an `AnyRef<T>` pointing into a `State` struct, and a `PropertyKind` referencing both.
+2. Per-property statics: a `getDefault` function returning a pointer to a static `ext::AnyRef<T>`, a `createRef` factory that creates an `ext::AnyRef<T>` pointing into a `State` struct, and a `PropertyKind` referencing both.
 3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and trampoline pointers for `FN` members).
 4. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
 5. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
@@ -581,8 +581,8 @@ class IMyWidget : public Interface<IMyWidget>
 public:
     // 1. State struct
     //    One field per PROP, initialized with its declared default.
-    //    Object<T, IMyWidget> stores a copy of this struct, and properties
-    //    read/write directly into it via AnyRef<T>.
+    //    ext::Object<T, IMyWidget> stores a copy of this struct, and properties
+    //    read/write directly into it via ext::AnyRef<T>.
     struct State {
         float width = 0.f;
     };
@@ -590,19 +590,19 @@ public:
     // 2. Default state and property kind statics
     //    _strata_default_state: returns a reference to a static State instance
     //    initialized with default values. Shared across all properties.
-    //    getDefault: returns a pointer to a static AnyRef<T> pointing into
+    //    getDefault: returns a pointer to a static ext::AnyRef<T> pointing into
     //    the default state. Used for static metadata queries and as fallback
     //    when state-backed storage is unavailable.
-    //    createRef: creates an AnyRef<T> pointing into the State struct at
+    //    createRef: creates an ext::AnyRef<T> pointing into the State struct at
     //    the given base address. Used by MetadataContainer to back properties
     //    with the Object's contiguous state storage.
     static State& _strata_default_state() { static State s; return s; }
     static const IAny* _strata_getdefault_width() {
-        static AnyRef<float> ref(&_strata_default_state().width);
+        static ext::AnyRef<float> ref(&_strata_default_state().width);
         return &ref;
     }
     static IAny::Ptr _strata_createref_width(void* base) {
-        return create_any_ref<float>(&static_cast<State*>(base)->width);
+        return ext::create_any_ref<float>(&static_cast<State*>(base)->width);
     }
     static constexpr PropertyKind _strata_propkind_width {
         &_strata_getdefault_width, &_strata_createref_width };
@@ -625,8 +625,8 @@ public:
     //    The free functions get_property(), get_event(), get_function() handle
     //    the null check on the IMetadata pointer.
 
-    PropertyT<float> width() const {
-        return PropertyT<float>(::strata::get_property(
+    Property<float> width() const {
+        return Property<float>(::strata::get_property(
             this->template get_interface<IMetadata>(), "width"));
     }
 

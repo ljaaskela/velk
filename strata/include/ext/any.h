@@ -8,7 +8,7 @@
 
 #include <cstring>
 
-namespace strata {
+namespace strata::ext {
 
 /**
  * @brief Base class for IAny implementations.
@@ -264,6 +264,6 @@ IAny::Ptr create_any_ref(T* ptr) {
     return IAny::Ptr(new AnyRef<T>(ptr), [](IAny* p) { p->unref(); });
 }
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // ANY_H

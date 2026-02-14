@@ -8,7 +8,7 @@
 
 namespace strata {
 
-class MetadataContainer final : public InterfaceDispatch<IMetadata>
+class MetadataContainer final : public ext::InterfaceDispatch<IMetadata>
 {
 public:
     explicit MetadataContainer(array_view<MemberDesc> members, IInterface* owner = nullptr);

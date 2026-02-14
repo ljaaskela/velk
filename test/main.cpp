@@ -26,13 +26,13 @@ struct Data
         return value != other.value && name != other.name;
     }
 
-    LazyEvent onChanged;
+    ext::LazyEvent onChanged;
 };
 
 Data globalData_;
 
 // Custom any type which accesses global data
-class MyDataAny final : public AnyCore<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public ext::AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
     Data &get_value() const override { return globalData_; }
@@ -75,11 +75,11 @@ public:
     )
 };
 
-class MyWidget : public Object<MyWidget, IMyWidget, ISerializable>
+class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     ReturnValue fn_reset(const IAny *args) override
     {
-        AnyT<const int> value(args);
+        Any<const int> value(args);
         if (value) {
             std::cout << "  MyWidget::fn_reset called with value " << value.get_value()
                       << std::endl;
@@ -103,18 +103,18 @@ int main()
     r.register_type<MyDataAny>();
     r.register_type<MyWidget>();
 
-    auto prop = PropertyT<float>();
+    auto prop = Property<float>();
     prop.set_value(5.f);
     auto prop2 = prop;
-    auto prop3 = PropertyT<float>(prop);
+    auto prop3 = Property<float>(prop);
 
     auto value = prop.get_value();
     std::cout << "Property<float> prop1 value is " << value << std::endl;
     std::cout << "Property<float> prop2 value is " << prop2.get_value() << std::endl;
     std::cout << "Property<float> prop3 value is " << prop3.get_value() << std::endl;
 
-    AnyT<Data> data;                 // One view to globalData
-    auto myprop = PropertyT<Data>(); // Property to global data
+    Any<Data> data;                 // One view to globalData
+    auto myprop = Property<Data>(); // Property to global data
     myprop.set_value({10.f, "Hello"});
 
     std::cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name
@@ -125,9 +125,9 @@ int main()
         if (!any) {
             return ReturnValue::INVALID_ARGUMENT;
         }
-        if (auto v = AnyT<const float>(*any)) {
+        if (auto v = Any<const float>(*any)) {
             std::cout << "new value: " << v.get_value();
-        } else if (auto v = AnyT<const Data>(*any)) {
+        } else if (auto v = Any<const Data>(*any)) {
             auto value = v.get_value();
             std::cout << "new value: " << value.name << ", " << value.value;
         } else {
@@ -145,9 +145,9 @@ int main()
 
     std::cout << "sizeof(float)            " << sizeof(float) << std::endl;
     std::cout << "sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << std::endl;
-    std::cout << "sizeof(AnyT<float>)      " << sizeof(AnyT<float>) << std::endl;
-    std::cout << "sizeof(AnyValue<float>) " << sizeof(AnyValue<float>) << std::endl;
-    std::cout << "sizeof(PropertyT<float>) " << sizeof(PropertyT<float>) << std::endl;
+    std::cout << "sizeof(Any<float>)      " << sizeof(Any<float>) << std::endl;
+    std::cout << "sizeof(AnyValue<float>) " << sizeof(ext::AnyValue<float>) << std::endl;
+    std::cout << "sizeof(Property<float>) " << sizeof(Property<float>) << std::endl;
     std::cout << "sizeof(MyDataAny)        " << sizeof(MyDataAny) << std::endl;
 
     // --- Static metadata via Strata (no instance needed) ---
@@ -225,7 +225,7 @@ int main()
 
         invoke_function(iw->reset()); // Invoke by interface accessor
         invoke_function(iw, "reset"); // Invoke by name
-        invoke_function(iw, "reset", AnyT<int>(42));
+        invoke_function(iw, "reset", Any<int>(42));
     }
 
     // --- Uid from string ---
@@ -267,8 +267,8 @@ int main()
             float height = 50.f;
         } state;
 
-        AnyRef<float> widthRef(&state.width);
-        AnyRef<float> heightRef(&state.height);
+        ext::AnyRef<float> widthRef(&state.width);
+        ext::AnyRef<float> heightRef(&state.height);
 
         std::cout << "  state = {" << state.width << ", " << state.height << "}" << std::endl;
         std::cout << "  widthRef.get_value() = " << widthRef.get_value() << std::endl;
@@ -296,7 +296,7 @@ int main()
         cloned->get_data(&clonedValue, sizeof(float), type_uid<float>());
         std::cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)" << std::endl;
 
-        std::cout << "  sizeof(AnyRef<float>) " << sizeof(AnyRef<float>) << std::endl;
+        std::cout << "  sizeof(AnyRef<float>) " << sizeof(ext::AnyRef<float>) << std::endl;
     }
 
     // --- State-backed property storage ---

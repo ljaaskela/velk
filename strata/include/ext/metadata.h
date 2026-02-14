@@ -9,7 +9,7 @@
 #include <type_traits>
 #include <utility>
 
-namespace strata {
+namespace strata::ext {
 
 // -- Constexpr metadata collection from interfaces --
 
@@ -68,6 +68,6 @@ struct InterfaceState<T, std::void_t<typename T::State>> {
     using type = typename T::State;
 };
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // EXT_METADATA_H

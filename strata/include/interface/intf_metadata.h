@@ -275,11 +275,11 @@ public:
 
 #define _STRATA_DEFAULTS_PROP(Type, Name, Default) \
     static const ::strata::IAny* _strata_getdefault_##Name() { \
-        static ::strata::AnyRef<Type> ref(&_strata_default_state().Name); \
+        static ::strata::ext::AnyRef<Type> ref(&_strata_default_state().Name); \
         return &ref; \
     } \
     static ::strata::IAny::Ptr _strata_createref_##Name(void* base) { \
-        return ::strata::create_any_ref<Type>(&static_cast<State*>(base)->Name); \
+        return ::strata::ext::create_any_ref<Type>(&static_cast<State*>(base)->Name); \
     } \
     static constexpr ::strata::PropertyKind _strata_propkind_##Name { \
         &_strata_getdefault_##Name, &_strata_createref_##Name };
@@ -319,8 +319,8 @@ public:
 // --- Accessor dispatch: tag -> typed non-virtual accessor method ---
 
 #define _STRATA_ACC_PROP(Type, Name, ...) \
-    ::strata::PropertyT<Type> Name() const { \
-        return ::strata::PropertyT<Type>(::strata::get_property( \
+    ::strata::Property<Type> Name() const { \
+        return ::strata::Property<Type>(::strata::get_property( \
             this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC_EVT(Name) \
@@ -360,7 +360,7 @@ public:
  *    named @c metadata, used for compile-time and runtime introspection.
  *    For @c FN members the descriptor includes a pointer to the trampoline.
  * -# A non-virtual @c const accessor method on the interface:
- *    - @c PROP &rarr; <tt>PropertyT\<Type\> Name() const</tt>
+ *    - @c PROP &rarr; <tt>Property\<Type\> Name() const</tt>
  *    - @c EVT  &rarr; <tt>IEvent::Ptr Name() const</tt>
  *    - @c FN   &rarr; <tt>IFunction::Ptr Name() const</tt>
  *

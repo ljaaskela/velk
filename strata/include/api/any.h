@@ -45,7 +45,7 @@ protected:
 };
 
 /** @brief Read-write wrapper around an IAny pointer. */
-class Any : public ConstAny
+class AnyBase : public ConstAny
 {
 public:
     /** @brief Implicit conversion to a mutable IAny pointer. */
@@ -56,7 +56,7 @@ public:
     IAny *get_any_interface() { return any_.get(); }
 
 protected:
-    Any() = default;
+    AnyBase() = default;
 };
 
 /**
@@ -67,7 +67,7 @@ protected:
  * @tparam T The value type. Use const T for read-only access.
  */
 template<class T>
-class AnyT final : public Any
+class Any final : public AnyBase
 {
     static constexpr bool IsReadWrite = !std::is_const_v<T>;
     static constexpr bool IsReadOnly = !IsReadWrite;
@@ -78,41 +78,41 @@ public:
 
     /** @brief Wraps an existing mutable IAny pointer (read-write). */
     template<class Flag = std::enable_if_t<IsReadWrite>>
-    constexpr AnyT(const IAny::Ptr &any) noexcept
+    constexpr Any(const IAny::Ptr &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
     template<class Flag = std::enable_if_t<IsReadOnly>>
-    constexpr AnyT(const IAny::ConstPtr &any) noexcept
+    constexpr Any(const IAny::ConstPtr &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps a const IAny reference (read-only). */
     template<class Flag = std::enable_if_t<IsReadOnly>>
-    constexpr AnyT(const IAny &any) noexcept
+    constexpr Any(const IAny &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
     template<class Flag = std::enable_if_t<IsReadOnly>>
-    constexpr AnyT(const IAny *any) noexcept
+    constexpr Any(const IAny *any) noexcept
     {
         if (any) {
             set_any(*any, TYPE_UID);
         }
     }
     /** @brief Move-constructs from an IAny rvalue. */
-    constexpr AnyT(IAny &&any) noexcept
+    constexpr Any(IAny &&any) noexcept
     {
         if (is_compatible(any, TYPE_UID)) {
             any_ = std::move(any);
         }
     }
     /** @brief Default-constructs an IAny of type T via Strata. */
-    AnyT() noexcept { create(); }
+    Any() noexcept { create(); }
     /** @brief Constructs an IAny of type T and initializes it with @p value. */
-    AnyT(const T &value) noexcept
+    Any(const T &value) noexcept
     {
         if (!is_compatible(any_, TYPE_UID)) {
             auto any = instance().create_any(TYPE_UID);
@@ -143,9 +143,9 @@ public:
     }
 
     /** @brief Creates a read-write typed view over an existing IAny pointer. */
-    static AnyT<T> ref(const IAny::Ptr &ref) { return AnyT<T>(ref); }
+    static Any<T> ref(const IAny::Ptr &ref) { return Any<T>(ref); }
     /** @brief Creates a read-only typed view over an existing const IAny pointer. */
-    static const AnyT<const T> const_ref(const IAny::ConstPtr &ref) { return AnyT<const T>(ref); }
+    static const Any<const T> const_ref(const IAny::ConstPtr &ref) { return Any<const T>(ref); }
 
 protected:
     void create() { set_any_direct(instance().create_any(TYPE_UID)); }

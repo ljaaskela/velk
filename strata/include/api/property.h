@@ -10,7 +10,7 @@
 namespace strata {
 
 /** @brief Convenience wrapper around an IProperty::Ptr with event subscription helpers. */
-class Property
+class PropertyBase
 {
 public:
     operator const IProperty::Ptr()
@@ -58,8 +58,8 @@ protected:
     IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
     void create() { prop_ = instance().create_property(get_type_uid(), {}); }
 
-    Property() = default;
-    explicit Property(IProperty::Ptr existing) : prop_(std::move(existing)) {}
+    PropertyBase() = default;
+    explicit PropertyBase(IProperty::Ptr existing) : prop_(std::move(existing)) {}
 
     IProperty::Ptr prop_;
 };
@@ -69,23 +69,23 @@ protected:
  * @tparam T The value type stored by the property.
  */
 template<class T>
-class PropertyT final : public Property
+class Property final : public PropertyBase
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
     /** @brief Default-constructs a property of type T via Strata. */
-    PropertyT()
+    Property()
     {
         create();
     }
     /** @brief Constructs a property of type T and sets its initial value. */
-    PropertyT(const T& value)
+    Property(const T& value)
     {
         create();
         set_value(value);
     }
     /** @brief Wraps an existing IProperty pointer. */
-    explicit PropertyT(IProperty::Ptr existing) : Property(std::move(existing)) {}
+    explicit Property(IProperty::Ptr existing) : PropertyBase(std::move(existing)) {}
     Uid get_type_uid() const override
     {
         return TYPE_UID;

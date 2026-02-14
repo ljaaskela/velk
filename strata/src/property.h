@@ -10,7 +10,7 @@
 
 namespace strata {
 
-class PropertyImpl final : public ObjectCore<PropertyImpl, IProperty, IPropertyInternal>
+class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IProperty, IPropertyInternal>
 {
 public:
     PropertyImpl() = default;
@@ -27,7 +27,7 @@ protected: // IPropertyInternal
 
 private:
     IAny::Ptr data_;
-    LazyEvent onChanged_;
+    ext::LazyEvent onChanged_;
     bool external_{};  ///< True if data_ implements IExternalAny (on_data_changed fires on_changed automatically).
 };
 

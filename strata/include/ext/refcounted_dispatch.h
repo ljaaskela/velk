@@ -4,7 +4,7 @@
 #include <atomic>
 #include <ext/interface_dispatch.h>
 
-namespace strata {
+namespace strata::ext {
 
 /**
  * @brief Adds intrusive reference counting to InterfaceDispatch.
@@ -41,6 +41,6 @@ private:
     ObjectData data_;
 };
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // EXT_REFCOUNTED_DISPATCH_H

@@ -4,7 +4,7 @@
 #include <common.h>
 #include <interface/intf_interface.h>
 
-namespace strata {
+namespace strata::ext {
 
 /**
  * @brief Concrete implementation of IInterface for an arbitrary pack of interfaces.
@@ -101,6 +101,6 @@ protected:
     ~InterfaceDispatch() override = default;
 };
 
-} // namespace strata
+} // namespace strata::ext
 
 #endif // EXT_INTERFACE_DISPATCH_H
