@@ -43,7 +43,7 @@ public:
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class ObjectCore : public RefCountedDispatch<IObject, ISharedFromObject, Interfaces...>
+class ObjectCore : public RefCountedDispatch<ISharedFromObject, Interfaces...>
 {
 public:
     ObjectCore() = default;

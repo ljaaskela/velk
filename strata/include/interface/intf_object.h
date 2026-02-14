@@ -17,7 +17,7 @@ public:
  *
  * Similar to std::enable_shared_from_this, but integrated with the Strata interface system.
  */
-class ISharedFromObject : public Interface<ISharedFromObject>
+class ISharedFromObject : public Interface<ISharedFromObject, IObject>
 {
 public:
     /** @brief Stores the owning shared_ptr. Called by the factory after creation. */

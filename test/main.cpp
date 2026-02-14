@@ -336,6 +336,11 @@ int main()
 
         std::cout << "  sizeof(IMyWidget::State) = " << sizeof(IMyWidget::State) << std::endl;
         std::cout << "  sizeof(ISerializable::State) = " << sizeof(ISerializable::State) << std::endl;
+        std::cout << "  sizeof(MyWidget) = " << sizeof(MyWidget) << std::endl;
+        std::cout << "  sizeof(ObjectCore<X>) [minimal] = "
+                  << sizeof(ext::ObjectCore<MyWidget>) << std::endl;
+        std::cout << "  sizeof(ObjectCore<X, ...5 interfaces>) = "
+                  << sizeof(ext::ObjectCore<MyWidget, IMetadata, IMetadataContainer, IMyWidget, ISerializable>) << std::endl;
     }
 
     return 0;
