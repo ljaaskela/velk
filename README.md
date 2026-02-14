@@ -29,9 +29,9 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Type hierarchy across layers](#type-hierarchy-across-layers)
 - [Key types](#key-types)
 - [Object memory layout](#object-memory-layout)
-  - [ObjectCore](#objectcore)
+  - [ext::ObjectCore](#extobjectcore)
   - [MetadataContainer](#metadatacontainer)
-  - [Object](#object)
+  - [ext::Object](#extobject)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
   - [Base types](#base-types)
 - [STRATA_INTERFACE reference](#strata_interface-reference)
@@ -362,7 +362,7 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | | | `ext::AnyValue<T>` | |
 | **Object** | `IObject` | `ext::ObjectCore<Final, Intf...>` | — |
 | | | `ext::Object<Final, Intf...>` | |
-| **Property** | `IProperty` | — | `Property` → `Property<T>` |
+| **Property** | `IProperty` | — | `Property<T>` |
 | **Function** | `IFunction` | — | `Function` |
 | **Event** | `IEvent` | `ext::LazyEvent` | — |
 
@@ -406,17 +406,23 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 
 An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
-### ObjectCore
+### ext::ObjectCore
 
-Interface infrastructure, reference counting and `ISharedFromObject` semantics.
+Interface infrastructure, reference counting and `ISharedFromObject` semantics. The size depends on how many interfaces the object implements, since multiple inheritance adds a vtable pointer per interface (MSVC x64).
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| InterfaceDispatch | vptr | 8 |
-| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
-| RefCountedDispatch | flags (`int32_t`) | 4 |
-| ObjectCore | `self_` (`weak_ptr`) | 16 |
-| **Total** | | **32 bytes** |
+| ext::InterfaceDispatch | vptr per interface | grows with N |
+| ext::RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| ext::RefCountedDispatch | flags (`int32_t`) | 4 |
+| ext::ObjectCore | `self_` (`weak_ptr`) | 16 |
+
+Measured sizes (MSVC x64):
+
+| Configuration | Interfaces | Size |
+|---|---|---|
+| `ext::ObjectCore<X>` (minimal) | 1 (ISharedFromObject) | **40 bytes** |
+| `ext::ObjectCore<X, IMetadata, IMetadataContainer, IMyWidget, ISerializable>` | 5 | **136 bytes** |
 
 ### MetadataContainer
 
@@ -432,33 +438,44 @@ Storage for per-object metadata.
 | **Total (baseline)** | **64 bytes** |
 
 Each accessed member adds a **24-byte** entry to the `instances_` vector:
-* an 8-byte metadata index (`size_t`) plus 
-* a 16-byte `shared_ptr<IInterface>`. 
+* an 8-byte metadata index (`size_t`) plus
+* a 16-byte `shared_ptr<IInterface>`.
 
 Members are created lazily, i.e. only when first accessed via `get_property()`, `get_event()`, or `get_function()`.
 
 Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shared across all instances at zero per-object cost.
 
-### Object
+### ext::Object
 
-Full object with ObjectCore features and runtime metadata.
+Full object with ext::ObjectCore features, runtime metadata, and per-interface property state storage.
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| ObjectCore | [ObjectCore](#objectcore) | 32 |
-| Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
-| MetadataContainer | [MetadataContainer](#MetadataContainer), heap-allocated | 64 |
-| **Total** | | **104 bytes** |
+| ext::ObjectCore | [ext::ObjectCore](#extobjectcore) | varies by interface count |
+| ext::Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
+| ext::Object | `states_` (tuple of interface `State` structs) | varies by interfaces |
+| MetadataContainer | [MetadataContainer](#metadatacontainer), heap-allocated | 64 |
+
+The `states_` tuple contains one `State` struct per interface that declares properties via `STRATA_INTERFACE`. Each `State` struct holds one field per `PROP` member, initialized with its declared default value. Properties backed by state storage use `ext::AnyRef<T>` to read/write directly into these fields.
 
 ### Example: MyWidget with 6 members
 
-Metadata is instantiated from object's static metadata when accessed by the application.
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata and IMetadataContainer, totaling 5 interfaces in the dispatch pack (ISharedFromObject subsumes IObject).
 
-| Scenario | Object | MetadataContainer | Cached members | Total |
+| Component | Size (x64) |
+|---|---|
+| ext::ObjectCore (5 interfaces) | 136 |
+| `meta_` (`unique_ptr<IMetadata>`) | 8 |
+| `states_` (`IMyWidget::State` (8) + `ISerializable::State` (32)) | 40 |
+| **sizeof(MyWidget)** | **184 bytes** |
+
+MetadataContainer (64 bytes) is heap-allocated separately. Member instances are created lazily as accessed.
+
+| Scenario | MyWidget | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 40 | 64 | 0 | **104 bytes** |
-| 3 members accessed | 40 | 64 | 3 × 24 = 72 | **176 bytes** |
-| All 6 members accessed | 40 | 64 | 6 × 24 = 144 | **248 bytes** |
+| No members accessed | 184 | 64 | 0 | **248 bytes** |
+| 3 members accessed | 184 | 64 | 3 × 24 = 72 | **320 bytes** |
+| All 6 members accessed | 184 | 64 | 6 × 24 = 144 | **392 bytes** |
 
 ### Base types
 
@@ -470,10 +487,10 @@ Metadata is instantiated from object's static metadata when accessed by the appl
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| InterfaceDispatch | vptr | 8 |
-| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
-| RefCountedDispatch | flags (`int32_t`) | 4 |
-| **AnyBase total** | | **16 bytes** |
+| ext::InterfaceDispatch | vptr | 8 |
+| ext::RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| ext::RefCountedDispatch | flags (`int32_t`) | 4 |
+| **ext::AnyBase total** | | **16 bytes** |
 
 `ext::AnyValue<T>` adds the stored value on top of the `ext::AnyBase` base. Measured sizes (MSVC x64):
 
@@ -498,10 +515,10 @@ An example of a custom any with external data storage `MyDataAny` can be found f
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| InterfaceDispatch | vptr | 8 |
-| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
-| RefCountedDispatch | flags (`int32_t`) | 4 |
-| ObjectCore | `self_` (`weak_ptr`) | 16 |
+| ext::InterfaceDispatch | vptr | 8 |
+| ext::RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| ext::RefCountedDispatch | flags (`int32_t`) | 4 |
+| ext::ObjectCore | `self_` (`weak_ptr`) | 16 |
 | FunctionImpl | `target_context_` (`void*`) | 8 |
 | FunctionImpl | `target_fn_` (`BoundFn*`) | 8 |
 | FunctionImpl | `handlers_` (`vector<ConstPtr>`) | 24 |
@@ -519,10 +536,10 @@ The `handlers_` vector is partitioned:
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| InterfaceDispatch | vptr | 8 |
-| RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
-| RefCountedDispatch | flags (`int32_t`) | 4 |
-| ObjectCore | `self_` (`weak_ptr`) | 16 |
+| ext::InterfaceDispatch | vptr | 8 |
+| ext::RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
+| ext::RefCountedDispatch | flags (`int32_t`) | 4 |
+| ext::ObjectCore | `self_` (`weak_ptr`) | 16 |
 | PropertyImpl | `data_` (`shared_ptr<IAny>`) | 16 |
 | PropertyImpl | `onChanged_` (`ext::LazyEvent`) | 16 |
 | PropertyImpl | `external_` (`bool`) + padding | 8 |
