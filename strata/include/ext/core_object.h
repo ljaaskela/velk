@@ -43,11 +43,11 @@ public:
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class CoreObject : public RefCountedDispatch<IObject, ISharedFromObject, Interfaces...>
+class ObjectCore : public RefCountedDispatch<IObject, ISharedFromObject, Interfaces...>
 {
 public:
-    CoreObject() = default;
-    ~CoreObject() override = default;
+    ObjectCore() = default;
+    ~ObjectCore() override = default;
 
 public:
     /** @brief Returns the compile-time class name of FinalClass. */

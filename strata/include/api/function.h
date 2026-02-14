@@ -9,7 +9,7 @@
 namespace strata {
 
 /** @brief Convenience wrapper that creates and owns an IFunction with a callback. */
-class Function : public CoreObject<Function>
+class Function : public ObjectCore<Function>
 {
 public:
     /** @brief Type alias for the native callback signature. */

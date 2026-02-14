@@ -20,10 +20,10 @@ enum class MemberKind : uint8_t { Property, Event, Function };
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
 using FnTrampoline = ReturnValue(*)(void* self, const IAny* args);
 
-/** @brief Returns a pointer to a function-local static SimpleAny\<T\> holding T{}. */
+/** @brief Returns a pointer to a function-local static AnyValue\<T\> holding T{}. */
 template<class T>
 const IAny* type_default_any() {
-    static SimpleAny<T> value;
+    static AnyValue<T> value;
     return &value;
 }
 
@@ -257,7 +257,7 @@ public:
     static constexpr ::strata::PropertyKind _strata_propkind_##Name { &::strata::type_default_any<Type> };
 #define _STRATA_DEFAULTS_PROP3(Type, Name, Default) \
     static const ::strata::IAny* _strata_getdefault_##Name() { \
-        static ::strata::SimpleAny<Type> a; \
+        static ::strata::AnyValue<Type> a; \
         static const bool _init_ = (a.set_value(Default), true); \
         (void)_init_; \
         return &a; \

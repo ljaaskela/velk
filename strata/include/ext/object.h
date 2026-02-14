@@ -10,18 +10,18 @@ namespace strata {
 /**
  * @brief CRTP base for Strata objects with metadata.
  *
- * Extends CoreObject with IMetadata support. Metadata is automatically collected
+ * Extends ObjectCore with IMetadata support. Metadata is automatically collected
  * from all Interfaces that declare metadata through STRATA_INTERFACE.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class Object : public CoreObject<FinalClass, IMetadata, IMetadataContainer, Interfaces...>
+class Object : public ObjectCore<FinalClass, IMetadata, IMetadataContainer, Interfaces...>
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
-    static constexpr auto metadata = collected_metadata<Interfaces...>::value;
+    static constexpr auto metadata = CollectedMetadata<Interfaces...>::value;
 
     Object() = default;
     ~Object() override = default;

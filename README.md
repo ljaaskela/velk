@@ -22,13 +22,14 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Custom Any types](#custom-any-types)
   - [Deferred invocation](#deferred-invocation)
 - [Architecture](#architecture)
-  - [interface/ -- Contracts](#interface----contracts)
-  - [ext/ -- CRTP helpers](#ext----crtp-helpers)
-  - [api/ -- User wrappers](#api----user-wrappers)
-  - [src/ -- Internal implementations](#src----internal-implementations)
+  - [interface/](#interface)
+  - [ext/](#ext)
+  - [api/](#api)
+  - [src/](#src)
+  - [Type hierarchy across layers](#type-hierarchy-across-layers)
 - [Key types](#key-types)
 - [Object memory layout](#object-memory-layout)
-  - [CoreObject](#coreobject)
+  - [ObjectCore](#objectcore)
   - [MetadataContainer](#metadatacontainer)
   - [Object](#object)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
@@ -38,15 +39,15 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 
 ## Features
 
-- **Interface-based architecture** -- define abstract interfaces with properties, events, and functions
-- **Central type system** -- register types, create instances by UID, query class info without instantiation
-- **Compile-time metadata** -- declare members with `STRATA_INTERFACE`, query them at compile time or runtime
-- **Type-erased values** -- `AnyT<T>` wrappers over a generic `IAny` container
-- **Typed properties** -- `PropertyT<T>` wrappers with automatic change notification events
-- **Events** -- observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
-- **Virtual function dispatch** -- `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
-- **Deferred invocation** -- functions and event handlers can be queued for execution during `update()`
-- **Custom type support** -- extend with user-defined `IAny` implementations for external or shared data
+- **Interface-based architecture:** define abstract interfaces with properties, events, and functions
+- **Central type system:** register types, create instances by UID, query class info without instantiation
+- **Compile-time metadata:** declare members with `STRATA_INTERFACE`, query them at compile time or runtime
+- **Type-erased values:** `AnyT<T>` wrappers over a generic `IAny` container
+- **Typed properties:** `PropertyT<T>` wrappers with automatic change notification events
+- **Events:** observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
+- **Virtual function dispatch:** `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
+- **Deferred invocation:** functions and event handlers can be queued for execution during `update()`
+- **Custom type support:** extend with user-defined `IAny` implementations for external or shared data
 
 ## Project structure
 
@@ -229,10 +230,10 @@ prop.set_value(10.f);  // triggers onChange
 
 ### Custom Any types
 
-Implement `CoreAny` to back a property with external or shared data:
+Implement `AnyCore` to back a property with external or shared data:
 
 ```cpp
-class MyDataAny final : public CoreAny<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
     Data& get_value() const override { return globalData_; }
@@ -289,7 +290,9 @@ strata/
   src/                   Internal runtime implementations (compiled into DLL)
 ```
 
-### interface/ -- Contracts
+### interface/
+
+Abstract interfaces (pure virtual). These define the ABI contracts.
 
 | Header | Description |
 |---|---|
@@ -305,19 +308,23 @@ strata/
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
-### ext/ -- CRTP helpers
+### ext/
+
+CRTP helpers and template implementations.
 
 | Header | Description |
 |---|---|
 | `interface_dispatch.h` | `InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces (walks parent interface chain) |
 | `refcounted_dispatch.h` | `RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
-| `core_object.h` | `ObjectFactory<T>` singleton factory; `CoreObject<T, Interfaces...>` CRTP with factory, self-pointer |
+| `core_object.h` | `ObjectFactory<T>` singleton factory; `ObjectCore<T, Interfaces...>` CRTP with factory, self-pointer |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
-| `metadata.h` | `collected_metadata<Interfaces...>` constexpr array concatenation |
-| `any.h` | `BaseAny`, `CoreAny<T>`, `SimpleAny<T>` |
+| `metadata.h` | `TypeMetadata<T>`, `CollectedMetadata<Interfaces...>` constexpr metadata collection |
+| `any.h` | `AnyBase`, `AnyMulti<Types...>`, `AnyCore<T>`, `AnyValue<T>` |
 | `event.h` | `LazyEvent` helper for deferred event creation |
 
-### api/ -- User wrappers
+### api/
+
+User-facing typed wrappers.
 
 | Header | Description |
 |---|---|
@@ -326,7 +333,9 @@ strata/
 | `any.h` | `AnyT<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support |
 
-### src/ -- Internal implementations
+### src/
+
+Internal runtime implementations (compiled into the DLL).
 
 | File | Description |
 |---|---|
@@ -335,6 +344,43 @@ strata/
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
 | `strata.cpp` | DLL entry point, exports `instance()` |
+
+### Type hierarchy across layers
+
+Each concept in Strata has types at up to three layers. The naming follows a consistent pattern:
+
+- **`I` prefix** — pure virtual interface (ABI contract)
+- **`Core` suffix** — minimal CRTP base (extend for custom behavior)
+- **`Value` / `Simple` / no suffix** — ready-to-use concrete or full-featured base
+- **`T` suffix** — typed api wrapper that users hold by value
+
+| Concept | interface/ | ext/ | api/ |
+|---------|-----------|------|------|
+| **Any** | `IAny` | `AnyBase` | `AnyT<T>` |
+| | | `AnyMulti<Types...>` | |
+| | | `AnyCore<Final, T>` | |
+| | | `AnyValue<T>` | |
+| **Object** | `IObject` | `ObjectCore<Final, Intf...>` | — |
+| | | `Object<Final, Intf...>` | |
+| **Property** | `IProperty` | — | `Property` → `PropertyT<T>` |
+| **Function** | `IFunction` | — | `Function` |
+| **Event** | `IEvent` | `LazyEvent` | — |
+
+**Any hierarchy** (ext/) — three levels for different extension points:
+
+| Class | Role | When to use |
+|-------|------|-------------|
+| `AnyBase<Final, Intf...>` | Internal base with ref-counting, clone, factory | Rarely used directly |
+| `AnyMulti<Final, Types...>` | Multi-type compatible any | When an any must expose multiple type UIDs |
+| `AnyCore<Final, T, Intf...>` | Single-type with virtual get/set | Extend for custom storage (external data, shared state) |
+| `AnyValue<T>` | Inline storage, ready to use | Default choice for simple typed values |
+
+**Object hierarchy** (ext/) — two levels:
+
+| Class | Role | When to use |
+|-------|------|-------------|
+| `ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `StrataImpl`) |
+| `Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `STRATA_INTERFACE` |
 
 ## Key types
 
@@ -345,8 +391,8 @@ strata/
 | `Interface<T, Base>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases, `ParentInterface` typedef for dispatch chain walking |
 | `InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces and their parent interface chains |
 | `RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |
-| `CoreObject<T, Interfaces...>` | CRTP base for concrete objects (without metadata); auto UID/name, factory, self-pointer |
-| `Object<T, Interfaces...>` | Extends `CoreObject` with metadata from all interfaces |
+| `ObjectCore<T, Interfaces...>` | Minimal CRTP base for objects (without metadata); auto UID/name, factory, self-pointer |
+| `Object<T, Interfaces...>` | Full CRTP base; extends `ObjectCore` with metadata from all interfaces |
 | `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
 | `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with cloned `IAny::Ptr` args |
 | `PropertyT<T>` | Typed property with `get_value()`/`set_value()` and change events |
@@ -360,7 +406,7 @@ strata/
 
 An `Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
-### CoreObject
+### ObjectCore
 
 Interface infrastructure, reference counting and `ISharedFromObject` semantics.
 
@@ -369,7 +415,7 @@ Interface infrastructure, reference counting and `ISharedFromObject` semantics.
 | InterfaceDispatch | vptr | 8 |
 | RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
 | RefCountedDispatch | flags (`int32_t`) | 4 |
-| CoreObject | `self_` (`weak_ptr`) | 16 |
+| ObjectCore | `self_` (`weak_ptr`) | 16 |
 | **Total** | | **32 bytes** |
 
 ### MetadataContainer
@@ -395,11 +441,11 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 
 ### Object
 
-Full object with CoreObject features and runtime metadata.
+Full object with ObjectCore features and runtime metadata.
 
 | Layer | Member | Size (x64) |
 |---|---|---|
-| CoreObject | [CoreObject](#CoreObject) | 32 |
+| ObjectCore | [ObjectCore](#objectcore) | 32 |
 | Object | `meta_` (`unique_ptr<IMetadata>`) | 8 |
 | MetadataContainer | [MetadataContainer](#MetadataContainer), heap-allocated | 64 |
 | **Total** | | **104 bytes** |
@@ -418,22 +464,22 @@ Metadata is instantiated from object's static metadata when accessed by the appl
 
 #### Any
 
-`BaseAny` types inherit `RefCountedDispatch<IAny>` directly
+`AnyBase` types inherit `RefCountedDispatch<IAny>` directly
 * `IAny` inherits `IObject` (for factory compatibility) but skips `ISharedFromObject` and the `self_` weak pointer. 
-* The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. CoreObject.
+* The single inheritance chain (`IInterface` → `IObject` → `IAny`) means only one vptr, saving 24 bytes total vs. ObjectCore.
 
 | Layer | Member | Size (x64) |
 |---|---|---|
 | InterfaceDispatch | vptr | 8 |
 | RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
 | RefCountedDispatch | flags (`int32_t`) | 4 |
-| **BaseAny total** | | **16 bytes** |
+| **AnyBase total** | | **16 bytes** |
 
-`SimpleAny<T>` adds the stored value on top of the BaseAny base. Measured sizes (MSVC x64):
+`AnyValue<T>` adds the stored value on top of the AnyBase base. Measured sizes (MSVC x64):
 
 | Type | Size |
 |---|---|
-| `SimpleAny<float>` | 32 bytes |
+| `AnyValue<float>` | 32 bytes |
 
 An example of a custom any with external data storage `MyDataAny` can be found from the demo application. 
 
@@ -455,7 +501,7 @@ An example of a custom any with external data storage `MyDataAny` can be found f
 | InterfaceDispatch | vptr | 8 |
 | RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
 | RefCountedDispatch | flags (`int32_t`) | 4 |
-| CoreObject | `self_` (`weak_ptr`) | 16 |
+| ObjectCore | `self_` (`weak_ptr`) | 16 |
 | FunctionImpl | `target_context_` (`void*`) | 8 |
 | FunctionImpl | `target_fn_` (`BoundFn*`) | 8 |
 | FunctionImpl | `handlers_` (`vector<ConstPtr>`) | 24 |
@@ -476,7 +522,7 @@ The `handlers_` vector is partitioned:
 | InterfaceDispatch | vptr | 8 |
 | RefCountedDispatch | refCount (`atomic<int32_t>`) | 4 |
 | RefCountedDispatch | flags (`int32_t`) | 4 |
-| CoreObject | `self_` (`weak_ptr`) | 16 |
+| ObjectCore | `self_` (`weak_ptr`) | 16 |
 | PropertyImpl | `data_` (`shared_ptr<IAny>`) | 16 |
 | PropertyImpl | `onChanged_` (`LazyEvent`) | 16 |
 | PropertyImpl | `external_` (`bool`) + padding | 8 |

@@ -12,7 +12,7 @@ namespace strata {
  * @brief Type-erased value container interface.
  *
  * Inherits IObject so that Any types are factory-compatible without
- * needing the full CoreObject machinery (ISharedFromObject, self-pointer).
+ * needing the full ObjectCore machinery (ISharedFromObject, self-pointer).
  *
  * Supports querying compatible types, and getting/setting data by type UID.
  */

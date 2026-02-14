@@ -15,13 +15,13 @@ namespace strata {
 
 /** @brief Gets T::metadata if it exists, otherwise an empty array. */
 template<class T, class = void>
-struct type_metadata {
+struct TypeMetadata {
     static constexpr std::array<MemberDesc, 0> value{};
 };
 
 /** @brief Specialization that extracts T::metadata when it exists. */
 template<class T>
-struct type_metadata<T, std::void_t<decltype(T::metadata)>> {
+struct TypeMetadata<T, std::void_t<decltype(T::metadata)>> {
     static constexpr auto value = T::metadata;
 };
 
@@ -37,20 +37,20 @@ constexpr std::array<T, N1 + N2> concat_arrays(std::array<T, N1> a, std::array<T
 
 /** @brief Collects metadata arrays from all interfaces into a single array. */
 template<class...>
-struct collected_metadata;
+struct CollectedMetadata;
 
 /** @brief Base case: no interfaces yield an empty metadata array. */
 template<>
-struct collected_metadata<> {
+struct CollectedMetadata<> {
     static constexpr std::array<MemberDesc, 0> value{};
 };
 
 /** @brief Recursive case: concatenates First::metadata with the rest. */
 template<class First, class... Rest>
-struct collected_metadata<First, Rest...> {
+struct CollectedMetadata<First, Rest...> {
     static constexpr auto value = concat_arrays(
-        type_metadata<First>::value,
-        collected_metadata<Rest...>::value
+        TypeMetadata<First>::value,
+        CollectedMetadata<Rest...>::value
     );
 };
 

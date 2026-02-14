@@ -10,7 +10,7 @@
 
 namespace strata {
 
-class PropertyImpl final : public CoreObject<PropertyImpl, IProperty, IPropertyInternal>
+class PropertyImpl final : public ObjectCore<PropertyImpl, IProperty, IPropertyInternal>
 {
 public:
     PropertyImpl() = default;

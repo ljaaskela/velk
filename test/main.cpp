@@ -32,7 +32,7 @@ struct Data
 Data globalData_;
 
 // Custom any type which accesses global data
-class MyDataAny final : public CoreAny<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
     Data &get_value() const override { return globalData_; }
@@ -146,7 +146,7 @@ int main()
     std::cout << "sizeof(float)            " << sizeof(float) << std::endl;
     std::cout << "sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << std::endl;
     std::cout << "sizeof(AnyT<float>)      " << sizeof(AnyT<float>) << std::endl;
-    std::cout << "sizeof(SimpleAny<float>) " << sizeof(SimpleAny<float>) << std::endl;
+    std::cout << "sizeof(AnyValue<float>) " << sizeof(AnyValue<float>) << std::endl;
     std::cout << "sizeof(PropertyT<float>) " << sizeof(PropertyT<float>) << std::endl;
     std::cout << "sizeof(MyDataAny)        " << sizeof(MyDataAny) << std::endl;
 

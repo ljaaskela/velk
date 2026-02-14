@@ -13,17 +13,17 @@ void RegisterTypes(IStrata &strata)
     strata.register_type<PropertyImpl>();
     strata.register_type<FunctionImpl>();
 
-    strata.register_type<SimpleAny<float>>();
-    strata.register_type<SimpleAny<double>>();
-    strata.register_type<SimpleAny<uint8_t>>();
-    strata.register_type<SimpleAny<uint16_t>>();
-    strata.register_type<SimpleAny<uint32_t>>();
-    strata.register_type<SimpleAny<uint64_t>>();
-    strata.register_type<SimpleAny<int8_t>>();
-    strata.register_type<SimpleAny<int16_t>>();
-    strata.register_type<SimpleAny<int32_t>>();
-    strata.register_type<SimpleAny<int64_t>>();
-    strata.register_type<SimpleAny<std::string>>();
+    strata.register_type<AnyValue<float>>();
+    strata.register_type<AnyValue<double>>();
+    strata.register_type<AnyValue<uint8_t>>();
+    strata.register_type<AnyValue<uint16_t>>();
+    strata.register_type<AnyValue<uint32_t>>();
+    strata.register_type<AnyValue<uint64_t>>();
+    strata.register_type<AnyValue<int8_t>>();
+    strata.register_type<AnyValue<int16_t>>();
+    strata.register_type<AnyValue<int32_t>>();
+    strata.register_type<AnyValue<int64_t>>();
+    strata.register_type<AnyValue<std::string>>();
 }
 
 StrataImpl::StrataImpl()

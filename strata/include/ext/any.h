@@ -19,7 +19,7 @@ namespace strata {
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template<class FinalClass, class... Interfaces>
-class BaseAny : public RefCountedDispatch<IAny, Interfaces...>
+class AnyBase : public RefCountedDispatch<IAny, Interfaces...>
 {
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
@@ -53,12 +53,12 @@ private:
 };
 
 /**
- * @brief BaseAny specialization that declares compatibility with one or more types.
+ * @brief AnyBase specialization that declares compatibility with one or more types.
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Types The data types this any is compatible with.
  */
 template<class FinalClass, class... Types>
-class BaseAnyT : public BaseAny<FinalClass>
+class AnyMulti : public AnyBase<FinalClass>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<Types...>();
@@ -78,7 +78,7 @@ public:
  * @brief A helper template for implementing an Any which supports a single type
  */
 template<class FinalClass, class T, class... Interfaces>
-class CoreAny : public BaseAny<FinalClass, Interfaces...>
+class AnyCore : public AnyBase<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
@@ -140,9 +140,9 @@ private:
  * For trivially copyable types, uses memcpy/memcmp instead of typed operations.
  */
 template<class T>
-class SimpleAny final : public CoreAny<SimpleAny<T>, T>
+class AnyValue final : public AnyCore<AnyValue<T>, T>
 {
-    using Base = CoreAny<SimpleAny<T>, T>;
+    using Base = AnyCore<AnyValue<T>, T>;
 
 public:
     ReturnValue set_value(const T &value) override
