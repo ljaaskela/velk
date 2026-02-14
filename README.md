@@ -229,10 +229,10 @@ prop.set_value(10.f);  // triggers onChange
 
 ### Custom Any types
 
-Implement `SingleTypeAny` to back a property with external or shared data:
+Implement `CoreAny` to back a property with external or shared data:
 
 ```cpp
-class MyDataAny final : public SingleTypeAny<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public CoreAny<MyDataAny, Data, IExternalAny>
 {
 public:
     Data& get_value() const override { return globalData_; }
@@ -314,7 +314,7 @@ strata/
 | `core_object.h` | `ObjectFactory<T>` singleton factory; `CoreObject<T, Interfaces...>` CRTP with factory, self-pointer |
 | `object.h` | `Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
 | `metadata.h` | `collected_metadata<Interfaces...>` constexpr array concatenation |
-| `any.h` | `BaseAny`, `SingleTypeAny<T>`, `SimpleAny<T>` |
+| `any.h` | `BaseAny`, `CoreAny<T>`, `SimpleAny<T>` |
 | `event.h` | `LazyEvent` helper for deferred event creation |
 
 ### api/ -- User wrappers

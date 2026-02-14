@@ -39,8 +39,14 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     case MemberKind::Property: {
         created = make_shared_impl<PropertyImpl>();
         if (auto *pi = created->get_interface<IPropertyInternal>()) {
-            if (auto any = instance().create_any(desc.typeUid)) {
-                pi->set_any(any);
+            if (auto* pk = desc.propertyKind()) {
+                if (pk->getDefault) {
+                    if (auto* def = pk->getDefault()) {
+                        if (auto any = def->clone()) {
+                            pi->set_any(any);
+                        }
+                    }
+                }
             }
         }
         break;
@@ -72,14 +78,16 @@ IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberK
             // virtual (via STRATA_INTERFACE), bind the FunctionImpl so that
             // invoke() routes through the static trampoline to the virtual
             // method on the owning object's interface subobject.
-            if ((kind == MemberKind::Function || kind == MemberKind::Event) && member.fnTrampoline && owner_) {
-                if (auto* fi = interface_cast<IFunctionInternal>(created)) {
-                    // Resolve the interface pointer that declared this function.
-                    // This is the 'self' the trampoline will static_cast back to
-                    // the concrete interface type (e.g. IMyWidget*).
-                    void* intf_ptr = owner_->get_interface(member.interfaceInfo->uid);
-                    if (intf_ptr) {
-                        fi->bind(intf_ptr, member.fnTrampoline);
+            if (auto* fk = member.functionKind()) {
+                if (fk->trampoline && owner_) {
+                    if (auto* fi = interface_cast<IFunctionInternal>(created)) {
+                        // Resolve the interface pointer that declared this function.
+                        // This is the 'self' the trampoline will static_cast back to
+                        // the concrete interface type (e.g. IMyWidget*).
+                        void* intf_ptr = owner_->get_interface(member.interfaceInfo->uid);
+                        if (intf_ptr) {
+                            fi->bind(intf_ptr, fk->trampoline);
+                        }
                     }
                 }
             }

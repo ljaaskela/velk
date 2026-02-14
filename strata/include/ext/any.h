@@ -78,7 +78,7 @@ public:
  * @brief A helper template for implementing an Any which supports a single type
  */
 template<class FinalClass, class T, class... Interfaces>
-class SingleTypeAny : public BaseAny<FinalClass, Interfaces...>
+class CoreAny : public BaseAny<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
@@ -140,9 +140,9 @@ private:
  * For trivially copyable types, uses memcpy/memcmp instead of typed operations.
  */
 template<class T>
-class SimpleAny final : public SingleTypeAny<SimpleAny<T>, T>
+class SimpleAny final : public CoreAny<SimpleAny<T>, T>
 {
-    using Base = SingleTypeAny<SimpleAny<T>, T>;
+    using Base = CoreAny<SimpleAny<T>, T>;
 
 public:
     ReturnValue set_value(const T &value) override

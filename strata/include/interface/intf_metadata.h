@@ -4,6 +4,7 @@
 #include <api/property.h>
 #include <array_view.h>
 #include <common.h>
+#include <ext/any.h>
 #include <interface/intf_event.h>
 #include <interface/intf_interface.h>
 #include <interface/intf_property.h>
@@ -19,20 +20,60 @@ enum class MemberKind : uint8_t { Property, Event, Function };
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
 using FnTrampoline = ReturnValue(*)(void* self, const IAny* args);
 
+/** @brief Returns a pointer to a function-local static SimpleAny\<T\> holding T{}. */
+template<class T>
+const IAny* type_default_any() {
+    static SimpleAny<T> value;
+    return &value;
+}
+
+/** @brief Kind-specific data for Property members. */
+struct PropertyKind {
+    const IAny*(*getDefault)() = nullptr;
+};
+
+/** @brief Kind-specific data for Function/Event members. */
+struct FunctionKind {
+    FnTrampoline trampoline = nullptr;
+};
+
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
 struct MemberDesc {
     std::string_view name;
     MemberKind kind;
     Uid typeUid;                        // only meaningful for Property
     const InterfaceInfo* interfaceInfo; // interface where this member was declared
-    FnTrampoline fnTrampoline{};        // non-null for FN members with trampolines
+    const void* ext = nullptr;          // points to PropertyKind or FunctionKind based on kind
+
+    constexpr const PropertyKind* propertyKind() const {
+        return kind == MemberKind::Property ? static_cast<const PropertyKind*>(ext) : nullptr;
+    }
+    constexpr const FunctionKind* functionKind() const {
+        return (kind == MemberKind::Function || kind == MemberKind::Event)
+            ? static_cast<const FunctionKind*>(ext) : nullptr;
+    }
 };
 
 /** @brief Creates a Property MemberDesc for type T. */
 template<class T>
-constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* info = nullptr)
+constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* info = nullptr,
+    const PropertyKind* pk = nullptr)
 {
-    return {name, MemberKind::Property, type_uid<T>(), info};
+    return {name, MemberKind::Property, type_uid<T>(), info, pk};
+}
+
+/** @brief Retrieves the typed default value from a MemberDesc. */
+template<class T>
+T get_default_value(const MemberDesc& desc) {
+    T value{};
+    if (auto* pk = desc.propertyKind()) {
+        if (pk->getDefault) {
+            if (auto* any = pk->getDefault()) {
+                any->get_data(&value, sizeof(T), type_uid<T>());
+            }
+        }
+    }
+    return value;
 }
 
 /** @brief Creates an Event MemberDesc. */
@@ -43,9 +84,9 @@ constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info 
 
 /** @brief Creates a Function MemberDesc. */
 constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr,
-    FnTrampoline trampoline = nullptr)
+    const FunctionKind* fk = nullptr)
 {
-    return {name, MemberKind::Function, {}, info, trampoline};
+    return {name, MemberKind::Function, {}, info, fk};
 }
 
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
@@ -203,16 +244,43 @@ public:
 #define _STRATA_FOR_EACH(M, ...) \
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_FE_, _STRATA_NARG(__VA_ARGS__))(M, __VA_ARGS__))
 
+// --- PROP argument counting (2 = no default, 3 = with default) ---
+
+#define _STRATA_PROP_ARGC_IMPL(_1, _2, _3, N, ...) N
+#define _STRATA_PROP_ARGC(...) _STRATA_EXPAND(_STRATA_PROP_ARGC_IMPL(__VA_ARGS__, 3, 2))
+
+// --- Defaults pass: generates kind-specific static data for each member ---
+
+#define _STRATA_DEFAULTS_PROP(...) \
+    _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_PROP, _STRATA_PROP_ARGC(__VA_ARGS__))(__VA_ARGS__))
+#define _STRATA_DEFAULTS_PROP2(Type, Name) \
+    static constexpr ::strata::PropertyKind _strata_propkind_##Name { &::strata::type_default_any<Type> };
+#define _STRATA_DEFAULTS_PROP3(Type, Name, Default) \
+    static const ::strata::IAny* _strata_getdefault_##Name() { \
+        static ::strata::SimpleAny<Type> a; \
+        static const bool _init_ = (a.set_value(Default), true); \
+        (void)_init_; \
+        return &a; \
+    } \
+    static constexpr ::strata::PropertyKind _strata_propkind_##Name { &_strata_getdefault_##Name };
+#define _STRATA_DEFAULTS_EVT(...)
+#define _STRATA_DEFAULTS_FN(Name) \
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
+#define _STRATA_DEFAULTS(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_, Tag)(__VA_ARGS__))
+
 // --- Metadata dispatch: tag -> MemberDesc initializer ---
 
-#define _STRATA_META_PROP(Type, Name) ::strata::PropertyDesc<Type>(#Name, &INFO),
-#define _STRATA_META_EVT(Name)        ::strata::EventDesc(#Name, &INFO),
-#define _STRATA_META_FN(Name)         ::strata::FunctionDesc(#Name, &INFO, &_strata_trampoline_##Name),
+#define _STRATA_META_PROP(Type, Name, ...) \
+    ::strata::PropertyDesc<Type>(#Name, &INFO, &_strata_propkind_##Name),
+#define _STRATA_META_EVT(Name) \
+    ::strata::EventDesc(#Name, &INFO),
+#define _STRATA_META_FN(Name) \
+    ::strata::FunctionDesc(#Name, &INFO, &_strata_fnkind_##Name),
 #define _STRATA_META(Tag, ...)        _STRATA_EXPAND(_STRATA_CAT(_STRATA_META_, Tag)(__VA_ARGS__))
 
 // --- Trampoline dispatch: tag -> virtual method + static trampoline for FN, no-op for PROP/EVT ---
 
-#define _STRATA_TRAMPOLINE_PROP(Type, Name)
+#define _STRATA_TRAMPOLINE_PROP(...)
 #define _STRATA_TRAMPOLINE_EVT(Name)
 #define _STRATA_TRAMPOLINE_FN(Name) \
     virtual ::strata::ReturnValue fn_##Name(const ::strata::IAny*) = 0; \
@@ -221,13 +289,14 @@ public:
     }
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
-/** @brief Generates a static constexpr metadata array from STRATA_P/STRATA_E/STRATA_F entries. */
+/** @brief Generates default-value functions and a static constexpr metadata array. */
 #define STRATA_METADATA(...) \
+    _STRATA_FOR_EACH(_STRATA_DEFAULTS, __VA_ARGS__) \
     static constexpr std::array metadata = { _STRATA_FOR_EACH(_STRATA_META, __VA_ARGS__) };
 
 // --- Accessor dispatch: tag -> typed non-virtual accessor method ---
 
-#define _STRATA_ACC_PROP(Type, Name) \
+#define _STRATA_ACC_PROP(Type, Name, ...) \
     ::strata::PropertyT<Type> Name() const { \
         return ::strata::PropertyT<Type>(::strata::get_property( \
             this->template get_interface<::strata::IMetadata>(), #Name)); \
@@ -252,11 +321,12 @@ public:
  * from @c Interface<T>. Each argument is a parenthesized tuple describing one
  * member. Three member kinds are supported:
  *
- * | Kind     | Syntax                    | Description                        |
- * |----------|---------------------------|------------------------------------|
- * | Property | @c (PROP, Type, Name)     | A typed property with Get/Set      |
- * | Event    | @c (EVT, Name)            | An observable event                |
- * | Function | @c (FN, Name)             | A callable function slot           |
+ * | Kind     | Syntax                          | Description                        |
+ * |----------|---------------------------------|------------------------------------|
+ * | Property | @c (PROP, Type, Name)           | A typed property (default: T{})    |
+ * | Property | @c (PROP, Type, Name, Default)  | A typed property with custom default |
+ * | Event    | @c (EVT, Name)                  | An observable event                |
+ * | Function | @c (FN, Name)                   | A callable function slot           |
  *
  * @par What the macro generates
  * For each member entry the macro produces:

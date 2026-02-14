@@ -32,7 +32,7 @@ struct Data
 Data globalData_;
 
 // Custom any type which accesses global data
-class MyDataAny final : public SingleTypeAny<MyDataAny, Data, IExternalAny>
+class MyDataAny final : public CoreAny<MyDataAny, Data, IExternalAny>
 {
 public:
     Data &get_value() const override { return globalData_; }
@@ -59,8 +59,8 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, width),
-        (PROP, float, height),
+        (PROP, float, width, 100.f),
+        (PROP, float, height, 50.f),
         (EVT, on_clicked),
         (FN, reset)
     )
@@ -162,8 +162,27 @@ int main()
             if (m.interfaceInfo) {
                 std::cout << " (from " << m.interfaceInfo->name << ")";
             }
+            if (m.propertyKind()) {
+                std::cout << " [has default]";
+            }
             std::cout << std::endl;
         }
+    }
+
+    // --- Static defaults (no instance needed) ---
+    std::cout << "\n--- Static metadata defaults ---" << std::endl;
+    if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
+        for (auto& m : info->members) {
+            if (auto* pk = m.propertyKind()) {
+                auto* def = pk->getDefault ? pk->getDefault() : nullptr;
+                std::cout << "  " << m.name << " default IAny: " << (def ? "ok" : "null") << std::endl;
+            }
+        }
+        // Typed access to specific defaults
+        std::cout << "  width default = " << get_default_value<float>(info->members[0]) << std::endl;
+        std::cout << "  height default = " << get_default_value<float>(info->members[1]) << std::endl;
+        // ISerializable::name (no custom default, should be "")
+        std::cout << "  name default = \"" << get_default_value<std::string>(info->members[4]) << "\"" << std::endl;
     }
 
     // --- Runtime metadata via IMetadata ---
@@ -190,6 +209,10 @@ int main()
     // --- Typed access via IMyWidget interface ---
     std::cout << "\n--- MyWidget via IMyWidget interface ---" << std::endl;
     if (auto* iw = interface_cast<IMyWidget>(widget)) {
+        // Verify runtime properties start with declared defaults
+        std::cout << "  width() initial value = " << iw->width().get_value() << " (expected 100)" << std::endl;
+        std::cout << "  height() initial value = " << iw->height().get_value() << " (expected 50)" << std::endl;
+
         auto w = iw->width();
         w.set_value(42.f);
         std::cout << "  width().set_value(42) -> width().get_value() = " << iw->width().get_value() << std::endl;
