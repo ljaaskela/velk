@@ -587,18 +587,19 @@ public:
         float width = 0.f;
     };
 
-    // 2. Property kind statics
-    //    getDefault: returns a pointer to a function-local static AnyValue<T>
-    //    holding the default value. Used for static metadata queries and as
-    //    fallback when state-backed storage is unavailable.
+    // 2. Default state and property kind statics
+    //    _strata_default_state: returns a reference to a static State instance
+    //    initialized with default values. Shared across all properties.
+    //    getDefault: returns a pointer to a static AnyRef<T> pointing into
+    //    the default state. Used for static metadata queries and as fallback
+    //    when state-backed storage is unavailable.
     //    createRef: creates an AnyRef<T> pointing into the State struct at
     //    the given base address. Used by MetadataContainer to back properties
     //    with the Object's contiguous state storage.
+    static State& _strata_default_state() { static State s; return s; }
     static const IAny* _strata_getdefault_width() {
-        static AnyValue<float> a;
-        static const bool _init_ = (a.set_value(0.f), true);
-        (void)_init_;
-        return &a;
+        static AnyRef<float> ref(&_strata_default_state().width);
+        return &ref;
     }
     static IAny::Ptr _strata_createref_width(void* base) {
         return create_any_ref<float>(&static_cast<State*>(base)->width);

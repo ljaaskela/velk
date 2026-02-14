@@ -275,10 +275,8 @@ public:
 
 #define _STRATA_DEFAULTS_PROP(Type, Name, Default) \
     static const ::strata::IAny* _strata_getdefault_##Name() { \
-        static ::strata::AnyValue<Type> a; \
-        static const bool _init_ = (a.set_value(Default), true); \
-        (void)_init_; \
-        return &a; \
+        static ::strata::AnyRef<Type> ref(&_strata_default_state().Name); \
+        return &ref; \
     } \
     static ::strata::IAny::Ptr _strata_createref_##Name(void* base) { \
         return ::strata::create_any_ref<Type>(&static_cast<State*>(base)->Name); \
@@ -314,6 +312,7 @@ public:
 /** @brief Generates default-value functions and a static constexpr metadata array. */
 #define STRATA_METADATA(...) \
     struct State { _STRATA_FOR_EACH(_STRATA_STATE, __VA_ARGS__) }; \
+    static State& _strata_default_state() { static State s; return s; } \
     _STRATA_FOR_EACH(_STRATA_DEFAULTS, __VA_ARGS__) \
     static constexpr std::array metadata = { _STRATA_FOR_EACH(_STRATA_META, __VA_ARGS__) };
 
