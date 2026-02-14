@@ -20,16 +20,10 @@ enum class MemberKind : uint8_t { Property, Event, Function };
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
 using FnTrampoline = ReturnValue(*)(void* self, const IAny* args);
 
-/** @brief Returns a pointer to a function-local static AnyValue\<T\> holding T{}. */
-template<class T>
-const IAny* type_default_any() {
-    static AnyValue<T> value;
-    return &value;
-}
-
 /** @brief Kind-specific data for Property members. */
 struct PropertyKind {
     const IAny*(*getDefault)() = nullptr;
+    IAny::Ptr(*createRef)(void* stateBase) = nullptr;
 };
 
 /** @brief Kind-specific data for Function/Event members. */
@@ -45,10 +39,14 @@ struct MemberDesc {
     const InterfaceInfo* interfaceInfo; // interface where this member was declared
     const void* ext = nullptr;          // points to PropertyKind or FunctionKind based on kind
 
-    constexpr const PropertyKind* propertyKind() const {
+    /// Typed ext member getter for MemberDesc.kind = MemberKind::Property
+    constexpr const PropertyKind *propertyKind() const
+    {
         return kind == MemberKind::Property ? static_cast<const PropertyKind*>(ext) : nullptr;
     }
-    constexpr const FunctionKind* functionKind() const {
+    /// Typed ext member getter for MemberDesc.kind = MemberKind::Function or MemberDesc.kind = MemberKind::Event
+    constexpr const FunctionKind *functionKind() const
+    {
         return (kind == MemberKind::Function || kind == MemberKind::Event)
             ? static_cast<const FunctionKind*>(ext) : nullptr;
     }
@@ -66,11 +64,10 @@ constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* in
 template<class T>
 T get_default_value(const MemberDesc& desc) {
     T value{};
-    if (auto* pk = desc.propertyKind()) {
-        if (pk->getDefault) {
-            if (auto* any = pk->getDefault()) {
-                any->get_data(&value, sizeof(T), type_uid<T>());
-            }
+    const auto *pk = desc.propertyKind();
+    if (pk && pk->getDefault) {
+        if (const auto *any = pk->getDefault()) {
+            any->get_data(&value, sizeof(T), type_uid<T>());
         }
     }
     return value;
@@ -89,8 +86,31 @@ constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* in
     return {name, MemberKind::Function, {}, info, fk};
 }
 
+/**
+ * @brief Interface for accessing per-interface property state structs.
+ *
+ * Provides contiguous, state-struct-backed property storage. MetadataContainer
+ * uses this to create AnyRef instances that read/write directly into the state struct.
+ */
+class IPropertyState : public Interface<IPropertyState>
+{
+public:
+    /** @brief Returns a pointer to the State struct for the given interface UID, or nullptr. */
+    virtual void *get_property_state(Uid interfaceUid) = 0;
+
+    /**
+     * @brief Type-safe state access. Returns a typed pointer to T::State.
+     * @tparam T The interface type whose State struct to retrieve.
+     */
+    template<class T>
+    typename T::State *get_property_state()
+    {
+        return static_cast<typename T::State *>(get_property_state(T::UID));
+    }
+};
+
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
-class IMetadata : public Interface<IMetadata>
+class IMetadata : public Interface<IMetadata, IPropertyState>
 {
 public:
     /** @brief Returns the static metadata descriptors for this object's class. */
@@ -244,25 +264,27 @@ public:
 #define _STRATA_FOR_EACH(M, ...) \
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_FE_, _STRATA_NARG(__VA_ARGS__))(M, __VA_ARGS__))
 
-// --- PROP argument counting (2 = no default, 3 = with default) ---
+// --- State pass: generates State struct fields for PROP members ---
 
-#define _STRATA_PROP_ARGC_IMPL(_1, _2, _3, N, ...) N
-#define _STRATA_PROP_ARGC(...) _STRATA_EXPAND(_STRATA_PROP_ARGC_IMPL(__VA_ARGS__, 3, 2))
+#define _STRATA_STATE_PROP(Type, Name, Default)  Type Name = Default;
+#define _STRATA_STATE_EVT(Name)
+#define _STRATA_STATE_FN(Name)
+#define _STRATA_STATE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_STATE_, Tag)(__VA_ARGS__))
 
 // --- Defaults pass: generates kind-specific static data for each member ---
 
-#define _STRATA_DEFAULTS_PROP(...) \
-    _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_PROP, _STRATA_PROP_ARGC(__VA_ARGS__))(__VA_ARGS__))
-#define _STRATA_DEFAULTS_PROP2(Type, Name) \
-    static constexpr ::strata::PropertyKind _strata_propkind_##Name { &::strata::type_default_any<Type> };
-#define _STRATA_DEFAULTS_PROP3(Type, Name, Default) \
+#define _STRATA_DEFAULTS_PROP(Type, Name, Default) \
     static const ::strata::IAny* _strata_getdefault_##Name() { \
         static ::strata::AnyValue<Type> a; \
         static const bool _init_ = (a.set_value(Default), true); \
         (void)_init_; \
         return &a; \
     } \
-    static constexpr ::strata::PropertyKind _strata_propkind_##Name { &_strata_getdefault_##Name };
+    static ::strata::IAny::Ptr _strata_createref_##Name(void* base) { \
+        return ::strata::create_any_ref<Type>(&static_cast<State*>(base)->Name); \
+    } \
+    static constexpr ::strata::PropertyKind _strata_propkind_##Name { \
+        &_strata_getdefault_##Name, &_strata_createref_##Name };
 #define _STRATA_DEFAULTS_EVT(...)
 #define _STRATA_DEFAULTS_FN(Name) \
     static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
@@ -291,6 +313,7 @@ public:
 
 /** @brief Generates default-value functions and a static constexpr metadata array. */
 #define STRATA_METADATA(...) \
+    struct State { _STRATA_FOR_EACH(_STRATA_STATE, __VA_ARGS__) }; \
     _STRATA_FOR_EACH(_STRATA_DEFAULTS, __VA_ARGS__) \
     static constexpr std::array metadata = { _STRATA_FOR_EACH(_STRATA_META, __VA_ARGS__) };
 
@@ -323,8 +346,7 @@ public:
  *
  * | Kind     | Syntax                          | Description                        |
  * |----------|---------------------------------|------------------------------------|
- * | Property | @c (PROP, Type, Name)           | A typed property (default: T{})    |
- * | Property | @c (PROP, Type, Name, Default)  | A typed property with custom default |
+ * | Property | @c (PROP, Type, Name, Default)  | A typed property with default value  |
  * | Event    | @c (EVT, Name)                  | An observable event                |
  * | Function | @c (FN, Name)                   | A callable function slot           |
  *
@@ -353,8 +375,8 @@ public:
  * {
  * public:
  *     STRATA_INTERFACE(
- *         (PROP, float, width),
- *         (PROP, float, height),
+ *         (PROP, float, width, 0.f),
+ *         (PROP, float, height, 0.f),
  *         (EVT, on_clicked),
  *         (FN, reset)          // generates: virtual fn_reset(const IAny*)
  *     )

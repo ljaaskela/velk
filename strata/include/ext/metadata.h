@@ -54,6 +54,20 @@ struct CollectedMetadata<First, Rest...> {
     );
 };
 
+// -- State struct extraction from interfaces --
+
+/** @brief Extracts T::State if it exists, otherwise provides an empty struct. */
+template<class T, class = void>
+struct InterfaceState {
+    struct type {};
+};
+
+/** @brief Specialization that extracts T::State when it exists. */
+template<class T>
+struct InterfaceState<T, std::void_t<typename T::State>> {
+    using type = typename T::State;
+};
+
 } // namespace strata
 
 #endif // EXT_METADATA_H

@@ -40,7 +40,18 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
         created = make_shared_impl<PropertyImpl>();
         if (auto *pi = created->get_interface<IPropertyInternal>()) {
             if (auto* pk = desc.propertyKind()) {
-                if (pk->getDefault) {
+                // Try state-backed ref first
+                if (pk->createRef && owner_) {
+                    if (auto* ps = interface_cast<IPropertyState>(owner_)) {
+                        if (void* base = ps->get_property_state(desc.interfaceInfo->uid)) {
+                            if (auto ref = pk->createRef(base)) {
+                                pi->set_any(ref);
+                            }
+                        }
+                    }
+                }
+                // Fallback to cloning default
+                if (!pi->get_any() && pk->getDefault) {
                     if (auto* def = pk->getDefault()) {
                         if (auto any = def->clone()) {
                             pi->set_any(any);

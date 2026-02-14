@@ -5,6 +5,8 @@
 #include <ext/metadata.h>
 #include <ext/core_object.h>
 
+#include <tuple>
+
 namespace strata {
 
 /**
@@ -58,6 +60,10 @@ public: // IMetadataContainer override
         }
     }
 
+public: // IPropertyState override
+    /** @brief Returns a pointer to the State struct for the given interface UID. */
+    void *get_property_state(Uid uid) override { return find_state<0>(uid); }
+
 public:
     /** @brief Returns the singleton factory for creating instances of FinalClass (with metadata). */
     static const IObjectFactory &get_factory()
@@ -81,6 +87,19 @@ private:
     };
 
     std::unique_ptr<IMetadata> meta_;
+    std::tuple<typename InterfaceState<Interfaces>::type...> states_;
+
+    template<size_t I>
+    void *find_state(Uid uid)
+    {
+        if constexpr (I < sizeof...(Interfaces)) {
+            using Intf = std::tuple_element_t<I, std::tuple<Interfaces...>>;
+            if (Intf::UID == uid) return &std::get<I>(states_);
+            return find_state<I + 1>(uid);
+        } else {
+            return nullptr;
+        }
+    }
 };
 
 } // namespace strata

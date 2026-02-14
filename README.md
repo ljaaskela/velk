@@ -94,8 +94,8 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, width),
-        (PROP, float, height),
+        (PROP, float, width, 0.f),
+        (PROP, float, height, 0.f),
         (EVT, on_clicked),
         (FN, reset)
     )
@@ -125,7 +125,7 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, std::string, name),
+        (PROP, std::string, name, ""),
         (FN, serialize)
     )
 };
@@ -167,7 +167,7 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, width),
+        (PROP, float, width, 0.f),
         (FN, reset)          // generates: virtual fn_reset(const IAny*)
     )
 };
@@ -534,7 +534,7 @@ The `handlers_` vector is partitioned:
 
 ```cpp
 STRATA_INTERFACE(
-    (PROP, Type, Name),   // generates PropertyT<Type> Name() const
+    (PROP, Type, Name, Default),  // generates PropertyT<Type> Name() const
     (EVT, Name),          // generates IEvent::Ptr Name() const
     (FN, Name)            // generates virtual fn_Name(const IAny*),
                           //          IFunction::Ptr Name() const
@@ -554,7 +554,7 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, float, width),
+        (PROP, float, width, 0.f),
         (EVT, on_clicked),
         (FN, reset)         // virtual fn_reset + accessor reset()
     )
@@ -565,11 +565,13 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 
 ### Manual metadata and accessors
 
-This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write the virtual methods, metadata array, and accessor methods by hand. The macro generates three things:
+This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write everything by hand. The macro generates five things:
 
-1. A `static constexpr std::array metadata` containing `MemberDesc` entries (with trampoline pointers for `FN` members).
-2. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
-3. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
+1. A `State` struct containing one field per `PROP` member, initialized with its default value.
+2. Per-property statics: a `getDefault` function returning a pointer to a static `AnyValue<T>`, a `createRef` factory that creates an `AnyRef<T>` pointing into a `State` struct, and a `PropertyKind` referencing both.
+3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and trampoline pointers for `FN` members).
+4. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+5. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
 
 Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface above:
 
@@ -577,18 +579,46 @@ Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface ab
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    // 1. Static metadata array
+    // 1. State struct
+    //    One field per PROP, initialized with its declared default.
+    //    Object<T, IMyWidget> stores a copy of this struct, and properties
+    //    read/write directly into it via AnyRef<T>.
+    struct State {
+        float width = 0.f;
+    };
+
+    // 2. Property kind statics
+    //    getDefault: returns a pointer to a function-local static AnyValue<T>
+    //    holding the default value. Used for static metadata queries and as
+    //    fallback when state-backed storage is unavailable.
+    //    createRef: creates an AnyRef<T> pointing into the State struct at
+    //    the given base address. Used by MetadataContainer to back properties
+    //    with the Object's contiguous state storage.
+    static const IAny* _strata_getdefault_width() {
+        static AnyValue<float> a;
+        static const bool _init_ = (a.set_value(0.f), true);
+        (void)_init_;
+        return &a;
+    }
+    static IAny::Ptr _strata_createref_width(void* base) {
+        return create_any_ref<float>(&static_cast<State*>(base)->width);
+    }
+    static constexpr PropertyKind _strata_propkind_width {
+        &_strata_getdefault_width, &_strata_createref_width };
+
+    // 3. Static metadata array
     //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
     //    Pass &INFO so each member knows which interface declared it.
     //    INFO is provided by Interface<IMyWidget> automatically.
+    //    PropertyDesc accepts an optional PropertyKind pointer as the third argument.
     //    FunctionDesc accepts an optional trampoline pointer as the third argument.
     static constexpr std::array metadata = {
-        PropertyDesc<float>("width", &INFO),
+        PropertyDesc<float>("width", &INFO, &_strata_propkind_width),
         EventDesc("on_clicked", &INFO),
         FunctionDesc("reset", &INFO, &_strata_trampoline_reset),
     };
 
-    // 2. Typed accessor methods
+    // 4. Typed accessor methods
     //    Each accessor queries IMetadata on the concrete object (via get_interface)
     //    and returns the runtime property/event/function by name.
     //    The free functions get_property(), get_event(), get_function() handle
@@ -609,7 +639,7 @@ public:
             this->template get_interface<IMetadata>(), "reset");
     }
 
-    // 3. Virtual method and trampoline for FN members
+    // 5. Virtual method and trampoline for FN members
     //    The virtual provides the override point for implementing classes.
     //    The static trampoline casts the void* context back to the interface
     //    type and calls the virtual. _strata_intf_type is a protected alias
@@ -623,5 +653,5 @@ public:
 
 The string names passed to `PropertyDesc` / `get_property` (etc.) are used for runtime lookup, so they must match exactly. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
 
-You can also use `STRATA_METADATA(...)` alone to generate only the metadata array without the accessor methods or virtual methods, then write them yourself.
+You can also use `STRATA_METADATA(...)` alone to generate the `State` struct, property kind statics, and metadata array without the accessor methods or virtual methods, then write them yourself.
 

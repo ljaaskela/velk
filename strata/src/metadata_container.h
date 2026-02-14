@@ -13,6 +13,9 @@ class MetadataContainer final : public InterfaceDispatch<IMetadata>
 public:
     explicit MetadataContainer(array_view<MemberDesc> members, IInterface* owner = nullptr);
 
+public: // IPropertyState (inherited via IMetadata — state lives in the Object, not here)
+    void *get_property_state(Uid) override { return nullptr; }
+
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
     IProperty::Ptr get_property(std::string_view name) const override;

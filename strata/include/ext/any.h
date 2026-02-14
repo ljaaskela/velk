@@ -212,6 +212,58 @@ private:
     T data_{};
 };
 
+/**
+ * @brief An Any implementation that reads/writes through a pointer to external storage.
+ *
+ * Does not own the data. Useful for ECS-style patterns where all property values live
+ * in a contiguous struct that can be memcpy'd. Cloning produces an owned AnyValue<T> copy.
+ */
+template<class T>
+class AnyRef final : public AnyCore<AnyRef<T>, T>
+{
+    using Base = AnyCore<AnyRef<T>, T>;
+
+public:
+    explicit AnyRef(T* ptr = nullptr) : ptr_(ptr) {}
+
+    /** @brief Retargets this any to a different memory location. */
+    void set_target(T* ptr) { ptr_ = ptr; }
+
+    ReturnValue set_value(const T &value) override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if (std::memcmp(ptr_, &value, sizeof(T)) != 0) {
+                std::memcpy(ptr_, &value, sizeof(T));
+                return ReturnValue::SUCCESS;
+            }
+        } else {
+            if (*ptr_ != value) {
+                *ptr_ = value;
+                return ReturnValue::SUCCESS;
+            }
+        }
+        return ReturnValue::NOTHING_TO_DO;
+    }
+
+    const T& get_value() const override { return *ptr_; }
+
+    /** @brief Clones as an owned AnyValue<T> (snapshot of the referenced data). */
+    IAny::Ptr clone() const override
+    {
+        auto c = AnyValue<T>::get_factory().template create_instance<IAny>();
+        return c && succeeded(c->copy_from(*this)) ? c : nullptr;
+    }
+
+private:
+    T* ptr_{};
+};
+
+/** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
+template<class T>
+IAny::Ptr create_any_ref(T* ptr) {
+    return IAny::Ptr(new AnyRef<T>(ptr), [](IAny* p) { p->unref(); });
+}
+
 } // namespace strata
 
 #endif // ANY_H

@@ -70,7 +70,7 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     STRATA_INTERFACE(
-        (PROP, std::string, name),
+        (PROP, std::string, name, ""),
         (FN, serialize)
     )
 };
@@ -257,6 +257,85 @@ int main()
         n.set_value(std::string("MyWidget1"));
         std::cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << std::endl;
         std::cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << std::endl;
+    }
+
+    // --- AnyRef: external struct storage ---
+    std::cout << "\n--- AnyRef<T> with struct storage ---" << std::endl;
+    {
+        struct WidgetState {
+            float width = 100.f;
+            float height = 50.f;
+        } state;
+
+        AnyRef<float> widthRef(&state.width);
+        AnyRef<float> heightRef(&state.height);
+
+        std::cout << "  state = {" << state.width << ", " << state.height << "}" << std::endl;
+        std::cout << "  widthRef.get_value() = " << widthRef.get_value() << std::endl;
+
+        // Write through the any, reads back from struct
+        widthRef.set_value(42.f);
+        std::cout << "  widthRef.set_value(42) -> state.width = " << state.width << std::endl;
+
+        // Write directly to struct, reads back through the any
+        state.height = 99.f;
+        std::cout << "  state.height = 99 -> heightRef.get_value() = " << heightRef.get_value() << std::endl;
+
+        // Snapshot via memcpy
+        WidgetState snapshot;
+        std::memcpy(&snapshot, &state, sizeof(WidgetState));
+        state.width = 0.f;
+        std::cout << "  memcpy snapshot, then state.width = 0" << std::endl;
+        std::cout << "  snapshot.width = " << snapshot.width << " (preserved)" << std::endl;
+        std::cout << "  widthRef.get_value() = " << widthRef.get_value() << " (follows live state)" << std::endl;
+
+        // Clone produces an owned AnyValue copy
+        auto cloned = widthRef.clone();
+        state.width = 777.f;
+        float clonedValue{};
+        cloned->get_data(&clonedValue, sizeof(float), type_uid<float>());
+        std::cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)" << std::endl;
+
+        std::cout << "  sizeof(AnyRef<float>) " << sizeof(AnyRef<float>) << std::endl;
+    }
+
+    // --- State-backed property storage ---
+    std::cout << "\n--- State-backed property storage ---" << std::endl;
+    {
+        auto widget2 = r.create<IObject>(MyWidget::get_class_uid());
+        auto* iw = interface_cast<IMyWidget>(widget2);
+        auto* ps = interface_cast<IPropertyState>(widget2);
+        if (iw && ps) {
+            auto *state = ps->get_property_state<IMyWidget>();
+            std::cout << "  IMyWidget::State* = " << (state ? "ok" : "null") << std::endl;
+            if (state) {
+                // Verify defaults in state struct
+                std::cout << "  state->width = " << state->width << " (expected 100)" << std::endl;
+                std::cout << "  state->height = " << state->height << " (expected 50)" << std::endl;
+
+                // Write through property, verify state reflects it
+                iw->width().set_value(200.f);
+                std::cout << "  After width().set_value(200): state->width = " << state->width << std::endl;
+
+                // Write to state directly, verify property reads it
+                state->height = 75.f;
+                std::cout << "  After state->height = 75: height().get_value() = " << iw->height().get_value() << std::endl;
+            }
+
+            // ISerializable state
+            auto* is = interface_cast<ISerializable>(widget2);
+            if (is) {
+                auto* sstate = static_cast<ISerializable::State*>(ps->get_property_state(ISerializable::UID));
+                std::cout << "  ISerializable::State* = " << (sstate ? "ok" : "null") << std::endl;
+                if (sstate) {
+                    is->name().set_value(std::string("TestName"));
+                    std::cout << "  After name().set_value(\"TestName\"): sstate->name = " << sstate->name << std::endl;
+                }
+            }
+        }
+
+        std::cout << "  sizeof(IMyWidget::State) = " << sizeof(IMyWidget::State) << std::endl;
+        std::cout << "  sizeof(ISerializable::State) = " << sizeof(ISerializable::State) << std::endl;
     }
 
     return 0;
