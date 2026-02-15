@@ -65,7 +65,7 @@ strata/
       ext/                CRTP helpers
       api/                User-facing wrappers
     src/                  Internal implementations
-  test/
+  demo/
     CMakeLists.txt
     main.cpp              Feature demonstration
 ```
@@ -80,7 +80,7 @@ cmake ..
 cmake --build .
 ```
 
-Output: `build/bin/strata.dll` (shared library) and `build/bin/test.exe` (demo).
+Output: `build/bin/strata.dll` (shared library) and `build/bin/demo.exe` (demo).
 
 ## Quick start
 
