@@ -82,7 +82,7 @@ strata/
     test_uid.cpp          Uid construction, parsing, validation
     test_any.cpp          IAny / AnyValue / AnyRef type erasure
     test_property.cpp     Property<T> wrapper and change events
-    test_function.cpp     Function, FnArgs, FunctionContext, events
+    test_function.cpp     Callback, FnArgs, FunctionContext, events
     test_object.cpp       Object system, interfaces, metadata
 ```
 
@@ -105,7 +105,7 @@ Unit tests use [GoogleTest 1.14.0](https://github.com/google/googletest), vendor
 build/bin/Release/tests.exe
 ```
 
-The test suite covers Uid construction/validation, Any/AnyValue/AnyRef type erasure, Property get/set/change events, Function/FnArgs/FunctionContext invocation, event handler add/remove, deferred execution, and the full object system (registration, interface casting, metadata lookup, property defaults, state-backed storage).
+The test suite covers Uid construction/validation, Any/AnyValue/AnyRef type erasure, Property get/set/change events, Callback/FnArgs/FunctionContext invocation, event handler add/remove, deferred execution, and the full object system (registration, interface casting, metadata lookup, property defaults, state-backed storage).
 
 ## Quick start
 
@@ -180,8 +180,8 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
     iw->width().set_value(42.f);
     float w = iw->width().get_value();  // 42.f
 
-    IEvent::Ptr clicked = iw->on_clicked();
-    IFunction::Ptr reset = iw->reset();
+    Event clicked = iw->on_clicked();
+    Function reset = iw->reset();
 }
 ```
 
@@ -258,10 +258,10 @@ invoke_function(widget.get(), "process", 1.f, 2u);             // multi-value (a
 
 #### Typed lambda parameters
 
-`Function` also accepts lambdas with typed parameters. Arguments are automatically extracted from `FnArgs` using `Any<const T>`, so there's no manual unpacking:
+`Callback` also accepts lambdas with typed parameters. Arguments are automatically extracted from `FnArgs` using `Any<const T>`, so there's no manual unpacking:
 
 ```cpp
-Function fn([&](const float& a, const int& b) -> ReturnValue {
+Callback fn([&](const float& a, const int& b) -> ReturnValue {
     // a and b are extracted from FnArgs automatically
     return ReturnValue::SUCCESS;
 });
@@ -272,10 +272,10 @@ const IAny* ptrs[] = {x, y};
 fn.invoke(FnArgs{ptrs, 2});
 ```
 
-Void-returning lambdas are supported — `Function` wraps them to return `ReturnValue::SUCCESS`:
+Void-returning lambdas are supported — `Callback` wraps them to return `ReturnValue::SUCCESS`:
 
 ```cpp
-Function fn([&](float value) {
+Callback fn([&](float value) {
     std::cout << "received: " << value << std::endl;
 });
 ```
@@ -283,7 +283,7 @@ Function fn([&](float value) {
 Zero-arity lambdas work too:
 
 ```cpp
-Function fn([&]() {
+Callback fn([&]() {
     std::cout << "called!" << std::endl;
 });
 fn.invoke();  // SUCCESS
@@ -293,7 +293,7 @@ The three constructor forms are mutually exclusive via SFINAE:
 
 | Callable type | Constructor |
 |---|---|
-| `ReturnValue(*)(FnArgs)` (raw function pointer) | `Function(CallbackFn*)` |
+| `ReturnValue(*)(FnArgs)` (raw function pointer) | `Callback(CallbackFn*)` |
 | Callable with `(FnArgs) -> ReturnValue` | Capturing lambda ctor |
 | Callable with typed params (any return) | Typed lambda ctor |
 
@@ -327,7 +327,7 @@ if (auto* meta = interface_cast<IMetadata>(widget)) {
 auto prop = Property<float>();
 prop.set_value(5.f);
 
-Function onChange([](FnArgs args) -> ReturnValue {
+Callback onChange([](FnArgs args) -> ReturnValue {
     if (auto v = Any<const float>(args[0])) {
         std::cout << "new value: " << v.get_value() << std::endl;
     }
@@ -475,7 +475,9 @@ User-facing typed wrappers.
 | `strata.h` | `instance()` singleton access |
 | `property.h` | `ConstProperty<T>` read-only and `Property<T>` typed property wrappers |
 | `any.h` | `Any<T>` typed any wrapper |
-| `function.h` | `Function` wrapper with lambda support, variadic `invoke_function` overloads |
+| `callback.h` | `Callback` creator with lambda support (constructs new IFunction instances) |
+| `function.h` | `Function` wrapper around existing IFunction, variadic `invoke_function` overloads |
+| `event.h` | `Event` wrapper around existing IEvent |
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
 
 ### src/
@@ -508,8 +510,8 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | **Object** | `IObject` | `ext::ObjectCore<Final, Intf...>` | — |
 | | | `ext::Object<Final, Intf...>` | |
 | **Property** | `IProperty` | — | `ConstProperty<T>`, `Property<T>` |
-| **Function** | `IFunction` | — | `Function` |
-| **Event** | `IEvent` | `ext::LazyEvent` | — |
+| **Function** | `IFunction` | — | `Function` (wrapper), `Callback` (creator) |
+| **Event** | `IEvent` | `ext::LazyEvent` | `Event` (wrapper) |
 
 **Any hierarchy** (ext/) — three levels for different extension points:
 
@@ -545,7 +547,9 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | `ConstProperty<T>` | Read-only typed property with `get_value()` and change events (returned by `RPROP` accessors) |
 | `Property<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `Any<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
-| `Function` | Wraps `ReturnValue(FnArgs)` callbacks |
+| `Function` | Lightweight wrapper around an existing `IFunction` pointer (returned by `FN`/`FN_RAW` accessors) |
+| `Event` | Lightweight wrapper around an existing `IEvent` pointer (returned by `EVT` accessors) |
+| `Callback` | Creates and owns an `IFunction` from `ReturnValue(FnArgs)` callbacks or typed lambdas |
 | `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
@@ -701,7 +705,7 @@ The `handlers_` vector is partitioned:
 STRATA_INTERFACE(
     (PROP, Type, Name, Default),          // Property<Type> Name() const
     (RPROP, Type, Name, Default),         // ConstProperty<Type> Name() const (read-only)
-    (EVT, Name),                          // IEvent::Ptr Name() const
+    (EVT, Name),                          // Event Name() const
     (FN, Name),                           // virtual fn_Name()          (zero-arg)
     (FN, Name, (T1, a1), (T2, a2)),       // virtual fn_Name(T1 a1, T2 a2) (typed)
     (FN_RAW, Name)                        // virtual fn_Name(FnArgs)   (raw untyped)
@@ -722,7 +726,7 @@ All three variants generate:
 1. A pure virtual method (signature depends on variant)
 2. A `static constexpr FunctionKind` with a trampoline (via `detail::FnBind` or `detail::FnRawBind`) that routes `IFunction::invoke()` to the virtual
 3. A `MemberDesc` with the trampoline pointer in the metadata array
-4. An accessor `IFunction::Ptr Name() const`
+4. An accessor `Function Name() const`
 
 For typed-arg functions, the trampoline automatically extracts each argument from `FnArgs` using `IAny::get_data()` with type deduction from the member function pointer. If fewer arguments are provided than expected, the trampoline returns `INVALID_ARGUMENT`. Extra arguments are ignored.
 
@@ -819,7 +823,7 @@ This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE`
 1. A `State` struct containing one field per `PROP`/`RPROP` member, initialized with its default value.
 2. Per-property statics: a `static constexpr PropertyKind` generated via `detail::PropBind<State, &State::member>` (or `detail::PropBind<State, &State::member, ObjectFlags::ReadOnly>` for `RPROP`), which provides `typeUid`, `getDefault`, `createRef`, and `flags` automatically.
 3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP`/`RPROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
-4. Non-virtual `const` accessor methods that query `IMetadata` at runtime. `PROP` returns `Property<T>`, `RPROP` returns `ConstProperty<T>`.
+4. Non-virtual `const` accessor methods that query `IMetadata` at runtime. `PROP` returns `Property<T>`, `RPROP` returns `ConstProperty<T>`, `EVT` returns `Event`, `FN`/`FN_RAW` return `Function`.
 5. For function members: a pure virtual method and a `static constexpr FunctionKind` generated via `detail::FnBind<&Intf::fn_Name>` (for `FN`) or `detail::FnRawBind<&Intf::fn_Name>` (for `FN_RAW`). Typed-arg `FN` additionally stores a `static constexpr FnArgDesc[]` array.
 
 Here is a manual equivalent showing all three function variants:
@@ -891,24 +895,24 @@ public:
             this->template get_interface<IMetadata>(), "width"));
     }
 
-    IEvent::Ptr on_clicked() const {
-        return ::strata::get_event(
-            this->template get_interface<IMetadata>(), "on_clicked");
+    Event on_clicked() const {
+        return Event(::strata::get_event(
+            this->template get_interface<IMetadata>(), "on_clicked"));
     }
 
-    IFunction::Ptr reset() const {
-        return ::strata::get_function(
-            this->template get_interface<IMetadata>(), "reset");
+    Function reset() const {
+        return Function(::strata::get_function(
+            this->template get_interface<IMetadata>(), "reset"));
     }
 
-    IFunction::Ptr add() const {
-        return ::strata::get_function(
-            this->template get_interface<IMetadata>(), "add");
+    Function add() const {
+        return Function(::strata::get_function(
+            this->template get_interface<IMetadata>(), "add"));
     }
 
-    IFunction::Ptr process() const {
-        return ::strata::get_function(
-            this->template get_interface<IMetadata>(), "process");
+    Function process() const {
+        return Function(::strata::get_function(
+            this->template get_interface<IMetadata>(), "process"));
     }
 };
 ```
