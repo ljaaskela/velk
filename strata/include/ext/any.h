@@ -38,19 +38,9 @@ public:
     /** @brief Returns the singleton factory for creating instances of FinalClass. */
     static const IObjectFactory &get_factory()
     {
-        static Factory factory_;
+        static DefaultFactory<FinalClass> factory_;
         return factory_;
     }
-
-private:
-    class Factory : public ObjectFactory<FinalClass>
-    {
-        const ClassInfo &get_class_info() const override
-        {
-            static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
-            return info;
-        }
-    };
 };
 
 /**

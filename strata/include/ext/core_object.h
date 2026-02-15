@@ -34,6 +34,23 @@ public:
 };
 
 /**
+ * @brief ObjectFactory with a default ClassInfo (UID + name, no metadata members).
+ *
+ * Used by ObjectCore and AnyBase where no compile-time metadata array is needed.
+ *
+ * @tparam FinalClass The concrete class whose get_class_uid()/get_class_name() are used.
+ */
+template<class FinalClass>
+class DefaultFactory : public ObjectFactory<FinalClass>
+{
+    const ClassInfo &get_class_info() const override
+    {
+        static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
+        return info;
+    }
+};
+
+/**
  * @brief CRTP base for concrete Strata objects (without metadata).
  *
  * Provides automatic class name/UID generation, self-pointer management,
@@ -75,21 +92,12 @@ public:
     /** @brief Returns the singleton factory for creating instances of FinalClass. */
     static const IObjectFactory &get_factory()
     {
-        static Factory factory_;
+        static DefaultFactory<FinalClass> factory_;
         return factory_;
     }
 
 private:
     IObject::WeakPtr self_{};
-
-    class Factory : public ObjectFactory<FinalClass>
-    {
-        const ClassInfo &get_class_info() const override
-        {
-            static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
-            return info;
-        }
-    };
 };
 
 } // namespace strata::ext
