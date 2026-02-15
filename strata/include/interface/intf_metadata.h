@@ -377,6 +377,67 @@ struct PropBind
     static constexpr PropertyKind kind { type_uid<value_type>(), &getDefault, &createRef, Flags }; ///< Pre-built PropertyKind.
 };
 
+/**
+ * @brief Binds a typed member function pointer to a FunctionKind trampoline.
+ *
+ * Given a pointer-to-member for a virtual method declared by @c FN (zero-arg
+ * or typed-arg), FnBind generates a static trampoline function and a
+ * @c static @c constexpr FunctionKind. This replaces per-function trampoline
+ * boilerplate that the STRATA_INTERFACE macro previously generated inline.
+ *
+ * Works for both zero-arg and typed-arg FN because @c interface_trampoline
+ * deduces @c Args... from the member function pointer.
+ *
+ * @tparam Fn Pointer-to-member (C++17 auto NTTP), e.g. @c &IMyWidget::fn_reset.
+ *
+ * @par Usage
+ * @code
+ * static constexpr FunctionKind fk = detail::FnBind<&IMyWidget::fn_reset>::kind;
+ * @endcode
+ *
+ * @see FnRawBind For @c FN_RAW members that receive @c FnArgs directly.
+ * @see PropBind  For the analogous property binding template.
+ */
+template<auto Fn>
+struct FnBind
+{
+    static ReturnValue trampoline(void* self, FnArgs args) {
+        return interface_trampoline(self, args, Fn);
+    }
+    static constexpr FunctionKind kind { &trampoline };
+};
+
+/**
+ * @brief Binds a raw member function pointer to a FunctionKind trampoline.
+ *
+ * For @c FN_RAW members whose virtual method receives @c FnArgs directly,
+ * FnRawBind generates a trampoline that passes @c FnArgs through without
+ * type extraction. This is needed because @c interface_trampoline would
+ * try to extract @c FnArgs as a typed argument via @c IAny, which doesn't work.
+ *
+ * @tparam Fn Pointer-to-member (C++17 auto NTTP), e.g. @c &IMyWidget::fn_process.
+ *
+ * @par Usage
+ * @code
+ * static constexpr FunctionKind fk = detail::FnRawBind<&IMyWidget::fn_process>::kind;
+ * @endcode
+ *
+ * @see FnBind  For typed @c FN members.
+ * @see PropBind For the analogous property binding template.
+ */
+template<auto Fn>
+struct FnRawBind
+{
+    template<class Intf>
+    static ReturnValue call(void* self, FnArgs args, ReturnValue(Intf::*fn)(FnArgs)) {
+        return (static_cast<Intf*>(self)->*fn)(args);
+    }
+    static ReturnValue trampoline(void* self, FnArgs args) {
+        return call(self, args, Fn);
+    }
+    static constexpr FunctionKind kind { &trampoline };
+};
+
 } // namespace detail
 
 } // namespace strata
@@ -482,11 +543,13 @@ struct PropBind
 #define _STRATA_DEFAULTS_EVT(...)
 
 #define _STRATA_DEFAULTS_FN_0(Name) \
-    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name, {} };
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name = \
+        ::strata::detail::FnBind<&_strata_intf_type::fn_##Name>::kind;
 #define _STRATA_DEFAULTS_FN_N(Name, ...) \
     static constexpr ::strata::FnArgDesc _strata_fnargs_##Name[] = { _STRATA_ARGDESCS(__VA_ARGS__) }; \
     static constexpr ::strata::FunctionKind _strata_fnkind_##Name { \
-        &_strata_trampoline_##Name, {_strata_fnargs_##Name, _STRATA_NARG(__VA_ARGS__)} };
+        &::strata::detail::FnBind<&_strata_intf_type::fn_##Name>::trampoline, \
+        {_strata_fnargs_##Name, _STRATA_NARG(__VA_ARGS__)} };
 
 #define _STRATA_DFN_1(Name)       _STRATA_DEFAULTS_FN_0(Name)
 #define _STRATA_DFN_2(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
@@ -501,7 +564,8 @@ struct PropBind
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_DFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 #define _STRATA_DEFAULTS_FN_RAW(Name) \
-    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name, {} };
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name = \
+        ::strata::detail::FnRawBind<&_strata_intf_type::fn_##Name>::kind;
 
 #define _STRATA_DEFAULTS(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_, Tag)(__VA_ARGS__))
 
@@ -526,15 +590,9 @@ struct PropBind
 #define _STRATA_TRAMPOLINE_EVT(Name)
 
 #define _STRATA_TRAMPOLINE_FN_0(Name) \
-    virtual ::strata::ReturnValue fn_##Name() = 0; \
-    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
-        return ::strata::detail::interface_trampoline(self, args, &_strata_intf_type::fn_##Name); \
-    }
+    virtual ::strata::ReturnValue fn_##Name() = 0;
 #define _STRATA_TRAMPOLINE_FN_N(Name, ...) \
-    virtual ::strata::ReturnValue fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0; \
-    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
-        return ::strata::detail::interface_trampoline(self, args, &_strata_intf_type::fn_##Name); \
-    }
+    virtual ::strata::ReturnValue fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0;
 
 #define _STRATA_TFN_1(Name)       _STRATA_TRAMPOLINE_FN_0(Name)
 #define _STRATA_TFN_2(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
@@ -549,10 +607,7 @@ struct PropBind
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_TFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 #define _STRATA_TRAMPOLINE_FN_RAW(Name) \
-    virtual ::strata::ReturnValue fn_##Name(::strata::FnArgs) = 0; \
-    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
-        return static_cast<_strata_intf_type*>(self)->fn_##Name(args); \
-    }
+    virtual ::strata::ReturnValue fn_##Name(::strata::FnArgs) = 0;
 
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
@@ -619,11 +674,12 @@ struct PropBind
  *
  * @par What the macro generates
  * For each member entry the macro produces:
- * -# For @c FN members only: a @c virtual method <tt>fn_Name(const IAny*)</tt>
- *    with a default implementation returning @c NOTHING_TO_DO, plus a static
- *    trampoline function that routes @c IFunction::invoke() calls to the
- *    virtual method. Implementing classes can @c override the virtual to
- *    provide function logic.
+ * -# For @c FN members only: a pure @c virtual method (e.g. <tt>fn_Name()</tt>,
+ *    <tt>fn_Name(T1, T2)</tt>, or <tt>fn_Name(FnArgs)</tt>). A static
+ *    trampoline that routes @c IFunction::invoke() calls to the virtual method
+ *    is generated via @c detail::FnBind (for @c FN) or @c detail::FnRawBind
+ *    (for @c FN_RAW). Implementing classes @c override the virtual to provide
+ *    function logic.
  * -# A @c MemberDesc initializer in a @c static @c constexpr @c std::array
  *    named @c metadata, used for compile-time and runtime introspection.
  *    For @c FN members the descriptor includes a pointer to the trampoline.

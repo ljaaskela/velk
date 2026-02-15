@@ -720,7 +720,7 @@ STRATA_INTERFACE(
 
 All three variants generate:
 1. A pure virtual method (signature depends on variant)
-2. A static trampoline that routes `IFunction::invoke()` to the virtual
+2. A `static constexpr FunctionKind` with a trampoline (via `detail::FnBind` or `detail::FnRawBind`) that routes `IFunction::invoke()` to the virtual
 3. A `MemberDesc` with the trampoline pointer in the metadata array
 4. An accessor `IFunction::Ptr Name() const`
 
@@ -820,7 +820,7 @@ This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE`
 2. Per-property statics: a `static constexpr PropertyKind` generated via `detail::PropBind<State, &State::member>` (or `detail::PropBind<State, &State::member, ObjectFlags::ReadOnly>` for `RPROP`), which provides `typeUid`, `getDefault`, `createRef`, and `flags` automatically.
 3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP`/`RPROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
 4. Non-virtual `const` accessor methods that query `IMetadata` at runtime. `PROP` returns `Property<T>`, `RPROP` returns `ConstProperty<T>`.
-5. For function members: a virtual method, a static trampoline, and (for typed-arg `FN`) a `static constexpr FnArgDesc[]` array.
+5. For function members: a pure virtual method and a `static constexpr FunctionKind` generated via `detail::FnBind<&Intf::fn_Name>` (for `FN`) or `detail::FnRawBind<&Intf::fn_Name>` (for `FN_RAW`). Typed-arg `FN` additionally stores a `static constexpr FnArgDesc[]` array.
 
 Here is a manual equivalent showing all three function variants:
 
@@ -846,32 +846,24 @@ public:
     static constexpr PropertyKind _strata_propkind_width =
         detail::PropBind<State, &State::width>::kind;
 
-    // 5a. Zero-arg FN: virtual + trampoline (uses detail::interface_trampoline)
+    // 5a. Zero-arg FN: virtual + FnBind trampoline
     virtual ReturnValue fn_reset() = 0;
-    static ReturnValue _strata_trampoline_reset(void* self, FnArgs args) {
-        return detail::interface_trampoline(self, args, &_strata_intf_type::fn_reset);
-    }
-    static constexpr FunctionKind _strata_fnkind_reset {
-        &_strata_trampoline_reset };
+    static constexpr FunctionKind _strata_fnkind_reset =
+        detail::FnBind<&_strata_intf_type::fn_reset>::kind;
 
-    // 5b. Typed-arg FN: virtual with typed params + trampoline + FnArgDesc array
+    // 5b. Typed-arg FN: virtual with typed params + FnBind trampoline + FnArgDesc array
     virtual ReturnValue fn_add(int x, float y) = 0;
-    static ReturnValue _strata_trampoline_add(void* self, FnArgs args) {
-        return detail::interface_trampoline(self, args, &_strata_intf_type::fn_add);
-    }
     static constexpr FnArgDesc _strata_fnargs_add[] = {
         {"x", type_uid<int>()}, {"y", type_uid<float>()}
     };
     static constexpr FunctionKind _strata_fnkind_add {
-        &_strata_trampoline_add, {_strata_fnargs_add, 2} };
+        &detail::FnBind<&_strata_intf_type::fn_add>::trampoline,
+        {_strata_fnargs_add, 2} };
 
-    // 5c. FN_RAW: virtual with FnArgs + direct trampoline (no type extraction)
+    // 5c. FN_RAW: virtual with FnArgs + FnRawBind trampoline (no type extraction)
     virtual ReturnValue fn_process(FnArgs) = 0;
-    static ReturnValue _strata_trampoline_process(void* self, FnArgs args) {
-        return static_cast<_strata_intf_type*>(self)->fn_process(args);
-    }
-    static constexpr FunctionKind _strata_fnkind_process {
-        &_strata_trampoline_process };
+    static constexpr FunctionKind _strata_fnkind_process =
+        detail::FnRawBind<&_strata_intf_type::fn_process>::kind;
 
     // 3. Static metadata array
     //    Each entry uses a helper: PropertyDesc(), EventDesc(), or FunctionDesc().
@@ -922,8 +914,8 @@ public:
 ```
 
 The key differences between variants:
-- **Zero-arg FN** and **typed-arg FN** both use `detail::interface_trampoline`, which deduces parameter types from the member function pointer and extracts values from `FnArgs` automatically. Typed-arg functions additionally store a `FnArgDesc` array in their `FunctionKind`.
-- **FN_RAW** uses a direct trampoline that passes `FnArgs` through to the virtual unchanged, matching the pre-typed-args behavior.
+- **Zero-arg FN** and **typed-arg FN** both use `detail::FnBind<&Intf::fn_Name>`, which generates a trampoline that deduces parameter types from the member function pointer and extracts values from `FnArgs` automatically. Typed-arg functions additionally store a `FnArgDesc` array in their `FunctionKind`.
+- **FN_RAW** uses `detail::FnRawBind<&Intf::fn_Name>`, which generates a trampoline that passes `FnArgs` through to the virtual unchanged without type extraction.
 
 The string names passed to `PropertyDesc` / `get_property` (etc.) are used for runtime lookup, so they must match exactly. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
 
