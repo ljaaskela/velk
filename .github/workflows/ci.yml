@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  checks: write
   pages: write
   id-token: write
 
@@ -28,7 +29,19 @@ jobs:
         run: cmake --build build
 
       - name: Run tests
-        run: build/bin/tests
+        run: build/bin/tests --gtest_output=xml:test-results.xml
+
+      - name: Publish test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: test-results.xml
+          reporter: java-junit
+
+    environment:
+      name: test-results
+      url: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   docs:
     runs-on: ubuntu-latest

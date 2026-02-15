@@ -1,5 +1,7 @@
 # Strata
 
+[![CI](https://github.com/ljaaskela/strata/actions/workflows/ci.yml/badge.svg)](https://github.com/ljaaskela/strata/actions/workflows/ci.yml)
+
 Strata is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
 
 Strata is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
