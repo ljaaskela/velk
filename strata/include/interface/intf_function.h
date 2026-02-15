@@ -10,13 +10,26 @@ namespace strata {
 /** @brief Specifies whether an invocation should execute immediately or be deferred to update(). */
 enum InvokeType : uint8_t { Immediate = 0, Deferred = 1 };
 
-/** @brief Non-owning view of function arguments. */
+/**
+ * @brief Non-owning view of function arguments.
+ *
+ * Passed by value (16 bytes). Constructed by callers from stack arrays of @c const @c IAny*.
+ * Supports bounds-checked indexing and range-for iteration.
+ */
 struct FnArgs {
-    const IAny* const* data = nullptr;
-    size_t count = 0;
+    const IAny* const* data = nullptr;  ///< Pointer to contiguous array of IAny pointers.
+    size_t count = 0;                   ///< Number of arguments.
 
+    /** @brief Returns the argument at index @p i, or nullptr if out of range. */
     const IAny* operator[](size_t i) const { return i < count ? data[i] : nullptr; }
+    /** @brief Returns true if there are no arguments. */
     bool empty() const { return count == 0; }
+
+    /** @brief Returns an iterator to the first argument. */
+    const IAny *const *begin() const { return data; }
+    /** @brief Returns an iterator past the last argument. */
+    const IAny *const *end() const { return data + count; }
+
 };
 
 /** @brief Interface for an invocable function object. */

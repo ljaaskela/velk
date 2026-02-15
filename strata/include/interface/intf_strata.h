@@ -2,6 +2,7 @@
 #define INTF_STRATA_H
 
 #include <functional>
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -35,13 +36,42 @@ public:
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
     virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value) const = 0;
+    /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
+    struct DeferredArgs : public ::strata::NoCopyMove
+    {
+        /** @brief Deep-clones each argument from @p args. */
+        explicit DeferredArgs(FnArgs args)
+        {
+            owned_.reserve(args.count);
+            for (auto *arg : args) {
+                owned_.push_back(arg ? arg->clone() : nullptr);
+            }
+        }
+
+        /** @brief Returns a non-owning FnArgs view. Builds the raw pointer array on first call. */
+        FnArgs view() const
+        {
+            if (owned_.size() && ptrs_.size() != owned_.size()) {
+                ptrs_.resize(owned_.size());
+                for (size_t i = 0; i < owned_.size(); ++i) {
+                    ptrs_[i] = owned_[i].get();
+                }
+            }
+            return {ptrs_.data(), ptrs_.size()};
+        }
+
+    private:
+        std::vector<IAny::Ptr> owned_;
+        mutable std::vector<const IAny*> ptrs_;
+    };
+
     /** @brief Deferred task */
     struct DeferredTask
     {
         /** @brief The function to invoke. */
         IFunction::ConstPtr fn;
-        /** @brief Function args. Each element is a cloned IAny. */
-        std::vector<IAny::Ptr> args;
+        /** @brief Cloned function args. Shared across tasks that originated from the same invocation. */
+        std::shared_ptr<DeferredArgs> args;
     };
     /**
      * @brief Enqueues tasks to be executed on the next update() call.

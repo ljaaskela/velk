@@ -13,9 +13,7 @@ ReturnValue FunctionImpl::invoke(FnArgs args, InvokeType type) const
     if (type == Deferred) {
         IStrata::DeferredTask task;
         task.fn = get_self<IFunction>();
-        for (size_t i = 0; i < args.count; ++i) {
-            task.args.push_back(args[i] ? args[i]->clone() : nullptr);
-        }
+        task.args = std::make_shared<IStrata::DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
         return ReturnValue::SUCCESS;
     }
@@ -48,20 +46,19 @@ void FunctionImpl::invoke_handlers(FnArgs args) const
         h->invoke(args);
     }
     auto deferred = deferred_handlers();
-    if (deferred.empty()) return;
-
-    // Clone args once, share across all deferred tasks
-    std::vector<IAny::Ptr> clonedArgs;
-    clonedArgs.reserve(args.count);
-    for (size_t i = 0; i < args.count; ++i) {
-        clonedArgs.push_back(args[i] ? args[i]->clone() : nullptr);
+    if (deferred.empty()) {
+        return;
     }
+    // Clone args once, share ownership across all deferred tasks
+    auto clonedArgs = std::make_shared<IStrata::DeferredArgs>(args);
 
     std::vector<IStrata::DeferredTask> tasks;
     tasks.reserve(deferred.size());
     for (const auto &h : deferred) {
         tasks.push_back({h, clonedArgs});
     }
+
+    // Queue N tasks to instance for exececution at next instance().update().
     instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
 }
 
