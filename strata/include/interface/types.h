@@ -4,6 +4,7 @@
 #include <array_view.h>
 #include <common.h>
 #include <interface/intf_interface.h>
+#include <type_traits>
 
 namespace strata {
 

@@ -4,6 +4,7 @@
 #include <api/strata.h>
 #include <cassert>
 #include <common.h>
+#include <type_traits>
 #include <interface/intf_any.h>
 #include <interface/intf_strata.h>
 

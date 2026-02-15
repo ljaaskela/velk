@@ -7,6 +7,7 @@
 #include <interface/intf_strata.h>
 
 #include <cstring>
+#include <type_traits>
 
 namespace strata::ext {
 
