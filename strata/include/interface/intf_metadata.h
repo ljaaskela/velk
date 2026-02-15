@@ -11,6 +11,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <utility>
 
 namespace strata {
 
@@ -26,9 +27,16 @@ struct PropertyKind {
     IAny::Ptr(*createRef)(void* stateBase) = nullptr;
 };
 
+/** @brief Describes a single argument of a typed function. */
+struct FnArgDesc {
+    std::string_view name;
+    Uid typeUid;
+};
+
 /** @brief Kind-specific data for Function/Event members. */
 struct FunctionKind {
     FnTrampoline trampoline = nullptr;
+    array_view<FnArgDesc> args;       // empty for zero-arg and FN_RAW
 };
 
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
@@ -200,6 +208,34 @@ inline ReturnValue invoke_event(const IInterface *o,
     return invoke_event(o, name, args);
 }
 
+namespace detail {
+
+template<class T>
+T extract_arg(const IAny* any) {
+    T value{};
+    if (any) any->get_data(&value, sizeof(T), type_uid<T>());
+    return value;
+}
+
+template<class Intf, class... Args, size_t... Is>
+ReturnValue interface_trampoline_impl(void* self, FnArgs args,
+    ReturnValue(Intf::*fn)(Args...), std::index_sequence<Is...>)
+{
+    return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
+}
+
+template<class Intf, class... Args>
+ReturnValue interface_trampoline(void* self, FnArgs args,
+    ReturnValue(Intf::*fn)(Args...))
+{
+    if constexpr (sizeof...(Args) > 0) {
+        if (args.count < sizeof...(Args)) return ReturnValue::INVALID_ARGUMENT;
+    }
+    return interface_trampoline_impl(self, args, fn, std::index_sequence_for<Args...>{});
+}
+
+} // namespace detail
+
 } // namespace strata
 
 // --- Preprocessor FOR_EACH machinery ---
@@ -257,11 +293,38 @@ inline ReturnValue invoke_event(const IInterface *o,
 #define _STRATA_FOR_EACH(M, ...) \
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_FE_, _STRATA_NARG(__VA_ARGS__))(M, __VA_ARGS__))
 
+// --- Param/ArgDesc expansion: (Type, Name) pairs -> typed param list / FnArgDesc array ---
+
+#define _STRATA_PARAM_PAIR(Type, Name) Type Name
+#define _STRATA_PARAMS_1(a)          _STRATA_EXPAND(_STRATA_PARAM_PAIR a)
+#define _STRATA_PARAMS_2(a, b)       _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAM_PAIR b)
+#define _STRATA_PARAMS_3(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_2(__VA_ARGS__))
+#define _STRATA_PARAMS_4(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_3(__VA_ARGS__))
+#define _STRATA_PARAMS_5(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_4(__VA_ARGS__))
+#define _STRATA_PARAMS_6(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_5(__VA_ARGS__))
+#define _STRATA_PARAMS_7(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_6(__VA_ARGS__))
+#define _STRATA_PARAMS_8(a, ...)     _STRATA_PARAMS_1(a), _STRATA_EXPAND(_STRATA_PARAMS_7(__VA_ARGS__))
+#define _STRATA_PARAMS(...) \
+    _STRATA_EXPAND(_STRATA_CAT(_STRATA_PARAMS_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
+
+#define _STRATA_ARGDESC_PAIR(Type, Name) ::strata::FnArgDesc{#Name, ::strata::type_uid<Type>()}
+#define _STRATA_ARGDESCS_1(a)        _STRATA_EXPAND(_STRATA_ARGDESC_PAIR a)
+#define _STRATA_ARGDESCS_2(a, b)     _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESC_PAIR b)
+#define _STRATA_ARGDESCS_3(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_2(__VA_ARGS__))
+#define _STRATA_ARGDESCS_4(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_3(__VA_ARGS__))
+#define _STRATA_ARGDESCS_5(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_4(__VA_ARGS__))
+#define _STRATA_ARGDESCS_6(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_5(__VA_ARGS__))
+#define _STRATA_ARGDESCS_7(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_6(__VA_ARGS__))
+#define _STRATA_ARGDESCS_8(a, ...)   _STRATA_ARGDESCS_1(a), _STRATA_EXPAND(_STRATA_ARGDESCS_7(__VA_ARGS__))
+#define _STRATA_ARGDESCS(...) \
+    _STRATA_EXPAND(_STRATA_CAT(_STRATA_ARGDESCS_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
+
 // --- State pass: generates State struct fields for PROP members ---
 
 #define _STRATA_STATE_PROP(Type, Name, Default)  Type Name = Default;
 #define _STRATA_STATE_EVT(Name)
-#define _STRATA_STATE_FN(Name)
+#define _STRATA_STATE_FN(...)
+#define _STRATA_STATE_FN_RAW(...)
 #define _STRATA_STATE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_STATE_, Tag)(__VA_ARGS__))
 
 // --- Defaults pass: generates kind-specific static data for each member ---
@@ -277,8 +340,29 @@ inline ReturnValue invoke_event(const IInterface *o,
     static constexpr ::strata::PropertyKind _strata_propkind_##Name { \
         &_strata_getdefault_##Name, &_strata_createref_##Name };
 #define _STRATA_DEFAULTS_EVT(...)
-#define _STRATA_DEFAULTS_FN(Name) \
+
+#define _STRATA_DEFAULTS_FN_0(Name) \
     static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
+#define _STRATA_DEFAULTS_FN_N(Name, ...) \
+    static constexpr ::strata::FnArgDesc _strata_fnargs_##Name[] = { _STRATA_ARGDESCS(__VA_ARGS__) }; \
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { \
+        &_strata_trampoline_##Name, {_strata_fnargs_##Name, _STRATA_NARG(__VA_ARGS__)} };
+
+#define _STRATA_DFN_1(Name)       _STRATA_DEFAULTS_FN_0(Name)
+#define _STRATA_DFN_2(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_3(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_4(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_5(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_6(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_7(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_8(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_9(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DEFAULTS_FN(...) \
+    _STRATA_EXPAND(_STRATA_CAT(_STRATA_DFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
+
+#define _STRATA_DEFAULTS_FN_RAW(Name) \
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
+
 #define _STRATA_DEFAULTS(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_, Tag)(__VA_ARGS__))
 
 // --- Metadata dispatch: tag -> MemberDesc initializer ---
@@ -287,7 +371,9 @@ inline ReturnValue invoke_event(const IInterface *o,
     ::strata::PropertyDesc<Type>(#Name, &INFO, &_strata_propkind_##Name),
 #define _STRATA_META_EVT(Name) \
     ::strata::EventDesc(#Name, &INFO),
-#define _STRATA_META_FN(Name) \
+#define _STRATA_META_FN(Name, ...) \
+    ::strata::FunctionDesc(#Name, &INFO, &_strata_fnkind_##Name),
+#define _STRATA_META_FN_RAW(Name) \
     ::strata::FunctionDesc(#Name, &INFO, &_strata_fnkind_##Name),
 #define _STRATA_META(Tag, ...)        _STRATA_EXPAND(_STRATA_CAT(_STRATA_META_, Tag)(__VA_ARGS__))
 
@@ -295,11 +381,36 @@ inline ReturnValue invoke_event(const IInterface *o,
 
 #define _STRATA_TRAMPOLINE_PROP(...)
 #define _STRATA_TRAMPOLINE_EVT(Name)
-#define _STRATA_TRAMPOLINE_FN(Name) \
+
+#define _STRATA_TRAMPOLINE_FN_0(Name) \
+    virtual ::strata::ReturnValue fn_##Name() = 0; \
+    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
+        return ::strata::detail::interface_trampoline(self, args, &_strata_intf_type::fn_##Name); \
+    }
+#define _STRATA_TRAMPOLINE_FN_N(Name, ...) \
+    virtual ::strata::ReturnValue fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0; \
+    static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
+        return ::strata::detail::interface_trampoline(self, args, &_strata_intf_type::fn_##Name); \
+    }
+
+#define _STRATA_TFN_1(Name)       _STRATA_TRAMPOLINE_FN_0(Name)
+#define _STRATA_TFN_2(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_3(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_4(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_5(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_6(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_7(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_8(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_9(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TRAMPOLINE_FN(...) \
+    _STRATA_EXPAND(_STRATA_CAT(_STRATA_TFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
+
+#define _STRATA_TRAMPOLINE_FN_RAW(Name) \
     virtual ::strata::ReturnValue fn_##Name(::strata::FnArgs) = 0; \
     static ::strata::ReturnValue _strata_trampoline_##Name(void* self, ::strata::FnArgs args) { \
         return static_cast<_strata_intf_type*>(self)->fn_##Name(args); \
     }
+
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
 /** @brief Generates default-value functions and a static constexpr metadata array. */
@@ -321,7 +432,12 @@ inline ReturnValue invoke_event(const IInterface *o,
         return ::strata::get_event( \
             this->template get_interface<::strata::IMetadata>(), #Name); \
     }
-#define _STRATA_ACC_FN(Name) \
+#define _STRATA_ACC_FN(Name, ...) \
+    ::strata::IFunction::Ptr Name() const { \
+        return ::strata::get_function( \
+            this->template get_interface<::strata::IMetadata>(), #Name); \
+    }
+#define _STRATA_ACC_FN_RAW(Name) \
     ::strata::IFunction::Ptr Name() const { \
         return ::strata::get_function( \
             this->template get_interface<::strata::IMetadata>(), #Name); \
@@ -336,11 +452,13 @@ inline ReturnValue invoke_event(const IInterface *o,
  * from @c Interface<T>. Each argument is a parenthesized tuple describing one
  * member. Three member kinds are supported:
  *
- * | Kind     | Syntax                          | Description                        |
- * |----------|---------------------------------|------------------------------------|
- * | Property | @c (PROP, Type, Name, Default)  | A typed property with default value  |
- * | Event    | @c (EVT, Name)                  | An observable event                |
- * | Function | @c (FN, Name)                   | A callable function slot           |
+ * | Kind     | Syntax                                   | Description                          |
+ * |----------|------------------------------------------|--------------------------------------|
+ * | Property | @c (PROP, Type, Name, Default)           | A typed property with default value  |
+ * | Event    | @c (EVT, Name)                           | An observable event                  |
+ * | Function | @c (FN, Name)                            | Zero-arg function                    |
+ * | Function | @c (FN, Name, (T1, a1), (T2, a2), ...)   | Typed-arg function with metadata     |
+ * | Function | @c (FN_RAW, Name)                        | Raw untyped function (receives FnArgs) |
  *
  * @par What the macro generates
  * For each member entry the macro produces:
