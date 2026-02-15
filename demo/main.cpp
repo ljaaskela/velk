@@ -62,7 +62,8 @@ public:
         (PROP, float, width, 100.f),
         (PROP, float, height, 50.f),
         (EVT, on_clicked),
-        (FN, reset)
+        (FN, reset),
+        (FN, add, (int, x), (float, y))
     )
 };
 
@@ -71,29 +72,27 @@ class ISerializable : public Interface<ISerializable>
 public:
     STRATA_INTERFACE(
         (PROP, std::string, name, ""),
-        (FN, serialize)
+        (FN_RAW, serialize)
     )
 };
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset(FnArgs args) override
+    ReturnValue fn_reset() override
     {
-        if (auto ctx = FunctionContext(args, 2)) {
-            std::cout << "  MyWidget::fn_reset called with " << ctx.size() << " args"
-                      << std::endl;
-        } else if (auto value = Any<const int>(args[0])) {
-            std::cout << "  MyWidget::fn_reset called with value " << value.get_value()
-                      << std::endl;
-        } else {
-            std::cout << "  MyWidget::fn_reset called!" << std::endl;
-        }
+        std::cout << "  MyWidget::fn_reset called!" << std::endl;
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_add(int x, float y) override
+    {
+        std::cout << "  MyWidget::fn_add(" << x << ", " << y << ") = " << (x + y) << std::endl;
         return ReturnValue::SUCCESS;
     }
 
     ReturnValue fn_serialize(FnArgs) override
     {
-        std::cout << "  MyWidget::fn_serialize called!" << std::endl;
+        std::cout << "  MyWidget::fn_serialize called (raw)!" << std::endl;
         return ReturnValue::SUCCESS;
     }
 };
@@ -223,11 +222,27 @@ int main()
         std::cout << "  on_clicked() ok: " << (iw->on_clicked() ? "yes" : "no") << std::endl;
         std::cout << "  reset() ok: " << (iw->reset() ? "yes" : "no") << std::endl;
 
-        std::cout << "  Invoking reset()..." << std::endl;
-
+        std::cout << "  Invoking reset() (zero-arg)..." << std::endl;
         invoke_function(iw->reset()); // Invoke by interface accessor
         invoke_function(iw, "reset"); // Invoke by name
-        invoke_function(iw, "reset", Any<int>(42));
+
+        std::cout << "  Invoking add() (typed args)..." << std::endl;
+        invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f));
+
+        // Inspect typed arg metadata
+        if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
+            for (auto& m : info->members) {
+                if (auto* fk = m.functionKind()) {
+                    if (!fk->args.empty()) {
+                        std::cout << "  Function \"" << m.name << "\" args:";
+                        for (auto& arg : fk->args) {
+                            std::cout << " " << arg.name;
+                        }
+                        std::cout << std::endl;
+                    }
+                }
+            }
+        }
     }
 
     // --- Uid from string ---
@@ -259,6 +274,8 @@ int main()
         n.set_value(std::string("MyWidget1"));
         std::cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << std::endl;
         std::cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << std::endl;
+        std::cout << "  Invoking serialize() (FN_RAW)..." << std::endl;
+        invoke_function(is, "serialize");
     }
 
     // --- AnyRef: external struct storage ---
@@ -366,8 +383,8 @@ int main()
         // Variadic invoke with raw values — auto-wraps in Any<T> + FunctionContext
         invoke_function(IFunction::Ptr(add), 10.f, 20);
 
-        // Same for named dispatch
-        invoke_function(widget.get(), "reset", 1.f, 2u);
+        // Same for named dispatch (typed args)
+        invoke_function(widget.get(), "add", Any<int>(5), Any<float>(2.5f));
 
         // Explicit IAny* args
         Any<float> arg0(3.f);

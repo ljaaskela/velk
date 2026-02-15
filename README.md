@@ -40,6 +40,9 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
   - [Base types](#base-types)
 - [STRATA_INTERFACE reference](#strata_interface-reference)
+  - [Function member variants](#function-member-variants)
+  - [Argument metadata](#argument-metadata)
+  - [Practical example](#practical-example)
   - [Manual metadata and accessors](#manual-metadata-and-accessors)
 
 ## Features
@@ -50,7 +53,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 - **Type-erased values:** `Any<T>` wrappers over a generic `IAny` container
 - **Typed properties:** `Property<T>` wrappers with automatic change notification events
 - **Events:** observable multi-handler events (inheriting IFunction) with immediate or deferred dispatch
-- **Virtual function dispatch:** `(FN, Name)` generates overridable `fn_Name()` virtuals, automatically wired to `IFunction::invoke()`
+- **Virtual function dispatch:** `(FN, Name)` generates overridable `fn_Name()` virtuals with optional typed parameters, automatically wired to `IFunction::invoke()`. `(FN_RAW, Name)` provides raw `FnArgs` access
 - **Deferred invocation:** functions and event handlers can be queued for execution during `update()`
 - **Custom type support:** extend with user-defined `IAny` implementations for external or shared data
 
@@ -134,8 +137,8 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    ReturnValue fn_reset(FnArgs args) override {
-        // implementation with access to 'this' and args
+    ReturnValue fn_reset() override {
+        // implementation with access to 'this'
         return ReturnValue::SUCCESS;
     }
 };
@@ -155,8 +158,8 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset(FnArgs args) override { /* ... */ return ReturnValue::SUCCESS; }
-    ReturnValue fn_serialize(FnArgs) override { /* ... */ return ReturnValue::SUCCESS; }
+    ReturnValue fn_reset() override { /* ... */ return ReturnValue::SUCCESS; }
+    ReturnValue fn_serialize() override { /* ... */ return ReturnValue::SUCCESS; }
 };
 ```
 
@@ -183,7 +186,7 @@ if (auto* iw = interface_cast<IMyWidget>(widget)) {
 
 ### Virtual function dispatch
 
-`(FN, Name)` in `STRATA_INTERFACE` generates a virtual method `fn_Name(FnArgs)` on the interface. Implementing classes override this virtual to provide logic. The override is automatically wired so that calling `invoke()` on the runtime `IFunction` routes to the virtual method.
+`STRATA_INTERFACE` supports three function forms. `(FN, Name)` generates a zero-arg virtual `fn_Name()`. `(FN, Name, (T1, a1), ...)` generates a typed virtual `fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs`. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
 
 ```cpp
 class IMyWidget : public Interface<IMyWidget>
@@ -191,22 +194,36 @@ class IMyWidget : public Interface<IMyWidget>
 public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
-        (FN, reset)          // generates: virtual fn_reset(FnArgs)
+        (FN, reset),                       // virtual fn_reset()
+        (FN, add, (int, x), (float, y)),   // virtual fn_add(int x, float y)
+        (FN_RAW, process)                  // virtual fn_process(FnArgs)
     )
 };
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    ReturnValue fn_reset(FnArgs) override {
+    ReturnValue fn_reset() override {
         std::cout << "reset!" << std::endl;
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_add(int x, float y) override {
+        std::cout << x + y << std::endl;
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_process(FnArgs args) override {
+        // manual unpacking via FunctionContext or Any<const T>
         return ReturnValue::SUCCESS;
     }
 };
 
-// Calling invoke() routes to fn_reset()
+// All forms are invoked through IFunction::invoke()
 auto widget = instance().create<IObject>(MyWidget::get_class_uid());
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
-    invoke_function(iw->reset());  // prints "reset!"
+    invoke_function(iw->reset());                               // zero-arg
+    invoke_function(iw, "add", Any<int>(10), Any<float>(3.f));  // typed
+    invoke_function(iw->process());                             // raw
 }
 ```
 
@@ -214,12 +231,12 @@ Each `fn_Name` is pure virtual, so implementing classes must override it. An exp
 
 #### Function arguments
 
-Functions receive arguments as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`.
+For **typed-arg** functions (`(FN, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `INVALID_ARGUMENT`.
 
-For multi-arg callbacks, use `FunctionContext` to validate the expected argument count:
+For **FN_RAW** functions, arguments arrive as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`. Use `FunctionContext` to validate the expected argument count:
 
 ```cpp
-ReturnValue fn_reset(FnArgs args) override {
+ReturnValue fn_process(FnArgs args) override {
     if (auto ctx = FunctionContext(args, 2)) {
         auto a = ctx.arg<float>(0);
         auto b = ctx.arg<int>(1);
@@ -229,24 +246,13 @@ ReturnValue fn_reset(FnArgs args) override {
 }
 ```
 
-Single-argument callbacks can access the argument directly:
+Callers use variadic `invoke_function` overloads — values are automatically wrapped in `Any<T>`:
 
 ```cpp
-ReturnValue fn_reset(FnArgs args) override {
-    if (auto value = Any<const int>(args[0])) {
-        // use value.get_value()
-    }
-    return ReturnValue::SUCCESS;
-}
-```
-
-Callers use variadic `invoke_function` overloads — values are automatically wrapped:
-
-```cpp
-invoke_function(iw->reset());                      // no args
-invoke_function(iw->reset(), Any<int>(42));         // single IAny arg
-invoke_function(iw->reset(), 1.f, 2u);             // multi-value (auto-wrapped)
-invoke_function(widget.get(), "reset", 1.f, 2u);   // by name
+invoke_function(iw->reset());                                   // zero-arg
+invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f));    // typed args
+invoke_function(iw->process(), Any<int>(42));                   // single IAny arg
+invoke_function(widget.get(), "process", 1.f, 2u);             // multi-value (auto-wrapped)
 ```
 
 #### Typed lambda parameters
@@ -691,20 +697,63 @@ The `handlers_` vector is partitioned:
 
 ```cpp
 STRATA_INTERFACE(
-    (PROP, Type, Name, Default),  // generates Property<Type> Name() const
-    (EVT, Name),          // generates IEvent::Ptr Name() const
-    (FN, Name)            // generates virtual fn_Name(FnArgs),
-                          //          IFunction::Ptr Name() const
+    (PROP, Type, Name, Default),          // Property<Type> Name() const
+    (EVT, Name),                          // IEvent::Ptr Name() const
+    (FN, Name),                           // virtual fn_Name()          (zero-arg)
+    (FN, Name, (T1, a1), (T2, a2)),       // virtual fn_Name(T1 a1, T2 a2) (typed)
+    (FN_RAW, Name)                        // virtual fn_Name(FnArgs)   (raw untyped)
 )
 ```
 
-For each `(FN, Name)` entry the macro generates:
-1. A pure `virtual ReturnValue fn_Name(FnArgs) = 0` method
-2. A static trampoline that routes `IFunction::invoke()` to `fn_Name()`
+### Function member variants
+
+`FN` and `FN_RAW` are the two tags for function members. `FN` supports zero-arg and typed-arg forms; `FN_RAW` preserves the untyped `FnArgs` signature.
+
+| Syntax | Virtual generated | Arg metadata | Use case |
+|--------|------------------|--------------|----------|
+| `(FN, reset)` | `fn_reset()` | none | Zero-arg functions |
+| `(FN, add, (int, x), (float, y))` | `fn_add(int x, float y)` | `FnArgDesc` per param | Typed args with reflection |
+| `(FN_RAW, process)` | `fn_process(FnArgs)` | none | Raw untyped args |
+
+All three variants generate:
+1. A pure virtual method (signature depends on variant)
+2. A static trampoline that routes `IFunction::invoke()` to the virtual
 3. A `MemberDesc` with the trampoline pointer in the metadata array
 4. An accessor `IFunction::Ptr Name() const`
 
-A practical example:
+For typed-arg functions, the trampoline automatically extracts each argument from `FnArgs` using `IAny::get_data()` with type deduction from the member function pointer. If fewer arguments are provided than expected, the trampoline returns `INVALID_ARGUMENT`. Extra arguments are ignored.
+
+### Argument metadata
+
+Typed-arg functions store a `static constexpr FnArgDesc[]` array alongside the trampoline in `FunctionKind`:
+
+```cpp
+struct FnArgDesc {
+    std::string_view name;   // parameter name (e.g. "x")
+    Uid typeUid;             // type_uid<T>() for the parameter type
+};
+
+struct FunctionKind {
+    FnTrampoline trampoline;
+    array_view<FnArgDesc> args;  // empty for zero-arg and FN_RAW
+};
+```
+
+Access via `MemberDesc::functionKind()->args`:
+
+```cpp
+if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
+    for (auto& m : info->members) {
+        if (auto* fk = m.functionKind(); fk && !fk->args.empty()) {
+            for (auto& arg : fk->args) {
+                // arg.name, arg.typeUid
+            }
+        }
+    }
+}
+```
+
+### Practical example
 
 ```cpp
 class IMyWidget : public Interface<IMyWidget>
@@ -713,12 +762,52 @@ public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
         (EVT, on_clicked),
-        (FN, reset)         // virtual fn_reset + accessor reset()
+        (FN, reset),                        // zero-arg
+        (FN, add, (int, x), (float, y))     // typed args
     )
+};
+
+class ISerializable : public Interface<ISerializable>
+{
+public:
+    STRATA_INTERFACE(
+        (PROP, std::string, name, ""),
+        (FN_RAW, serialize)                 // raw FnArgs
+    )
+};
+
+class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
+{
+    ReturnValue fn_reset() override {
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_add(int x, float y) override {
+        // x and y are extracted from FnArgs automatically
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_serialize(FnArgs args) override {
+        // manual arg unpacking via FunctionContext or Any<const T>
+        return ReturnValue::SUCCESS;
+    }
 };
 ```
 
-Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Members track which interface declared them via `InterfaceInfo`.
+Invocation works the same for all variants — callers always go through `IFunction::invoke()`:
+
+```cpp
+auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+if (auto* iw = interface_cast<IMyWidget>(widget)) {
+    invoke_function(iw->reset());                            // zero-arg
+    invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f)); // typed
+}
+if (auto* is = interface_cast<ISerializable>(widget)) {
+    invoke_function(is, "serialize");                         // FN_RAW
+}
+```
+
+Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Up to 8 typed parameters per function. Members track which interface declared them via `InterfaceInfo`.
 
 ### Manual metadata and accessors
 
@@ -726,11 +815,11 @@ This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE`
 
 1. A `State` struct containing one field per `PROP` member, initialized with its default value.
 2. Per-property statics: a `getDefault` function returning a pointer to a static `ext::AnyRef<T>`, a `createRef` factory that creates an `ext::AnyRef<T>` pointing into a `State` struct, and a `PropertyKind` referencing both.
-3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and trampoline pointers for `FN` members).
+3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
 4. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
-5. For `FN` members: a virtual `fn_Name()` method and a static trampoline function.
+5. For function members: a virtual method, a static trampoline, and (for typed-arg `FN`) a `static constexpr FnArgDesc[]` array.
 
-Here is a manual equivalent to the STRATA_INTERFACE-using IMyWidget interface above:
+Here is a manual equivalent showing all three function variants:
 
 ```cpp
 class IMyWidget : public Interface<IMyWidget>
@@ -764,16 +853,45 @@ public:
     static constexpr PropertyKind _strata_propkind_width {
         &_strata_getdefault_width, &_strata_createref_width };
 
+    // 5a. Zero-arg FN: virtual + trampoline (uses detail::interface_trampoline)
+    virtual ReturnValue fn_reset() = 0;
+    static ReturnValue _strata_trampoline_reset(void* self, FnArgs args) {
+        return detail::interface_trampoline(self, args, &_strata_intf_type::fn_reset);
+    }
+    static constexpr FunctionKind _strata_fnkind_reset {
+        &_strata_trampoline_reset };
+
+    // 5b. Typed-arg FN: virtual with typed params + trampoline + FnArgDesc array
+    virtual ReturnValue fn_add(int x, float y) = 0;
+    static ReturnValue _strata_trampoline_add(void* self, FnArgs args) {
+        return detail::interface_trampoline(self, args, &_strata_intf_type::fn_add);
+    }
+    static constexpr FnArgDesc _strata_fnargs_add[] = {
+        {"x", type_uid<int>()}, {"y", type_uid<float>()}
+    };
+    static constexpr FunctionKind _strata_fnkind_add {
+        &_strata_trampoline_add, {_strata_fnargs_add, 2} };
+
+    // 5c. FN_RAW: virtual with FnArgs + direct trampoline (no type extraction)
+    virtual ReturnValue fn_process(FnArgs) = 0;
+    static ReturnValue _strata_trampoline_process(void* self, FnArgs args) {
+        return static_cast<_strata_intf_type*>(self)->fn_process(args);
+    }
+    static constexpr FunctionKind _strata_fnkind_process {
+        &_strata_trampoline_process };
+
     // 3. Static metadata array
     //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
     //    Pass &INFO so each member knows which interface declared it.
     //    INFO is provided by Interface<IMyWidget> automatically.
     //    PropertyDesc accepts an optional PropertyKind pointer as the third argument.
-    //    FunctionDesc accepts an optional trampoline pointer as the third argument.
+    //    FunctionDesc accepts an optional FunctionKind pointer as the third argument.
     static constexpr std::array metadata = {
         PropertyDesc<float>("width", &INFO, &_strata_propkind_width),
         EventDesc("on_clicked", &INFO),
-        FunctionDesc("reset", &INFO, &_strata_trampoline_reset),
+        FunctionDesc("reset", &INFO, &_strata_fnkind_reset),
+        FunctionDesc("add", &INFO, &_strata_fnkind_add),
+        FunctionDesc("process", &INFO, &_strata_fnkind_process),
     };
 
     // 4. Typed accessor methods
@@ -797,17 +915,21 @@ public:
             this->template get_interface<IMetadata>(), "reset");
     }
 
-    // 5. Virtual method and trampoline for FN members
-    //    The virtual provides the override point for implementing classes.
-    //    The static trampoline casts the void* context back to the interface
-    //    type and calls the virtual. _strata_intf_type is a protected alias
-    //    for T provided by Interface<T>.
-    virtual ReturnValue fn_reset(FnArgs) = 0;
-    static ReturnValue _strata_trampoline_reset(void* self, FnArgs args) {
-        return static_cast<_strata_intf_type*>(self)->fn_reset(args);
+    IFunction::Ptr add() const {
+        return ::strata::get_function(
+            this->template get_interface<IMetadata>(), "add");
+    }
+
+    IFunction::Ptr process() const {
+        return ::strata::get_function(
+            this->template get_interface<IMetadata>(), "process");
     }
 };
 ```
+
+The key differences between variants:
+- **Zero-arg FN** and **typed-arg FN** both use `detail::interface_trampoline`, which deduces parameter types from the member function pointer and extracts values from `FnArgs` automatically. Typed-arg functions additionally store a `FnArgDesc` array in their `FunctionKind`.
+- **FN_RAW** uses a direct trampoline that passes `FnArgs` through to the virtual unchanged, matching the pre-typed-args behavior.
 
 The string names passed to `PropertyDesc` / `get_property` (etc.) are used for runtime lookup, so they must match exactly. `&INFO` is a pointer to the `static constexpr InterfaceInfo` provided by `Interface<T>`, which records the interface UID and name for each member.
 

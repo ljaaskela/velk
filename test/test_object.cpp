@@ -35,21 +35,51 @@ public:
     )
 };
 
-class TestWidget : public ext::Object<TestWidget, ITestWidget, ITestSerializable>
+class ITestMath : public Interface<ITestMath>
+{
+public:
+    STRATA_INTERFACE(
+        (FN, add, (int, x), (int, y))
+    )
+};
+
+class ITestRaw : public Interface<ITestRaw>
+{
+public:
+    STRATA_INTERFACE(
+        (FN_RAW, process)
+    )
+};
+
+class TestWidget : public ext::Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
 {
 public:
     int resetCallCount = 0;
     int serializeCallCount = 0;
+    int lastAddResult = 0;
+    int processCallCount = 0;
 
-    ReturnValue fn_reset(FnArgs) override
+    ReturnValue fn_reset() override
     {
         resetCallCount++;
         return ReturnValue::SUCCESS;
     }
 
-    ReturnValue fn_serialize(FnArgs) override
+    ReturnValue fn_serialize() override
     {
         serializeCallCount++;
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_add(int x, int y) override
+    {
+        lastAddResult = x + y;
+        return ReturnValue::SUCCESS;
+    }
+
+    ReturnValue fn_process(FnArgs) override
+    {
+        processCallCount++;
         return ReturnValue::SUCCESS;
     }
 };
@@ -201,7 +231,9 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
 
     // ITestWidget: width, height, on_clicked, reset
     // ITestSerializable: version, serialize
-    EXPECT_EQ(info->members.size(), 6u);
+    // ITestMath: add
+    // ITestRaw: process
+    EXPECT_EQ(info->members.size(), 8u);
 
     // Check first member
     EXPECT_EQ(info->members[0].name, "width");
@@ -246,4 +278,87 @@ TEST_F(ObjectTest, PropertyStateReadWrite)
     // Write to state directly, read through property
     state->height = 75.f;
     EXPECT_FLOAT_EQ(iw->height().get_value(), 75.f);
+}
+
+TEST_F(ObjectTest, TypedFunctionInvoke)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* raw = dynamic_cast<TestWidget*>(obj.get());
+    ASSERT_NE(raw, nullptr);
+
+    // Invoke typed function via IAny args
+    Any<int> a(3);
+    Any<int> b(7);
+    const IAny* ptrs[] = {a, b};
+    FnArgs args{ptrs, 2};
+    invoke_function(obj.get(), "add", args);
+    EXPECT_EQ(raw->lastAddResult, 10);
+
+    // Invoke via variadic helper
+    invoke_function(obj.get(), "add", Any<int>(10), Any<int>(20));
+    EXPECT_EQ(raw->lastAddResult, 30);
+}
+
+TEST_F(ObjectTest, TypedFunctionArgMetadata)
+{
+    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    ASSERT_NE(info, nullptr);
+
+    // Find the "add" member
+    const MemberDesc* addDesc = nullptr;
+    for (auto& m : info->members) {
+        if (m.name == "add") { addDesc = &m; break; }
+    }
+    ASSERT_NE(addDesc, nullptr);
+    EXPECT_EQ(addDesc->kind, MemberKind::Function);
+
+    auto* fk = addDesc->functionKind();
+    ASSERT_NE(fk, nullptr);
+    EXPECT_EQ(fk->args.size(), 2u);
+    EXPECT_EQ(fk->args[0].name, "x");
+    EXPECT_EQ(fk->args[0].typeUid, type_uid<int>());
+    EXPECT_EQ(fk->args[1].name, "y");
+    EXPECT_EQ(fk->args[1].typeUid, type_uid<int>());
+}
+
+TEST_F(ObjectTest, ZeroArgFunctionHasNoArgMetadata)
+{
+    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    ASSERT_NE(info, nullptr);
+
+    const MemberDesc* resetDesc = nullptr;
+    for (auto& m : info->members) {
+        if (m.name == "reset") { resetDesc = &m; break; }
+    }
+    ASSERT_NE(resetDesc, nullptr);
+
+    auto* fk = resetDesc->functionKind();
+    ASSERT_NE(fk, nullptr);
+    EXPECT_TRUE(fk->args.empty());
+}
+
+TEST_F(ObjectTest, FnRawInvoke)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* raw = dynamic_cast<TestWidget*>(obj.get());
+    ASSERT_NE(raw, nullptr);
+
+    invoke_function(obj.get(), "process");
+    EXPECT_EQ(raw->processCallCount, 1);
+}
+
+TEST_F(ObjectTest, FnRawHasNoArgMetadata)
+{
+    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    ASSERT_NE(info, nullptr);
+
+    const MemberDesc* processDesc = nullptr;
+    for (auto& m : info->members) {
+        if (m.name == "process") { processDesc = &m; break; }
+    }
+    ASSERT_NE(processDesc, nullptr);
+
+    auto* fk = processDesc->functionKind();
+    ASSERT_NE(fk, nullptr);
+    EXPECT_TRUE(fk->args.empty());
 }
