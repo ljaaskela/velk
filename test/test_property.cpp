@@ -39,22 +39,17 @@ TEST(Property, CopySemanticsShareSameIProperty)
     EXPECT_FLOAT_EQ(copy.get_value(), 20.f);
 }
 
-namespace {
-    static int s_onChangedCallCount = 0;
-    static float s_onChangedReceivedValue = 0.f;
-}
-
 TEST(Property, OnChangedEventFires)
 {
-    s_onChangedCallCount = 0;
-    s_onChangedReceivedValue = 0.f;
+    int callCount = 0;
+    float receivedValue = 0.f;
 
     Property<float> p;
 
-    Function handler([](FnArgs args) -> ReturnValue {
-        s_onChangedCallCount++;
+    Function handler([&](FnArgs args) -> ReturnValue {
+        callCount++;
         if (auto v = Any<const float>(args[0])) {
-            s_onChangedReceivedValue = v.get_value();
+            receivedValue = v.get_value();
         }
         return ReturnValue::SUCCESS;
     });
@@ -62,8 +57,8 @@ TEST(Property, OnChangedEventFires)
     p.add_on_changed(handler);
     p.set_value(42.f);
 
-    EXPECT_EQ(s_onChangedCallCount, 1);
-    EXPECT_FLOAT_EQ(s_onChangedReceivedValue, 42.f);
+    EXPECT_EQ(callCount, 1);
+    EXPECT_FLOAT_EQ(receivedValue, 42.f);
 }
 
 TEST(Property, SetSameValueReturnsNothingToDo)
@@ -90,24 +85,20 @@ TEST(Property, SetDifferentValueReturnsSuccess)
     EXPECT_EQ(p.get_value(), 10);
 }
 
-namespace {
-    static int s_sameValueCallCount = 0;
-}
-
 TEST(Property, OnChangedDoesNotFireOnSameValue)
 {
-    s_sameValueCallCount = 0;
+    int callCount = 0;
 
     Property<int> p(5);
 
-    Function handler([](FnArgs) -> ReturnValue {
-        s_sameValueCallCount++;
+    Function handler([&](FnArgs) -> ReturnValue {
+        callCount++;
         return ReturnValue::SUCCESS;
     });
 
     p.add_on_changed(handler);
     p.set_value(5); // same value
-    EXPECT_EQ(s_sameValueCallCount, 0);
+    EXPECT_EQ(callCount, 0);
 }
 
 TEST(Property, BoolConversion)

@@ -60,6 +60,8 @@ class IFunctionInternal : public Interface<IFunctionInternal>
 public:
     /** @brief Function pointer type for bound trampoline callbacks. */
     using BoundFn = ReturnValue(void* context, FnArgs);
+    /** @brief Function pointer type for deleting an owned context. */
+    using ContextDeleter = void(void*);
 
     /** @brief Sets the callback that will be called when IFunction::invoke is called. */
     virtual void set_invoke_callback(IFunction::CallableFn *fn) = 0;
@@ -70,6 +72,18 @@ public:
      * @param fn Static trampoline that casts context and calls the virtual method.
      */
     virtual void bind(void* context, BoundFn* fn) = 0;
+
+    /**
+     * @brief Sets an owned callback with a heap-allocated context.
+     *
+     * Takes ownership of @p context. The @p deleter is called on @p context
+     * when the function is destroyed or a new callback is set.
+     *
+     * @param context Heap-allocated callable (ownership transferred).
+     * @param fn Static trampoline that casts context and invokes it.
+     * @param deleter Static function that deletes context.
+     */
+    virtual void set_owned_callback(void* context, BoundFn* fn, ContextDeleter* deleter) = 0;
 };
 
 /**

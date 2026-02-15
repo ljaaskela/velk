@@ -12,7 +12,7 @@ namespace strata {
  * Usage in callbacks:
  * @code
  * ReturnValue fn_reset(FnArgs args) override {
- *     if (auto ctx = FunctionContext(args)) {
+ *     if (auto ctx = FunctionContext(args, 1)) { // Expecting 1 argument 
  *         auto a = Any<const float>(ctx[0]);
  *     }
  * }

@@ -21,6 +21,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
   - [Use typed accessors](#use-typed-accessors)
   - [Query metadata](#query-metadata)
   - [Virtual function dispatch](#virtual-function-dispatch)
+  - [Typed lambda parameters](#typed-lambda-parameters)
   - [Properties with change notifications](#properties-with-change-notifications)
   - [Custom Any types](#custom-any-types)
   - [Direct state access](#direct-state-access)
@@ -247,6 +248,49 @@ invoke_function(iw->reset(), Any<int>(42));         // single IAny arg
 invoke_function(iw->reset(), 1.f, 2u);             // multi-value (auto-wrapped)
 invoke_function(widget.get(), "reset", 1.f, 2u);   // by name
 ```
+
+#### Typed lambda parameters
+
+`Function` also accepts lambdas with typed parameters. Arguments are automatically extracted from `FnArgs` using `Any<const T>`, so there's no manual unpacking:
+
+```cpp
+Function fn([&](const float& a, const int& b) -> ReturnValue {
+    // a and b are extracted from FnArgs automatically
+    return ReturnValue::SUCCESS;
+});
+
+Any<float> x(3.14f);
+Any<int> y(42);
+const IAny* ptrs[] = {x, y};
+fn.invoke(FnArgs{ptrs, 2});
+```
+
+Void-returning lambdas are supported — `Function` wraps them to return `ReturnValue::SUCCESS`:
+
+```cpp
+Function fn([&](float value) {
+    std::cout << "received: " << value << std::endl;
+});
+```
+
+Zero-arity lambdas work too:
+
+```cpp
+Function fn([&]() {
+    std::cout << "called!" << std::endl;
+});
+fn.invoke();  // SUCCESS
+```
+
+The three constructor forms are mutually exclusive via SFINAE:
+
+| Callable type | Constructor |
+|---|---|
+| `ReturnValue(*)(FnArgs)` (raw function pointer) | `Function(CallbackFn*)` |
+| Callable with `(FnArgs) -> ReturnValue` | Capturing lambda ctor |
+| Callable with typed params (any return) | Typed lambda ctor |
+
+When fewer arguments are provided than the lambda expects, `invoke()` returns `INVALID_ARGUMENT`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
 
 ### Query metadata
 

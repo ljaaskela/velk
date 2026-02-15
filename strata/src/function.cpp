@@ -3,6 +3,20 @@
 
 namespace strata {
 
+FunctionImpl::~FunctionImpl()
+{
+    release_owned_context();
+}
+
+void FunctionImpl::release_owned_context()
+{
+    if (context_deleter_ && owned_context_) {
+        context_deleter_(owned_context_);
+    }
+    owned_context_ = nullptr;
+    context_deleter_ = nullptr;
+}
+
 ReturnValue FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
 {
     return reinterpret_cast<IFunction::CallableFn*>(ctx)(args);
@@ -64,12 +78,23 @@ void FunctionImpl::invoke_handlers(FnArgs args) const
 
 void FunctionImpl::set_invoke_callback(IFunction::CallableFn *fn)
 {
+    release_owned_context();
     target_context_ = reinterpret_cast<void*>(fn);
     target_fn_ = fn ? &callback_trampoline : nullptr;
 }
 
 void FunctionImpl::bind(void* context, IFunctionInternal::BoundFn* fn)
 {
+    release_owned_context();
+    target_context_ = context;
+    target_fn_ = fn;
+}
+
+void FunctionImpl::set_owned_callback(void* context, BoundFn* fn, ContextDeleter* deleter)
+{
+    release_owned_context();
+    owned_context_ = context;
+    context_deleter_ = deleter;
     target_context_ = context;
     target_fn_ = fn;
 }
