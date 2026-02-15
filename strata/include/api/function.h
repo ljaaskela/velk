@@ -19,36 +19,24 @@ namespace detail {
 
 // --- callable_traits: extract return type and parameter types from a callable's operator() ---
 
+template<class R, class... Args>
+struct callable_traits_base {
+    using return_type = R;
+    using args_tuple = std::tuple<Args...>;
+    static constexpr size_t arity = sizeof...(Args);
+};
+
 template<class F, class = void>
 struct callable_traits; // SFINAE-friendly primary (undefined)
 
 template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const> {
-    using return_type = R;
-    using args_tuple = std::tuple<Args...>;
-    static constexpr size_t arity = sizeof...(Args);
-};
-
+struct callable_traits<R(C::*)(Args...) const> : callable_traits_base<R, Args...> {};
 template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...)> {
-    using return_type = R;
-    using args_tuple = std::tuple<Args...>;
-    static constexpr size_t arity = sizeof...(Args);
-};
-
+struct callable_traits<R(C::*)(Args...)> : callable_traits_base<R, Args...> {};
 template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const noexcept> {
-    using return_type = R;
-    using args_tuple = std::tuple<Args...>;
-    static constexpr size_t arity = sizeof...(Args);
-};
-
+struct callable_traits<R(C::*)(Args...) const noexcept> : callable_traits_base<R, Args...> {};
 template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) noexcept> {
-    using return_type = R;
-    using args_tuple = std::tuple<Args...>;
-    static constexpr size_t arity = sizeof...(Args);
-};
+struct callable_traits<R(C::*)(Args...) noexcept> : callable_traits_base<R, Args...> {};
 
 template<class F>
 struct callable_traits<F, std::void_t<decltype(&F::operator())>>
@@ -205,15 +193,6 @@ private:
  */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IFunction::Ptr& fn, const Args&... args)
-{
-    const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
-    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Args)}) : ReturnValue::INVALID_ARGUMENT;
-}
-
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
 ReturnValue invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
@@ -235,35 +214,12 @@ ReturnValue invoke_function(const IInterface* o, std::string_view name, const Ar
     return meta ? invoke_function(meta->get_function(name), FnArgs{ptrs, sizeof...(Args)}) : ReturnValue::INVALID_ARGUMENT;
 }
 
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface::Ptr& o, std::string_view name, const Args&... args)
-{
-    return invoke_function(o.get(), name, args...);
-}
-
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface::ConstPtr& o, std::string_view name, const Args&... args)
-{
-    return invoke_function(o.get(), name, args...);
-}
-
 // Variadic invoke_function: value args (auto-wrapped in Any<T>)
 
 namespace detail {
 
-template<class Tuple, size_t... Is>
-ReturnValue invoke_with_any_tuple(const IFunction::Ptr& fn, Tuple& tup, std::index_sequence<Is...>)
-{
-    const IAny* ptrs[] = {static_cast<const IAny*>(std::get<Is>(tup))...};
-    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Is)}) : ReturnValue::INVALID_ARGUMENT;
-}
-
-template<class Tuple, size_t... Is>
-ReturnValue invoke_with_any_tuple(const IFunction::ConstPtr& fn, Tuple& tup, std::index_sequence<Is...>)
+template<class FnPtr, class Tuple, size_t... Is>
+ReturnValue invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence<Is...>)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(std::get<Is>(tup))...};
     return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Is)}) : ReturnValue::INVALID_ARGUMENT;
@@ -285,15 +241,6 @@ FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
  */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IFunction::Ptr& fn, const Args&... args)
-{
-    auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
-    return detail::invoke_with_any_tuple(fn, tup, std::index_sequence_for<Args...>{});
-}
-
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
 ReturnValue invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
@@ -310,22 +257,6 @@ ReturnValue invoke_function(const IInterface* o, std::string_view name, const Ar
     auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
     auto* meta = interface_cast<IMetadata>(o);
     return meta ? invoke_function(meta->get_function(name), fnArgs) : ReturnValue::INVALID_ARGUMENT;
-}
-
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface::Ptr& o, std::string_view name, const Args&... args)
-{
-    return invoke_function(o.get(), name, args...);
-}
-
-/** @copydoc invoke_function */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface::ConstPtr& o, std::string_view name, const Args&... args)
-{
-    return invoke_function(o.get(), name, args...);
 }
 
 } // namespace strata

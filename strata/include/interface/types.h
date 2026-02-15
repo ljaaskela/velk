@@ -108,13 +108,13 @@ enum ReturnValue : int16_t {
 };
 
 /** @brief Returns true if the return value indicates success (non-negative). */
-[[maybe_unused]] static constexpr bool succeeded(ReturnValue ret)
+inline constexpr bool succeeded(ReturnValue ret)
 {
     return ret >= 0;
 }
 
 /** @brief Returns true if the return value indicates failure (negative). */
-[[maybe_unused]] static constexpr bool failed(ReturnValue ret)
+inline constexpr bool failed(ReturnValue ret)
 {
     return ret < 0;
 }

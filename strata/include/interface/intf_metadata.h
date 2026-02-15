@@ -160,53 +160,21 @@ public:
  * @param name Name of the function to query.
  * @param args Function arguments.
  */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface *o,
-                                                    std::string_view name,
-                                                    FnArgs args = {})
+inline ReturnValue invoke_function(const IInterface *o,
+                                   std::string_view name,
+                                   FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_function(meta->get_function(name), args) : ReturnValue::INVALID_ARGUMENT;
 }
 
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface::Ptr &o,
-                                                    std::string_view name,
-                                                    FnArgs args = {})
-{
-    return invoke_function(o.get(), name, args);
-}
-
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface::ConstPtr &o,
-                                                    std::string_view name,
-                                                    FnArgs args = {})
-{
-    return invoke_function(o.get(), name, args);
-}
-
 /** @brief Invoke a named function with a single IAny argument. */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface *o,
-                                                    std::string_view name,
-                                                    const IAny *arg)
+inline ReturnValue invoke_function(const IInterface *o,
+                                   std::string_view name,
+                                   const IAny *arg)
 {
     FnArgs args{&arg, 1};
     return invoke_function(o, name, args);
-}
-
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface::Ptr &o,
-                                                    std::string_view name,
-                                                    const IAny *arg)
-{
-    return invoke_function(o.get(), name, arg);
-}
-
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IInterface::ConstPtr &o,
-                                                    std::string_view name,
-                                                    const IAny *arg)
-{
-    return invoke_function(o.get(), name, arg);
 }
 
 /**
@@ -215,36 +183,18 @@ public:
  * @param name Name of the event to query.
  * @param args Event arguments.
  */
-[[maybe_unused]] static ReturnValue invoke_event(const IInterface::Ptr &o,
-                                                 std::string_view name,
-                                                 FnArgs args = {})
-{
-    auto meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
-}
-
-/** @copydoc invoke_event */
-[[maybe_unused]] static ReturnValue invoke_event(const IInterface::ConstPtr &o,
-                                                 std::string_view name,
-                                                 FnArgs args = {})
+inline ReturnValue invoke_event(const IInterface *o,
+                                std::string_view name,
+                                FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @brief Invoke a named event with a single IAny argument. */
-[[maybe_unused]] static ReturnValue invoke_event(const IInterface::Ptr &o,
-                                                 std::string_view name,
-                                                 const IAny *arg)
-{
-    FnArgs args{&arg, 1};
-    return invoke_event(o, name, args);
-}
-
-/** @copydoc invoke_event */
-[[maybe_unused]] static ReturnValue invoke_event(const IInterface::ConstPtr &o,
-                                                 std::string_view name,
-                                                 const IAny *arg)
+inline ReturnValue invoke_event(const IInterface *o,
+                                std::string_view name,
+                                const IAny *arg)
 {
     FnArgs args{&arg, 1};
     return invoke_event(o, name, args);

@@ -92,26 +92,13 @@ public:
  * @param args Arguments for invocation.
  * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, FnArgs args = {}, InvokeType type = Immediate)
-{
-    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
-}
-
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
+inline ReturnValue invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
 {
     return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @brief Invokes a function with a single IAny argument. */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::Ptr &fn, const IAny *arg, InvokeType type = Immediate)
-{
-    FnArgs args{&arg, 1};
-    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
-}
-
-/** @copydoc invoke_function */
-[[maybe_unused]] static ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
+inline ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
 {
     FnArgs args{&arg, 1};
     return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
