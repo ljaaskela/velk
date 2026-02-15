@@ -9,10 +9,18 @@
 #ifndef STRATA_EXPORT
 #ifdef STRATA_EXPORTS
 /* We are building this library */
-#define STRATA_EXPORT __declspec(dllexport)
+#  ifdef _MSC_VER
+#    define STRATA_EXPORT __declspec(dllexport)
+#  else
+#    define STRATA_EXPORT __attribute__((visibility("default")))
+#  endif
 #    else
         /* We are using this library */
-#define STRATA_EXPORT __declspec(dllimport)
+#  ifdef _MSC_VER
+#    define STRATA_EXPORT __declspec(dllimport)
+#  else
+#    define STRATA_EXPORT __attribute__((visibility("default")))
+#  endif
 #    endif
 #  endif
 
