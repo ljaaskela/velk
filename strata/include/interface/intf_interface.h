@@ -31,7 +31,7 @@ public:
     /** @brief Weak pointer to a mutable IInterface. */
     using WeakPtr = std::weak_ptr<IInterface>;
     /** @brief Weak pointer to a const IInterface. */
-    using ConstWeakPtrr = std::weak_ptr<const IInterface>;
+    using ConstWeakPtr = std::weak_ptr<const IInterface>;
 
 public:
     /** @brief Returns a pointer to the requested interface, or nullptr if not supported. */

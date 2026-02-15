@@ -10,33 +10,41 @@
 
 namespace strata {
 
-/** @brief Convenience wrapper around an IProperty::Ptr with event subscription helpers. */
-class PropertyBase
+/**
+ * @brief Typed property wrapper with get_value/set_value accessors for type T.
+ * @tparam T The value type stored by the property.
+ */
+template<class T>
+class Property final
 {
 public:
-    operator const IProperty::Ptr()
+    static constexpr Uid TYPE_UID = type_uid<T>();
+
+    /** @brief Default-constructs a property of type T via Strata. */
+    Property() { prop_ = instance().create_property(TYPE_UID, {}); }
+
+    /** @brief Constructs a property of type T and sets its initial value. */
+    Property(const T& value)
     {
-        return prop_;
+        prop_ = instance().create_property(TYPE_UID, {});
+        set_value(value);
     }
-    operator const IProperty::ConstPtr() const
-    {
-        return prop_;
-    }
+
+    /** @brief Wraps an existing IProperty pointer. */
+    explicit Property(IProperty::Ptr existing) : prop_(std::move(existing)) {}
+
+    operator const IProperty::Ptr() { return prop_; }
+    operator const IProperty::ConstPtr() const { return prop_; }
+
     /** @brief Returns true if the underlying IProperty is valid. */
-    operator bool() const
-    {
-        return prop_.operator bool();
-    }
+    operator bool() const { return prop_.operator bool(); }
+
     /** @brief Returns the underlying IProperty pointer. */
-    const IProperty::Ptr get_property_interface()
-    {
-        return prop_;
-    }
+    const IProperty::Ptr get_property_interface() { return prop_; }
+
     /** @copydoc get_property_interface() */
-    const IProperty::ConstPtr get_property_interface() const
-    {
-        return prop_;
-    }
+    const IProperty::ConstPtr get_property_interface() const { return prop_; }
+
     /** @brief Subscribes @p fn to be called when the property value changes. */
     void add_on_changed(const IFunction::ConstPtr &fn)
     {
@@ -44,6 +52,7 @@ public:
             prop_->on_changed()->add_handler(fn);
         }
     }
+
     /** @brief Unsubscribes @p fn from property change notifications. */
     void remove_on_changed(const IFunction::ConstPtr &fn)
     {
@@ -52,45 +61,6 @@ public:
         }
     }
 
-    /** @brief Returns the UID of the value type stored by this property. */
-    virtual Uid get_type_uid() const = 0;
-
-protected:
-    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
-    void create() { prop_ = instance().create_property(get_type_uid(), {}); }
-
-    PropertyBase() = default;
-    explicit PropertyBase(IProperty::Ptr existing) : prop_(std::move(existing)) {}
-
-    IProperty::Ptr prop_;
-};
-
-/**
- * @brief Typed property wrapper with get_value/set_value accessors for type T.
- * @tparam T The value type stored by the property.
- */
-template<class T>
-class Property final : public PropertyBase
-{
-public:
-    static constexpr Uid TYPE_UID = type_uid<T>();
-    /** @brief Default-constructs a property of type T via Strata. */
-    Property()
-    {
-        create();
-    }
-    /** @brief Constructs a property of type T and sets its initial value. */
-    Property(const T& value)
-    {
-        create();
-        set_value(value);
-    }
-    /** @brief Wraps an existing IProperty pointer. */
-    explicit Property(IProperty::Ptr existing) : PropertyBase(std::move(existing)) {}
-    Uid get_type_uid() const override
-    {
-        return TYPE_UID;
-    }
     /** @brief Returns the current value of the property. */
     T get_value() const {
         T value{};
@@ -101,14 +71,19 @@ public:
         }
         return value;
     }
+
     /** @brief Sets the property to @p value. */
     void set_value(const T& value) {
         if (auto internal = get_internal()) {
             internal->set_data(&value, sizeof(T), TYPE_UID);
         }
     }
+
+private:
+    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
+    IProperty::Ptr prop_;
 };
 
 } // namespace strata
 
-#endif // PROPERTY_H
+#endif // API_PROPERTY_H
