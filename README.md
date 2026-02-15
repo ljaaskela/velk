@@ -305,7 +305,7 @@ Static metadata is available from Strata without creating an instance:
 ```cpp
 if (auto* info = s.get_class_info(MyWidget::get_class_uid())) {
     for (auto& m : info->members) {
-        // m.name, m.kind, m.typeUid, m.interfaceInfo
+        // m.name, m.kind, m.interfaceInfo
     }
 }
 ```
@@ -814,7 +814,7 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write everything by hand. The macro generates five things:
 
 1. A `State` struct containing one field per `PROP` member, initialized with its default value.
-2. Per-property statics: a `getDefault` function returning a pointer to a static `ext::AnyRef<T>`, a `createRef` factory that creates an `ext::AnyRef<T>` pointing into a `State` struct, and a `PropertyKind` referencing both.
+2. Per-property statics: a `static constexpr PropertyKind` generated via `detail::PropBind<State, &State::member>`, which provides `typeUid`, `getDefault`, and `createRef` automatically.
 3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
 4. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
 5. For function members: a virtual method, a static trampoline, and (for typed-arg `FN`) a `static constexpr FnArgDesc[]` array.
@@ -833,25 +833,15 @@ public:
         float width = 0.f;
     };
 
-    // 2. Default state and property kind statics
-    //    _strata_default_state: returns a reference to a static State instance
-    //    initialized with default values. Shared across all properties.
-    //    getDefault: returns a pointer to a static ext::AnyRef<T> pointing into
-    //    the default state. Used for static metadata queries and as fallback
-    //    when state-backed storage is unavailable.
-    //    createRef: creates an ext::AnyRef<T> pointing into the State struct at
-    //    the given base address. Used by MetadataContainer to back properties
-    //    with the Object's contiguous state storage.
-    static State& _strata_default_state() { static State s; return s; }
-    static const IAny* _strata_getdefault_width() {
-        static ext::AnyRef<float> ref(&_strata_default_state().width);
-        return &ref;
-    }
-    static IAny::Ptr _strata_createref_width(void* base) {
-        return ext::create_any_ref<float>(&static_cast<State*>(base)->width);
-    }
-    static constexpr PropertyKind _strata_propkind_width {
-        &_strata_getdefault_width, &_strata_createref_width };
+    // 2. Property kind statics via PropBind
+    //    detail::PropBind<State, &State::member> provides typeUid, getDefault,
+    //    and createRef automatically. typeUid is type_uid<T>() for the property's
+    //    value type. getDefault returns a pointer to a static ext::AnyRef<T>
+    //    pointing into a shared default State singleton. createRef creates an
+    //    ext::AnyRef<T> pointing into the State struct at the given base address,
+    //    used by MetadataContainer to back properties with contiguous state storage.
+    static constexpr PropertyKind _strata_propkind_width =
+        detail::PropBind<State, &State::width>::kind;
 
     // 5a. Zero-arg FN: virtual + trampoline (uses detail::interface_trampoline)
     virtual ReturnValue fn_reset() = 0;
@@ -881,13 +871,14 @@ public:
         &_strata_trampoline_process };
 
     // 3. Static metadata array
-    //    Each entry uses a helper: PropertyDesc<T>(), EventDesc(), or FunctionDesc().
+    //    Each entry uses a helper: PropertyDesc(), EventDesc(), or FunctionDesc().
     //    Pass &INFO so each member knows which interface declared it.
     //    INFO is provided by Interface<IMyWidget> automatically.
     //    PropertyDesc accepts an optional PropertyKind pointer as the third argument.
+    //    The PropertyKind carries the type UID, so PropertyDesc doesn't need a template argument.
     //    FunctionDesc accepts an optional FunctionKind pointer as the third argument.
     static constexpr std::array metadata = {
-        PropertyDesc<float>("width", &INFO, &_strata_propkind_width),
+        PropertyDesc("width", &INFO, &_strata_propkind_width),
         EventDesc("on_clicked", &INFO),
         FunctionDesc("reset", &INFO, &_strata_fnkind_reset),
         FunctionDesc("add", &INFO, &_strata_fnkind_add),

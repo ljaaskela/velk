@@ -23,29 +23,31 @@ using FnTrampoline = ReturnValue(*)(void* self, FnArgs args);
 
 /** @brief Kind-specific data for Property members. */
 struct PropertyKind {
+    Uid typeUid;                                ///< type_uid<T>() for the property's value type.
+    /** @brief Returns a pointer to a static IAny holding the property's default value. */
     const IAny*(*getDefault)() = nullptr;
+    /** @brief Creates an AnyRef pointing into the State struct at @p stateBase. */
     IAny::Ptr(*createRef)(void* stateBase) = nullptr;
 };
 
 /** @brief Describes a single argument of a typed function. */
 struct FnArgDesc {
-    std::string_view name;
-    Uid typeUid;
+    std::string_view name;  ///< Parameter name (e.g. "x").
+    Uid typeUid;            ///< type_uid<T>() for the parameter type.
 };
 
 /** @brief Kind-specific data for Function/Event members. */
 struct FunctionKind {
-    FnTrampoline trampoline = nullptr;
-    array_view<FnArgDesc> args;       // empty for zero-arg and FN_RAW
+    FnTrampoline trampoline = nullptr;  ///< Static trampoline that routes invoke() to the virtual method.
+    array_view<FnArgDesc> args;         ///< Typed argument descriptors; empty for zero-arg and FN_RAW.
 };
 
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
 struct MemberDesc {
-    std::string_view name;
-    MemberKind kind;
-    Uid typeUid;                        // only meaningful for Property
-    const InterfaceInfo* interfaceInfo; // interface where this member was declared
-    const void* ext = nullptr;          // points to PropertyKind or FunctionKind based on kind
+    std::string_view name;              ///< Member name used for runtime lookup.
+    MemberKind kind;                    ///< Discriminator (Property, Event, or Function).
+    const InterfaceInfo* interfaceInfo; ///< Interface that declared this member.
+    const void* ext = nullptr;          ///< Points to PropertyKind or FunctionKind based on @c kind.
 
     /// Typed ext member getter for MemberDesc.kind = MemberKind::Property
     constexpr const PropertyKind *propertyKind() const
@@ -60,15 +62,24 @@ struct MemberDesc {
     }
 };
 
-/** @brief Creates a Property MemberDesc for type T. */
-template<class T>
+/**
+ * @brief Creates a Property MemberDesc.
+ * @param name Member name for runtime lookup.
+ * @param info Interface that declares this member (may be nullptr).
+ * @param pk PropertyKind with typeUid, getDefault, and createRef (may be nullptr).
+ */
 constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* info = nullptr,
     const PropertyKind* pk = nullptr)
 {
-    return {name, MemberKind::Property, type_uid<T>(), info, pk};
+    return {name, MemberKind::Property, info, pk};
 }
 
-/** @brief Retrieves the typed default value from a MemberDesc. */
+/**
+ * @brief Retrieves the typed default value from a MemberDesc.
+ * @tparam T The expected value type.
+ * @param desc Member descriptor whose PropertyKind::getDefault to query.
+ * @return The default value, or a value-initialized @p T if unavailable.
+ */
 template<class T>
 T get_default_value(const MemberDesc& desc) {
     T value{};
@@ -81,17 +92,26 @@ T get_default_value(const MemberDesc& desc) {
     return value;
 }
 
-/** @brief Creates an Event MemberDesc. */
+/**
+ * @brief Creates an Event MemberDesc.
+ * @param name Member name for runtime lookup.
+ * @param info Interface that declares this member (may be nullptr).
+ */
 constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info = nullptr)
 {
-    return {name, MemberKind::Event, {}, info};
+    return {name, MemberKind::Event, info};
 }
 
-/** @brief Creates a Function MemberDesc. */
+/**
+ * @brief Creates a Function MemberDesc.
+ * @param name Member name for runtime lookup.
+ * @param info Interface that declares this member (may be nullptr).
+ * @param fk FunctionKind with trampoline and argument descriptors (may be nullptr).
+ */
 constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr,
     const FunctionKind* fk = nullptr)
 {
-    return {name, MemberKind::Function, {}, info, fk};
+    return {name, MemberKind::Function, info, fk};
 }
 
 /**
@@ -132,19 +152,34 @@ public:
     virtual IFunction::Ptr get_function(std::string_view name) const = 0;
 };
 
-/** @brief Null-safe property lookup on an IMetadata pointer. */
+/**
+ * @brief Null-safe property lookup on an IMetadata pointer.
+ * @param meta Metadata interface pointer (may be nullptr).
+ * @param name Property name to look up.
+ * @return The runtime property instance, or nullptr if @p meta is null or the name is not found.
+ */
 inline IProperty::Ptr get_property(const IMetadata* meta, std::string_view name)
 {
     return meta ? meta->get_property(name) : nullptr;
 }
 
-/** @brief Null-safe event lookup on an IMetadata pointer. */
+/**
+ * @brief Null-safe event lookup on an IMetadata pointer.
+ * @param meta Metadata interface pointer (may be nullptr).
+ * @param name Event name to look up.
+ * @return The runtime event instance, or nullptr if @p meta is null or the name is not found.
+ */
 inline IEvent::Ptr get_event(const IMetadata* meta, std::string_view name)
 {
     return meta ? meta->get_event(name) : nullptr;
 }
 
-/** @brief Null-safe function lookup on an IMetadata pointer. */
+/**
+ * @brief Null-safe function lookup on an IMetadata pointer.
+ * @param meta Metadata interface pointer (may be nullptr).
+ * @param name Function name to look up.
+ * @return The runtime function instance, or nullptr if @p meta is null or the name is not found.
+ */
 inline IFunction::Ptr get_function(const IMetadata* meta, std::string_view name)
 {
     return meta ? meta->get_function(name) : nullptr;
@@ -176,7 +211,12 @@ inline ReturnValue invoke_function(const IInterface *o,
     return meta ? invoke_function(meta->get_function(name), args) : ReturnValue::INVALID_ARGUMENT;
 }
 
-/** @brief Invoke a named function with a single IAny argument. */
+/**
+ * @brief Invoke a named function with a single IAny argument.
+ * @param o Object to query for the function.
+ * @param name Function name to look up.
+ * @param arg Single argument to pass.
+ */
 inline ReturnValue invoke_function(const IInterface *o,
                                    std::string_view name,
                                    const IAny *arg)
@@ -199,7 +239,12 @@ inline ReturnValue invoke_event(const IInterface *o,
     return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::INVALID_ARGUMENT;
 }
 
-/** @brief Invoke a named event with a single IAny argument. */
+/**
+ * @brief Invoke a named event with a single IAny argument.
+ * @param o Object to query for the event.
+ * @param name Event name to look up.
+ * @param arg Single argument to pass.
+ */
 inline ReturnValue invoke_event(const IInterface *o,
                                 std::string_view name,
                                 const IAny *arg)
@@ -208,8 +253,15 @@ inline ReturnValue invoke_event(const IInterface *o,
     return invoke_event(o, name, args);
 }
 
+/** @brief Internal helpers for STRATA_INTERFACE macro expansion. */
 namespace detail {
 
+/**
+ * @brief Extracts a typed value from an IAny pointer.
+ * @tparam T The target value type.
+ * @param any Source IAny (may be nullptr).
+ * @return The extracted value, or a value-initialized @p T if @p any is null or type mismatches.
+ */
 template<class T>
 T extract_arg(const IAny* any) {
     T value{};
@@ -217,6 +269,15 @@ T extract_arg(const IAny* any) {
     return value;
 }
 
+/**
+ * @brief Implementation of interface_trampoline; unpacks FnArgs into typed parameters.
+ * @tparam Intf The interface type containing the virtual method.
+ * @tparam Args Parameter types deduced from the member function pointer.
+ * @tparam Is Index sequence for argument extraction.
+ * @param self Pointer to the interface instance (cast to @p Intf*).
+ * @param args Runtime function arguments.
+ * @param fn Pointer-to-member for the virtual method to call.
+ */
 template<class Intf, class... Args, size_t... Is>
 ReturnValue interface_trampoline_impl(void* self, FnArgs args,
     ReturnValue(Intf::*fn)(Args...), std::index_sequence<Is...>)
@@ -224,6 +285,19 @@ ReturnValue interface_trampoline_impl(void* self, FnArgs args,
     return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
 }
 
+/**
+ * @brief Routes an IFunction::invoke() call to a typed virtual method.
+ *
+ * Validates argument count (for non-zero-arg functions), then delegates to
+ * interface_trampoline_impl to extract typed values from FnArgs.
+ *
+ * @tparam Intf The interface type containing the virtual method.
+ * @tparam Args Parameter types deduced from the member function pointer.
+ * @param self Pointer to the interface instance.
+ * @param args Runtime function arguments.
+ * @param fn Pointer-to-member for the virtual method to call.
+ * @return The virtual method's return value, or INVALID_ARGUMENT if too few args.
+ */
 template<class Intf, class... Args>
 ReturnValue interface_trampoline(void* self, FnArgs args,
     ReturnValue(Intf::*fn)(Args...))
@@ -233,6 +307,74 @@ ReturnValue interface_trampoline(void* self, FnArgs args,
     }
     return interface_trampoline_impl(self, args, fn, std::index_sequence_for<Args...>{});
 }
+
+/**
+ * @brief Deduces the member type from a pointer-to-member.
+ * @tparam S The struct/class type.
+ * @tparam T The member type.
+ * @note Declaration only; used with @c decltype, never called.
+ */
+template<class S, class T>
+T member_type_helper(T S::*);
+
+/**
+ * @brief Returns a lazily-constructed default-initialized State singleton.
+ * @tparam State The state struct type (e.g. IMyWidget::State).
+ * @return Reference to the shared static default instance.
+ */
+template<class State>
+State& default_state()
+{
+    static State s{};
+    return s;
+}
+
+/**
+ * @brief Binds a pointer-to-member to PropertyKind function pointers.
+ *
+ * Given a State struct type and a pointer-to-member, PropBind generates a
+ * @c static @c constexpr PropertyKind with @c getDefault and @c createRef
+ * functions. This replaces per-property boilerplate that the STRATA_INTERFACE
+ * macro previously generated inline.
+ *
+ * @tparam State The state struct type (e.g. IMyWidget::State).
+ * @tparam Mem Pointer-to-member (C++17 auto NTTP), e.g. @c &State::width.
+ *
+ * @par Usage
+ * @code
+ * static constexpr PropertyKind pk = detail::PropBind<State, &State::width>::kind;
+ * @endcode
+ */
+template<class State, auto Mem>
+struct PropBind
+{
+    using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.
+
+    /**
+     * @brief Returns a pointer to a static AnyRef holding the default value.
+     *
+     * The AnyRef points into the shared default_state<State>() singleton,
+     * so the returned value reflects the State struct's default initialization.
+     */
+    static const IAny* getDefault()
+    {
+        static ext::AnyRef<value_type> ref(&(default_state<State>().*Mem));
+        return &ref;
+    }
+
+    /**
+     * @brief Creates an AnyRef pointing into a live State struct.
+     * @param base Pointer to the State struct instance (cast from void*).
+     * @return Owning pointer to an AnyRef<value_type> targeting the member.
+     */
+    static IAny::Ptr createRef(void* base)
+    {
+        return ext::create_any_ref<value_type>(
+            &(static_cast<State*>(base)->*Mem));
+    }
+
+    static constexpr PropertyKind kind { type_uid<value_type>(), &getDefault, &createRef }; ///< Pre-built PropertyKind.
+};
 
 } // namespace detail
 
@@ -330,19 +472,12 @@ ReturnValue interface_trampoline(void* self, FnArgs args,
 // --- Defaults pass: generates kind-specific static data for each member ---
 
 #define _STRATA_DEFAULTS_PROP(Type, Name, Default) \
-    static const ::strata::IAny* _strata_getdefault_##Name() { \
-        static ::strata::ext::AnyRef<Type> ref(&_strata_default_state().Name); \
-        return &ref; \
-    } \
-    static ::strata::IAny::Ptr _strata_createref_##Name(void* base) { \
-        return ::strata::ext::create_any_ref<Type>(&static_cast<State*>(base)->Name); \
-    } \
-    static constexpr ::strata::PropertyKind _strata_propkind_##Name { \
-        &_strata_getdefault_##Name, &_strata_createref_##Name };
+    static constexpr ::strata::PropertyKind _strata_propkind_##Name = \
+        ::strata::detail::PropBind<State, &State::Name>::kind;
 #define _STRATA_DEFAULTS_EVT(...)
 
 #define _STRATA_DEFAULTS_FN_0(Name) \
-    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name, {} };
 #define _STRATA_DEFAULTS_FN_N(Name, ...) \
     static constexpr ::strata::FnArgDesc _strata_fnargs_##Name[] = { _STRATA_ARGDESCS(__VA_ARGS__) }; \
     static constexpr ::strata::FunctionKind _strata_fnkind_##Name { \
@@ -361,14 +496,14 @@ ReturnValue interface_trampoline(void* self, FnArgs args,
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_DFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 #define _STRATA_DEFAULTS_FN_RAW(Name) \
-    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name };
+    static constexpr ::strata::FunctionKind _strata_fnkind_##Name { &_strata_trampoline_##Name, {} };
 
 #define _STRATA_DEFAULTS(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_DEFAULTS_, Tag)(__VA_ARGS__))
 
 // --- Metadata dispatch: tag -> MemberDesc initializer ---
 
 #define _STRATA_META_PROP(Type, Name, ...) \
-    ::strata::PropertyDesc<Type>(#Name, &INFO, &_strata_propkind_##Name),
+    ::strata::PropertyDesc(#Name, &INFO, &_strata_propkind_##Name),
 #define _STRATA_META_EVT(Name) \
     ::strata::EventDesc(#Name, &INFO),
 #define _STRATA_META_FN(Name, ...) \
@@ -413,10 +548,18 @@ ReturnValue interface_trampoline(void* self, FnArgs args,
 
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
-/** @brief Generates default-value functions and a static constexpr metadata array. */
+/**
+ * @brief Generates a State struct, per-property PropertyKind statics, and a
+ *        @c static @c constexpr metadata array from member declarations.
+ *
+ * This is the data-only subset of STRATA_INTERFACE: it produces the State
+ * struct and metadata array but does @e not generate virtual methods, trampolines,
+ * or accessor methods. Use it when you want to write those by hand.
+ *
+ * @see STRATA_INTERFACE For the full macro that also generates accessors and virtuals.
+ */
 #define STRATA_METADATA(...) \
     struct State { _STRATA_FOR_EACH(_STRATA_STATE, __VA_ARGS__) }; \
-    static State& _strata_default_state() { static State s; return s; } \
     _STRATA_FOR_EACH(_STRATA_DEFAULTS, __VA_ARGS__) \
     static constexpr std::array metadata = { _STRATA_FOR_EACH(_STRATA_META, __VA_ARGS__) };
 
@@ -531,7 +674,7 @@ ReturnValue interface_trampoline(void* self, FnArgs args,
  * @code
  * if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
  *     for (auto& m : info->members) {
- *         // m.name, m.kind, m.typeUid
+ *         // m.name, m.kind, m.interfaceInfo
  *     }
  * }
  * @endcode

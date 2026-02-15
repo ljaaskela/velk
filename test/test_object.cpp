@@ -347,6 +347,34 @@ TEST_F(ObjectTest, FnRawInvoke)
     EXPECT_EQ(raw->processCallCount, 1);
 }
 
+TEST_F(ObjectTest, PropBindGetDefault)
+{
+    // PropBind for ITestWidget::State::width should return 100.f
+    using Bind = detail::PropBind<ITestWidget::State, &ITestWidget::State::width>;
+    const IAny* def = Bind::getDefault();
+    ASSERT_NE(def, nullptr);
+    float val = 0.f;
+    def->get_data(&val, sizeof(float), type_uid<float>());
+    EXPECT_FLOAT_EQ(val, 100.f);
+}
+
+TEST_F(ObjectTest, PropBindCreateRef)
+{
+    // PropBind::createRef should create an AnyRef pointing into a State struct
+    ITestWidget::State state;
+    state.width = 42.f;
+    auto ref = detail::PropBind<ITestWidget::State, &ITestWidget::State::width>::createRef(&state);
+    ASSERT_TRUE(ref);
+    float val = 0.f;
+    ref->get_data(&val, sizeof(float), type_uid<float>());
+    EXPECT_FLOAT_EQ(val, 42.f);
+
+    // Writing through the ref should update the state
+    float newVal = 99.f;
+    ref->set_data(&newVal, sizeof(float), type_uid<float>());
+    EXPECT_FLOAT_EQ(state.width, 99.f);
+}
+
 TEST_F(ObjectTest, FnRawHasNoArgMetadata)
 {
     auto* info = instance().get_class_info(TestWidget::get_class_uid());
