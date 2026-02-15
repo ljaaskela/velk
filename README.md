@@ -111,7 +111,7 @@ The test suite covers Uid construction/validation, Any/AnyValue/AnyRef type eras
 
 ### Define an interface
 
-Use `STRATA_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods.
+Use `STRATA_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods. Use `RPROP` for read-only properties that can be observed but not written through the public API.
 
 ```cpp
 #include <interface/intf_metadata.h>
@@ -122,6 +122,7 @@ public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
         (PROP, float, height, 0.f),
+        (RPROP, int, id, 0),
         (EVT, on_clicked),
         (FN, reset)
     )
@@ -472,7 +473,7 @@ User-facing typed wrappers.
 | Header | Description |
 |---|---|
 | `strata.h` | `instance()` singleton access |
-| `property.h` | `Property<T>` typed property wrapper |
+| `property.h` | `ConstProperty<T>` read-only and `Property<T>` typed property wrappers |
 | `any.h` | `Any<T>` typed any wrapper |
 | `function.h` | `Function` wrapper with lambda support, variadic `invoke_function` overloads |
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
@@ -506,7 +507,7 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | | | `ext::AnyValue<T>` | |
 | **Object** | `IObject` | `ext::ObjectCore<Final, Intf...>` | — |
 | | | `ext::Object<Final, Intf...>` | |
-| **Property** | `IProperty` | — | `Property<T>` |
+| **Property** | `IProperty` | — | `ConstProperty<T>`, `Property<T>` |
 | **Function** | `IFunction` | — | `Function` |
 | **Event** | `IEvent` | `ext::LazyEvent` | — |
 
@@ -541,6 +542,7 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | `FnArgs` | Non-owning view of function arguments (`{const IAny* const* data, size_t count}`) with bounds-checked `operator[]` |
 | `FunctionContext` | Lightweight view over `FnArgs` with count validation and typed `arg<T>(i)` access |
 | `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with a cloned `std::vector<IAny::Ptr>` of args |
+| `ConstProperty<T>` | Read-only typed property with `get_value()` and change events (returned by `RPROP` accessors) |
 | `Property<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `Any<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |
 | `Function` | Wraps `ReturnValue(FnArgs)` callbacks |
@@ -698,6 +700,7 @@ The `handlers_` vector is partitioned:
 ```cpp
 STRATA_INTERFACE(
     (PROP, Type, Name, Default),          // Property<Type> Name() const
+    (RPROP, Type, Name, Default),         // ConstProperty<Type> Name() const (read-only)
     (EVT, Name),                          // IEvent::Ptr Name() const
     (FN, Name),                           // virtual fn_Name()          (zero-arg)
     (FN, Name, (T1, a1), (T2, a2)),       // virtual fn_Name(T1 a1, T2 a2) (typed)
@@ -813,10 +816,10 @@ Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` a
 
 This is **not** recommended, but if you prefer not to use the `STRATA_INTERFACE` macro (e.g. for IDE autocompletion, debugging, or fine-grained control), you can write everything by hand. The macro generates five things:
 
-1. A `State` struct containing one field per `PROP` member, initialized with its default value.
-2. Per-property statics: a `static constexpr PropertyKind` generated via `detail::PropBind<State, &State::member>`, which provides `typeUid`, `getDefault`, and `createRef` automatically.
-3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
-4. Non-virtual `const` accessor methods that query `IMetadata` at runtime.
+1. A `State` struct containing one field per `PROP`/`RPROP` member, initialized with its default value.
+2. Per-property statics: a `static constexpr PropertyKind` generated via `detail::PropBind<State, &State::member>` (or `detail::PropBind<State, &State::member, ObjectFlags::ReadOnly>` for `RPROP`), which provides `typeUid`, `getDefault`, `createRef`, and `flags` automatically.
+3. A `static constexpr std::array metadata` containing `MemberDesc` entries (with `PropertyKind` pointers for `PROP`/`RPROP` members and `FunctionKind` pointers for `FN`/`FN_RAW` members).
+4. Non-virtual `const` accessor methods that query `IMetadata` at runtime. `PROP` returns `Property<T>`, `RPROP` returns `ConstProperty<T>`.
 5. For function members: a virtual method, a static trampoline, and (for typed-arg `FN`) a `static constexpr FnArgDesc[]` array.
 
 Here is a manual equivalent showing all three function variants:

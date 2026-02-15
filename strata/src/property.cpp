@@ -1,10 +1,14 @@
 #include "property.h"
 #include <interface/intf_external_any.h>
+#include <interface/types.h>
 
 namespace strata {
 
 ReturnValue PropertyImpl::set_value(const IAny &from)
 {
+    if (get_object_data().flags & ObjectFlags::ReadOnly) {
+        return ReturnValue::READ_ONLY;
+    }
     if (data_) {
         auto ret = data_->copy_from(from);
         if (ret == ReturnValue::SUCCESS && !external_) {
@@ -38,8 +42,16 @@ IAny::ConstPtr PropertyImpl::get_any() const
 {
     return data_;
 }
+void PropertyImpl::set_flags(int32_t flags)
+{
+    get_object_data().flags = flags;
+}
+
 ReturnValue PropertyImpl::set_data(const void *data, size_t size, Uid type)
 {
+    if (get_object_data().flags & ObjectFlags::ReadOnly) {
+        return ReturnValue::READ_ONLY;
+    }
     auto ret = ReturnValue::FAIL;
     if (data_) {
         ret = data_->set_data(data, size, type);

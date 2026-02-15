@@ -4,8 +4,15 @@
 #include <atomic>
 #include <ext/interface_dispatch.h>
 
-namespace strata::ext {
+namespace strata {
 
+/** @brief General-purpose object flags. Checked by runtime implementations. */
+namespace ObjectFlags {
+constexpr int32_t None = 0;
+constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
+} // namespace ObjectFlags
+
+namespace ext {
 /**
  * @brief Adds intrusive reference counting to InterfaceDispatch.
  *
@@ -33,7 +40,7 @@ protected:
     struct ObjectData
     {
         alignas(4) std::atomic<int32_t> refCount{1};
-        alignas(4) int32_t flags{};
+        alignas(4) int32_t flags{ObjectFlags::None};
     };
     constexpr ObjectData &get_object_data() noexcept { return data_; }
 
@@ -41,6 +48,7 @@ private:
     ObjectData data_;
 };
 
-} // namespace strata::ext
+} // namespace ext
+} // namespace strata
 
 #endif // EXT_REFCOUNTED_DISPATCH_H

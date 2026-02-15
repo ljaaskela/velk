@@ -53,6 +53,11 @@ public:
      * @param type Type UID of the data.
      */
     virtual ReturnValue set_data(const void *data, size_t size, Uid type) = 0;
+    /**
+     * @brief Sets object flags (e.g. ObjectFlags::ReadOnly) on the property.
+     * @param flags Bitwise combination of ObjectFlags constants.
+     */
+    virtual void set_flags(int32_t flags) = 0;
 };
 
 } // namespace strata

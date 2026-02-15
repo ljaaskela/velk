@@ -101,10 +101,11 @@ const T *interface_cast(const std::shared_ptr<U> &obj)
 
 /** @brief Standard return codes for Strata operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t {
-    SUCCESS = 0,         ///< Operation succeeded.
-    NOTHING_TO_DO = 1,   ///< Operation succeeded but had no effect (e.g. value unchanged).
-    FAIL = -1,           ///< Operation failed.
+    SUCCESS = 0,           ///< Operation succeeded.
+    NOTHING_TO_DO = 1,     ///< Operation succeeded but had no effect (e.g. value unchanged).
+    FAIL = -1,             ///< Operation failed.
     INVALID_ARGUMENT = -2, ///< One or more arguments were invalid.
+    READ_ONLY = -3,        ///< Write rejected: target is read-only.
 };
 
 /** @brief Returns true if the return value indicates success (non-negative). */

@@ -21,6 +21,7 @@ public:
     STRATA_INTERFACE(
         (PROP, float, width, 100.f),
         (PROP, float, height, 50.f),
+        (RPROP, int, id, 42),
         (EVT, on_clicked),
         (FN, reset)
     )
@@ -229,21 +230,24 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
     auto* info = instance().get_class_info(TestWidget::get_class_uid());
     ASSERT_NE(info, nullptr);
 
-    // ITestWidget: width, height, on_clicked, reset
+    // ITestWidget: width, height, id, on_clicked, reset
     // ITestSerializable: version, serialize
     // ITestMath: add
     // ITestRaw: process
-    EXPECT_EQ(info->members.size(), 8u);
+    EXPECT_EQ(info->members.size(), 9u);
 
     // Check first member
     EXPECT_EQ(info->members[0].name, "width");
     EXPECT_EQ(info->members[0].kind, MemberKind::Property);
 
-    EXPECT_EQ(info->members[2].name, "on_clicked");
-    EXPECT_EQ(info->members[2].kind, MemberKind::Event);
+    EXPECT_EQ(info->members[2].name, "id");
+    EXPECT_EQ(info->members[2].kind, MemberKind::Property);
 
-    EXPECT_EQ(info->members[3].name, "reset");
-    EXPECT_EQ(info->members[3].kind, MemberKind::Function);
+    EXPECT_EQ(info->members[3].name, "on_clicked");
+    EXPECT_EQ(info->members[3].kind, MemberKind::Event);
+
+    EXPECT_EQ(info->members[4].name, "reset");
+    EXPECT_EQ(info->members[4].kind, MemberKind::Function);
 }
 
 TEST_F(ObjectTest, StaticDefaultValues)
@@ -253,7 +257,8 @@ TEST_F(ObjectTest, StaticDefaultValues)
 
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f);  // width
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[1]), 50.f);   // height
-    EXPECT_EQ(get_default_value<int>(info->members[4]), 1);              // version
+    EXPECT_EQ(get_default_value<int>(info->members[2]), 42);             // id (RPROP)
+    EXPECT_EQ(get_default_value<int>(info->members[5]), 1);              // version
 }
 
 TEST_F(ObjectTest, PropertyStateReadWrite)
@@ -389,4 +394,96 @@ TEST_F(ObjectTest, FnRawHasNoArgMetadata)
     auto* fk = processDesc->functionKind();
     ASSERT_NE(fk, nullptr);
     EXPECT_TRUE(fk->args.empty());
+}
+
+// --- RPROP tests ---
+
+TEST_F(ObjectTest, RPropGetValueReturnsDefault)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+
+    // RPROP accessor returns ConstProperty<int>
+    ConstProperty<int> id = iw->id();
+    EXPECT_TRUE(id);
+    EXPECT_EQ(id.get_value(), 42);
+}
+
+TEST_F(ObjectTest, RPropStateWriteReadable)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    auto* ps = interface_cast<IPropertyState>(obj);
+    ASSERT_NE(iw, nullptr);
+    ASSERT_NE(ps, nullptr);
+
+    auto* state = ps->get_property_state<ITestWidget>();
+    ASSERT_NE(state, nullptr);
+
+    // Default in state struct
+    EXPECT_EQ(state->id, 42);
+
+    // Write to state directly, read through accessor
+    state->id = 99;
+    EXPECT_EQ(iw->id().get_value(), 99);
+}
+
+TEST_F(ObjectTest, RPropSetValueReturnsReadOnly)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto prop = meta->get_property("id");
+    ASSERT_TRUE(prop);
+
+    // set_value on a read-only property should return READ_ONLY
+    Any<int> newVal(100);
+    EXPECT_EQ(prop->set_value(*static_cast<const IAny*>(newVal)), ReturnValue::READ_ONLY);
+
+    // Value should be unchanged
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+    EXPECT_EQ(iw->id().get_value(), 42);
+}
+
+TEST_F(ObjectTest, RPropSetDataReturnsReadOnly)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto prop = meta->get_property("id");
+    ASSERT_TRUE(prop);
+
+    auto* pi = interface_cast<IPropertyInternal>(prop);
+    ASSERT_NE(pi, nullptr);
+
+    // set_data on a read-only property should return READ_ONLY
+    int newVal = 100;
+    EXPECT_EQ(pi->set_data(&newVal, sizeof(int), type_uid<int>()), ReturnValue::READ_ONLY);
+
+    // Value should be unchanged
+    auto* iw = interface_cast<ITestWidget>(obj);
+    ASSERT_NE(iw, nullptr);
+    EXPECT_EQ(iw->id().get_value(), 42);
+}
+
+TEST_F(ObjectTest, RPropOnChangedObservable)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto* iw = interface_cast<ITestWidget>(obj);
+    auto* ps = interface_cast<IPropertyState>(obj);
+    ASSERT_NE(iw, nullptr);
+    ASSERT_NE(ps, nullptr);
+
+    // RPROP should support add_on_changed for observing state changes
+    int notified = 0;
+    Function onChange([&]() { notified++; });
+    iw->id().add_on_changed(onChange);
+
+    // Writing through state directly does not fire on_changed (by design),
+    // but the accessor still works for observation setup
+    EXPECT_EQ(notified, 0);
 }

@@ -28,6 +28,7 @@ struct PropertyKind {
     const IAny*(*getDefault)() = nullptr;
     /** @brief Creates an AnyRef pointing into the State struct at @p stateBase. */
     IAny::Ptr(*createRef)(void* stateBase) = nullptr;
+    int32_t flags{ObjectFlags::None}; ///< ObjectFlags to apply to the created PropertyImpl.
 };
 
 /** @brief Describes a single argument of a typed function. */
@@ -345,7 +346,7 @@ State& default_state()
  * static constexpr PropertyKind pk = detail::PropBind<State, &State::width>::kind;
  * @endcode
  */
-template<class State, auto Mem>
+template<class State, auto Mem, int32_t Flags = 0>
 struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.
@@ -373,7 +374,7 @@ struct PropBind
             &(static_cast<State*>(base)->*Mem));
     }
 
-    static constexpr PropertyKind kind { type_uid<value_type>(), &getDefault, &createRef }; ///< Pre-built PropertyKind.
+    static constexpr PropertyKind kind { type_uid<value_type>(), &getDefault, &createRef, Flags }; ///< Pre-built PropertyKind.
 };
 
 } // namespace detail
@@ -464,6 +465,7 @@ struct PropBind
 // --- State pass: generates State struct fields for PROP members ---
 
 #define _STRATA_STATE_PROP(Type, Name, Default)  Type Name = Default;
+#define _STRATA_STATE_RPROP(Type, Name, Default) Type Name = Default;
 #define _STRATA_STATE_EVT(Name)
 #define _STRATA_STATE_FN(...)
 #define _STRATA_STATE_FN_RAW(...)
@@ -474,6 +476,9 @@ struct PropBind
 #define _STRATA_DEFAULTS_PROP(Type, Name, Default) \
     static constexpr ::strata::PropertyKind _strata_propkind_##Name = \
         ::strata::detail::PropBind<State, &State::Name>::kind;
+#define _STRATA_DEFAULTS_RPROP(Type, Name, Default) \
+    static constexpr ::strata::PropertyKind _strata_propkind_##Name = \
+        ::strata::detail::PropBind<State, &State::Name, ::strata::ObjectFlags::ReadOnly>::kind;
 #define _STRATA_DEFAULTS_EVT(...)
 
 #define _STRATA_DEFAULTS_FN_0(Name) \
@@ -504,6 +509,8 @@ struct PropBind
 
 #define _STRATA_META_PROP(Type, Name, ...) \
     ::strata::PropertyDesc(#Name, &INFO, &_strata_propkind_##Name),
+#define _STRATA_META_RPROP(Type, Name, ...) \
+    ::strata::PropertyDesc(#Name, &INFO, &_strata_propkind_##Name),
 #define _STRATA_META_EVT(Name) \
     ::strata::EventDesc(#Name, &INFO),
 #define _STRATA_META_FN(Name, ...) \
@@ -515,6 +522,7 @@ struct PropBind
 // --- Trampoline dispatch: tag -> virtual method + static trampoline for FN, no-op for PROP/EVT ---
 
 #define _STRATA_TRAMPOLINE_PROP(...)
+#define _STRATA_TRAMPOLINE_RPROP(...)
 #define _STRATA_TRAMPOLINE_EVT(Name)
 
 #define _STRATA_TRAMPOLINE_FN_0(Name) \
@@ -570,6 +578,11 @@ struct PropBind
         return ::strata::Property<Type>(::strata::get_property( \
             this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
+#define _STRATA_ACC_RPROP(Type, Name, ...) \
+    ::strata::ConstProperty<Type> Name() const { \
+        return ::strata::ConstProperty<Type>(::strata::get_property( \
+            this->template get_interface<::strata::IMetadata>(), #Name)); \
+    }
 #define _STRATA_ACC_EVT(Name) \
     ::strata::IEvent::Ptr Name() const { \
         return ::strata::get_event( \
@@ -598,6 +611,7 @@ struct PropBind
  * | Kind     | Syntax                                   | Description                          |
  * |----------|------------------------------------------|--------------------------------------|
  * | Property | @c (PROP, Type, Name, Default)           | A typed property with default value  |
+ * | Read-only| @c (RPROP, Type, Name, Default)          | A read-only property with default    |
  * | Event    | @c (EVT, Name)                           | An observable event                  |
  * | Function | @c (FN, Name)                            | Zero-arg function                    |
  * | Function | @c (FN, Name, (T1, a1), (T2, a2), ...)   | Typed-arg function with metadata     |
