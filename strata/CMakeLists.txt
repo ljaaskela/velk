@@ -36,6 +36,8 @@ src/function.cpp
     include/interface/intf_metadata.h
     include/interface/types.h
     include/api/any.h
+    include/api/callback.h
+    include/api/event.h
     include/api/property.h
     include/api/function.h
     include/api/function_context.h

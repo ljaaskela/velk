@@ -1,7 +1,8 @@
 #include <api/strata.h>
 
 #include <api/any.h>
-#include <api/function.h>
+#include <api/callback.h>
+#include <api/function_context.h>
 #include <api/property.h>
 #include <ext/any.h>
 #include <ext/event.h>
@@ -121,7 +122,7 @@ int main()
     std::cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name
               << std::endl;
 
-    Function valueChanged([](FnArgs args) -> ReturnValue {
+    Callback valueChanged([](FnArgs args) -> ReturnValue {
         std::cout << "Property value changed, ";
         if (!args[0]) {
             return ReturnValue::INVALID_ARGUMENT;
@@ -365,7 +366,7 @@ int main()
     // --- FunctionContext: multi-arg function invocation ---
     std::cout << "\n--- FunctionContext multi-arg ---" << std::endl;
     {
-        Function add([](FnArgs args) -> ReturnValue {
+        Callback add([](FnArgs args) -> ReturnValue {
             auto ctx = FunctionContext(args, 2);
             if (!ctx) {
                 std::cout << "  add: expected 2 args" << std::endl;

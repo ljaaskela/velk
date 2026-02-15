@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <api/any.h>
-#include <api/function.h>
+#include <api/callback.h>
 #include <api/function_context.h>
 #include <api/property.h>
 #include <api/strata.h>
@@ -480,7 +480,7 @@ TEST_F(ObjectTest, RPropOnChangedObservable)
 
     // RPROP should support add_on_changed for observing state changes
     int notified = 0;
-    Function onChange([&]() { notified++; });
+    Callback onChange([&]() { notified++; });
     iw->id().add_on_changed(onChange);
 
     // Writing through state directly does not fire on_changed (by design),

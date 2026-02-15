@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <api/any.h>
-#include <api/function.h>
+#include <api/callback.h>
 #include <api/property.h>
 #include <api/strata.h>
 #include <interface/intf_property.h>
@@ -46,7 +46,7 @@ TEST(Property, OnChangedEventFires)
 
     Property<float> p;
 
-    Function handler([&](FnArgs args) -> ReturnValue {
+    Callback handler([&](FnArgs args) -> ReturnValue {
         callCount++;
         if (auto v = Any<const float>(args[0])) {
             receivedValue = v.get_value();
@@ -91,7 +91,7 @@ TEST(Property, OnChangedDoesNotFireOnSameValue)
 
     Property<int> p(5);
 
-    Function handler([&](FnArgs) -> ReturnValue {
+    Callback handler([&](FnArgs) -> ReturnValue {
         callCount++;
         return ReturnValue::SUCCESS;
     });

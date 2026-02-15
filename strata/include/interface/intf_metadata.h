@@ -1,6 +1,9 @@
 #ifndef INTF_METADATA_H
 #define INTF_METADATA_H
 
+#include <api/any.h>
+#include <api/event.h>
+#include <api/function.h>
 #include <api/property.h>
 #include <array_view.h>
 #include <common.h>
@@ -252,6 +255,48 @@ inline ReturnValue invoke_event(const IInterface *o,
 {
     FnArgs args{&arg, 1};
     return invoke_event(o, name, args);
+}
+
+// Variadic invoke_function: IAny-convertible args (name-based)
+
+/**
+ * @brief Invokes a named function with multiple IAny-convertible arguments.
+ * @param o The object to query for the function.
+ * @param name Name of the function to query.
+ * @param args Two or more IAny-convertible arguments.
+ */
+template<class... Args, std::enable_if_t<
+    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
+ReturnValue invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+{
+    const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
+    auto* meta = interface_cast<IMetadata>(o);
+    return meta ? invoke_function(meta->get_function(name), FnArgs{ptrs, sizeof...(Args)}) : ReturnValue::INVALID_ARGUMENT;
+}
+
+// Variadic invoke_function: value args (name-based)
+
+namespace detail {
+
+template<class Tuple, size_t... Is>
+FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
+{
+    ((ptrs[Is] = static_cast<const IAny*>(std::get<Is>(tup))), ...);
+    return {ptrs, sizeof...(Is)};
+}
+
+} // namespace detail
+
+/** @brief Invokes a named function with multiple value arguments. */
+template<class... Args, std::enable_if_t<
+    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
+ReturnValue invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+{
+    auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
+    const IAny* ptrs[sizeof...(Args)];
+    auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
+    auto* meta = interface_cast<IMetadata>(o);
+    return meta ? invoke_function(meta->get_function(name), fnArgs) : ReturnValue::INVALID_ARGUMENT;
 }
 
 /** @brief Internal helpers for STRATA_INTERFACE macro expansion. */
@@ -639,19 +684,19 @@ struct FnRawBind
             this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC_EVT(Name) \
-    ::strata::IEvent::Ptr Name() const { \
-        return ::strata::get_event( \
-            this->template get_interface<::strata::IMetadata>(), #Name); \
+    ::strata::Event Name() const { \
+        return ::strata::Event(::strata::get_event( \
+            this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC_FN(Name, ...) \
-    ::strata::IFunction::Ptr Name() const { \
-        return ::strata::get_function( \
-            this->template get_interface<::strata::IMetadata>(), #Name); \
+    ::strata::Function Name() const { \
+        return ::strata::Function(::strata::get_function( \
+            this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC_FN_RAW(Name) \
-    ::strata::IFunction::Ptr Name() const { \
-        return ::strata::get_function( \
-            this->template get_interface<::strata::IMetadata>(), #Name); \
+    ::strata::Function Name() const { \
+        return ::strata::Function(::strata::get_function( \
+            this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
 #define _STRATA_ACC(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_ACC_, Tag)(__VA_ARGS__))
 
@@ -685,8 +730,8 @@ struct FnRawBind
  *    For @c FN members the descriptor includes a pointer to the trampoline.
  * -# A non-virtual @c const accessor method on the interface:
  *    - @c PROP &rarr; <tt>Property\<Type\> Name() const</tt>
- *    - @c EVT  &rarr; <tt>IEvent::Ptr Name() const</tt>
- *    - @c FN   &rarr; <tt>IFunction::Ptr Name() const</tt>
+ *    - @c EVT  &rarr; <tt>Event Name() const</tt>
+ *    - @c FN   &rarr; <tt>Function Name() const</tt>
  *
  *    Each accessor obtains the runtime instance by querying the object's
  *    @c IMetadata interface, so it works on any @c Object that implements
@@ -735,8 +780,8 @@ struct FnRawBind
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
  *     iw->width().set_value(42.f);
  *     float w = iw->width().get_value();   // 42.f
- *     IEvent::Ptr clicked = iw->on_clicked();
- *     IFunction::Ptr reset = iw->reset();
+ *     Event clicked = iw->on_clicked();
+ *     Function reset = iw->reset();
  * }
  * @endcode
  *
