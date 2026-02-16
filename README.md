@@ -84,7 +84,7 @@ Output:
 * `build/bin/Release/strata.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
-* `build/bin/Release/strata_benchmark.exe` (benchmark)
+* `build/bin/Release/benchmarks.exe` (benchmarks)
 
 ## Testing
 

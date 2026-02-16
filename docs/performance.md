@@ -18,7 +18,7 @@
 | **Metadata lookup (cached)** | Cache-first scan | ~84 ns | Subsequent call; scans cached instances first, no allocation |
 | **Object creation** | 2 heap allocations | ~160 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
 
-*Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmark.exe` to reproduce.*
+*Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
 ### Property get/set
 

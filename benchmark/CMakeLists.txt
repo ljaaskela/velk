@@ -20,6 +20,5 @@ add_subdirectory(
     EXCLUDE_FROM_ALL
 )
 
-add_executable(strata_benchmark main.cpp)
-set_target_properties(strata_benchmark PROPERTIES OUTPUT_NAME "benchmark")
-target_link_libraries(strata_benchmark PRIVATE strata benchmark::benchmark benchmark::benchmark_main)
+add_executable(benchmarks main.cpp)
+target_link_libraries(benchmarks PRIVATE strata benchmark::benchmark benchmark::benchmark_main)
