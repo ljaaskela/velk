@@ -45,7 +45,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | [Quick start](#quick-start) | Getting started |
 | [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
 | [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation |
-| [Memory layout](docs/memory-layout.md) | Object sizes, per-member overhead, base type layouts |
+| [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
 | [STRATA_INTERFACE](docs/strata-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
 ## Project structure
@@ -57,7 +57,7 @@ strata/
   docs/                   Documentation
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
-    memory-layout.md      Object memory layout and sizes
+    performance.md        Operation costs and memory layout
     strata-interface.md   STRATA_INTERFACE macro reference
   strata/
     include/              Public API (consumers depend only on these headers)
