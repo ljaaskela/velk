@@ -113,6 +113,9 @@ public:
         (FN, reset),
         (FN, resize, (float, w), (float, h))
     )
+
+    // Regular pure virtual function, part of the interface but not metadata.
+    virtual void paint() = 0; 
 };
 ```
 
@@ -125,15 +128,18 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
+    // Implementations of the IMyWidget static metadata-defined functions "reset" and "resize"
     ReturnValue fn_reset() override {
         return ReturnValue::SUCCESS;
     }
-
     ReturnValue fn_resize(float w, float h) override {
-        width().set_value(w);   // width property defined in STRATA_INTERFACE
+        width().set_value(w);   // width property as defined in STRATA_INTERFACE
         height().set_value(h);
         return ReturnValue::SUCCESS;
     }
+
+    // Implementation of the pure virtual non-metadata function defined in IMyWidget
+    void paint() override {}
 };
 ```
 
@@ -151,9 +157,13 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
+    // Implementations for the functions defined in IMyWidget and ISerializable static metadata
     ReturnValue fn_reset() override { /* ... */ return ReturnValue::SUCCESS; }                  // zero-arg
     ReturnValue fn_resize(float w, float h) override { /* ... */ return ReturnValue::SUCCESS; } // typed args
     ReturnValue fn_serialize() override { /* ... */ return ReturnValue::SUCCESS; }              // from ISerializable
+
+    // Non-metadata paint() from IMyWidget
+    void paint() override {}
 };
 ```
 
