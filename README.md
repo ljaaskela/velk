@@ -105,9 +105,10 @@ Use `STRATA_INTERFACE` to declare properties, events, and functions. This genera
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
+    // Static interface metadata: 2 writable properties, 1 read-only property, 1 event and 2 functions
     STRATA_INTERFACE(
-        (PROP, float, width, 0.f),
-        (PROP, float, height, 0.f),
+        (PROP, float, width, 100.f),
+        (PROP, float, height, 100.f),
         (RPROP, int, id, 0),
         (EVT, on_clicked),
         (FN, reset),
@@ -180,12 +181,14 @@ auto widget = s.create<IObject>(MyWidget::get_class_uid());     // create by UID
 
 ```cpp
 auto widget = s.create<IMyWidget>(MyWidget::get_class_uid());
-if (widget) {             // query interface
-    iw->width().set_value(42.f);                                // set property
-    float w = iw->width().get_value();                          // read property
+if (widget) {
+    auto wp = iw->width();
+    wp.set_value(42.f);                                         // set property
+    float w = wp.get_value();                                   // read property
 
     Event clicked = iw->on_clicked();                           // get event handle
-    Function reset = iw->reset();                               // get function handle
+    clicked.add_handler([]() { std::cout << "clicked"; });      // add event handler
+    Function reset = iw->reset().invoke();                      // get function handle
 }
 ```
 
@@ -207,7 +210,7 @@ Runtime metadata is available through `IMetadata` on any instance:
 
 ```cpp
 auto widget = s.create(MyWidget::get_class_uid());
-if (auto* meta = interface_cast<IMetadata>(widget)) {           // runtime introspection
+if (auto* meta = interface_cast<IMetadata>(widget)) {           // query interface for runtime introspection
     auto prop  = meta->get_property("width");                   // lookup by name
     auto event = meta->get_event("on_clicked");                 // lookup by name
     auto func  = meta->get_function("reset");                   // lookup by name
@@ -223,10 +226,16 @@ This is useful for bulk operations like serialization or snapshotting (`memcpy` 
 ```cpp
 auto widget = s.create(MyWidget::get_class_uid());
 if (auto* ps = interface_cast<IPropertyState>(widget)) {
+    // State struct generated through STRATA_INTERFACE in IMyWidget declaration
+    // struct IWidget::State { 
+    //   float width { 100.f };
+    //   float height { 100.f };
+    //   int id { 0 };
+    // }
     if (auto* state = ps->get_property_state<IMyWidget>()) {    // IMyWidget::State*
         state->width = 200.f;                                   // write directly, no notifications
         float w = state->width;                                 // read with zero overhead
-        iw->width().get_value();                                // reads the same field (200.f) with
+        iw->width().get_value();                                // reads the same field (200.f) through property accessor
     }
 }
 ```
