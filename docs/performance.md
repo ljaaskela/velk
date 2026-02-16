@@ -1,5 +1,22 @@
 # Performance
 
+This document covers runtime performance and memory usage related topics.
+
+## Contents
+
+- [Operation costs](#operation-costs)
+  - [Property get/set](#property-getset)
+  - [Direct state access](#direct-state-access)
+  - [Function invoke](#function-invoke)
+  - [Event dispatch](#event-dispatch)
+  - [interface_cast](#interface_cast)
+  - [Metadata lookup](#metadata-lookup)
+  - [Object creation](#object-creation)
+- [Memory layout](#memory-layout)
+  - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
+  - [Common base layers](#common-base-layers)
+  - [Base types](#base-types)
+
 ## Operation costs
 
 | Operation | Cost | Measured | Notes |

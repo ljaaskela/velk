@@ -1,5 +1,17 @@
 # STRATA_INTERFACE reference
 
+This document covers STRATA_INTERFACE macro and its usage, as well as manual option for metadata definition.
+
+## Contents
+
+- [STRATA_INTERFACE](#strata_interface)
+- [Function member variants](#function-member-variants)
+- [Argument metadata](#argument-metadata)
+- [Practical example](#practical-example)
+- [Manual metadata and accessors](#manual-metadata-and-accessors)
+
+## STRATA_INTERFACE
+
 ```cpp
 STRATA_INTERFACE(
     (PROP, Type, Name, Default),          // Property<Type> Name() const
