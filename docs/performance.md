@@ -15,7 +15,7 @@
 | **Event dispatch (deferred)** | Clone + queue | ~205 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~845 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
-| **Metadata lookup (cached)** | Linear scan | ~86 ns | Subsequent call; scans `instances_` cache, no allocation |
+| **Metadata lookup (cached)** | Cache-first scan | ~84 ns | Subsequent call; scans cached instances first, no allocation |
 | **Object creation** | 2 heap allocations | ~160 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmark.exe` to reproduce.*
@@ -57,9 +57,9 @@ Complexity is `O(N + P)` where N is the number of interfaces in the pack (typica
 
 ### Metadata lookup
 
-`MetadataContainer::find_or_create(name, kind)` does a linear scan of the static `members_` array comparing by name and kind. If found, it checks the `instances_` cache (another linear scan, `O(M)` where M is already-created members). On cache miss, it allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
+`MetadataContainer::find_or_create(name, kind)` checks the `instances_` cache first — a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
 
-Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` — shared across all instances at zero per-object cost.
+Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Since applications typically access a subset of declared members, the cache-first scan is shorter than the full members array. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` — shared across all instances at zero per-object cost.
 
 ### Object creation
 

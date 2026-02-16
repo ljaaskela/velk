@@ -40,6 +40,7 @@ private:
     // Helper: find static member by name+kind, lazily create if needed
     IInterface::Ptr find_or_create(std::string_view name, MemberKind kind) const;
     IInterface::Ptr create(MemberDesc desc) const;
+    void bind(const MemberDesc &m, const IInterface::Ptr &fn) const;
 };
 
 } // namespace strata

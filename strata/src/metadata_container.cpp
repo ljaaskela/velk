@@ -75,43 +75,51 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     return created;
 }
 
-IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberKind kind) const
+void MetadataContainer::bind(const MemberDesc &m, const IInterface::Ptr &fn) const
 {
-    for (size_t i = 0; i < members_.size(); ++i) {
-        auto &member = members_[i];
-        if (member.kind != kind || member.name != name) {
-            // Not a match
-            continue;
-        }
-        // Check cache
-        for (auto& [idx, ptr] : instances_) {
-            if (idx == i) return ptr;
-        }
-        // Create and cache
-        if (auto created = create(member)) {
-            // Wire virtual dispatch: if the interface declared a fn_Name()
-            // virtual (via STRATA_INTERFACE), bind the FunctionImpl so that
-            // invoke() routes through the static trampoline to the virtual
-            // method on the owning object's interface subobject.
-            if (auto* fk = member.functionKind()) {
-                if (fk->trampoline && owner_) {
-                    if (auto* fi = interface_cast<IFunctionInternal>(created)) {
-                        // Resolve the interface pointer that declared this function.
-                        // This is the 'self' the trampoline will static_cast back to
-                        // the concrete interface type (e.g. IMyWidget*).
-                        void* intf_ptr = owner_->get_interface(member.interfaceInfo->uid);
-                        if (intf_ptr) {
-                            fi->bind(intf_ptr, fk->trampoline);
-                        }
-                    }
-                }
+    // Wire virtual dispatch: if the interface declared a fn_Name()
+    // virtual (via STRATA_INTERFACE), bind the FunctionImpl so that
+    // invoke() routes through the static trampoline to the virtual
+    // method on the owning object's interface subobject.
+
+    auto *fk = m.functionKind(); // Only valid for functions
+    if (fk && fk->trampoline && owner_) {
+        if (auto *fi = interface_cast<IFunctionInternal>(fn)) {
+            // Resolve the interface pointer that declared this function.
+            // This is the 'self' the trampoline will static_cast back to
+            // the concrete interface type (e.g. IMyWidget*).
+            void *intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
+            if (intf_ptr) {
+                fi->bind(intf_ptr, fk->trampoline);
             }
-            // Add to metadata
-            instances_.emplace_back(i, created);
-            return created;
         }
     }
-    return {};
+}
+
+IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberKind kind) const
+{
+    auto matches = [&](const MemberDesc &m) { return m.kind == kind && m.name == name; };
+
+    // Check cache first
+    for (auto &[idx, ptr] : instances_) {
+        if (matches(members_[idx])) {
+            return ptr;
+        }
+    }
+    IInterface::Ptr created;
+    // Find in static metadata and create if found
+    for (size_t i = 0; i < members_.size(); ++i) {
+        auto &m = members_[i];
+        if (matches(m)) {
+            // Create
+            created = create(m);
+            // Bind (if function)
+            bind(m, created);
+            // Add to metadata
+            instances_.emplace_back(i, created);
+        }
+    }
+    return created;
 }
 
 IProperty::Ptr MetadataContainer::get_property(std::string_view name) const

@@ -449,7 +449,7 @@ struct FnBind
     static ReturnValue trampoline(void* self, FnArgs args) {
         return interface_trampoline(self, args, Fn);
     }
-    static constexpr FunctionKind kind { &trampoline };
+    static constexpr FunctionKind kind{&trampoline, {}};
 };
 
 /**
@@ -480,7 +480,7 @@ struct FnRawBind
     static ReturnValue trampoline(void* self, FnArgs args) {
         return call(self, args, Fn);
     }
-    static constexpr FunctionKind kind { &trampoline };
+    static constexpr FunctionKind kind{&trampoline, {}};
 };
 
 } // namespace detail
