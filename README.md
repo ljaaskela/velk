@@ -225,17 +225,15 @@ This is useful for bulk operations like serialization or snapshotting (`memcpy` 
 
 ```cpp
 auto widget = s.create(MyWidget::get_class_uid());
-if (auto* ps = interface_cast<IPropertyState>(widget)) {
+if (auto* state = get_property_state<IMyWidget>(widget.get())) {// IMyWidget::State*
     // State struct generated through STRATA_INTERFACE in IMyWidget declaration
     // struct IWidget::State { 
     //   float width { 100.f };
     //   float height { 100.f };
     //   int id { 0 };
     // }
-    if (auto* state = ps->get_property_state<IMyWidget>()) {    // IMyWidget::State*
-        state->width = 200.f;                                   // write directly, no notifications
-        float w = state->width;                                 // read with zero overhead
-        iw->width().get_value();                                // reads the same field (200.f) through property accessor
-    }
+    state->width = 200.f;                                       // write directly, no notifications
+    float w = state->width;                                     // read with zero overhead
+    iw->width().get_value();                                    // reads the same field (200.f) through property accessor
 }
 ```

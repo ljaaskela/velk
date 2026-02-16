@@ -270,7 +270,9 @@ TEST_F(ObjectTest, PropertyStateReadWrite)
     ASSERT_NE(ps, nullptr);
 
     auto* state = ps->get_property_state<ITestWidget>();
+    auto *state2 = get_property_state<ITestWidget>(ps);
     ASSERT_NE(state, nullptr);
+    ASSERT_EQ(state, state2);
 
     // Defaults in state struct
     EXPECT_FLOAT_EQ(state->width, 100.f);

@@ -141,6 +141,18 @@ public:
     }
 };
 
+/**
+ * @brief Type-safe property state access. Returns a typed pointer to T::State.
+ * @tparam T The interface type whose State struct to retrieve.
+ * @param object The object whose property state to return.
+ */
+template<class T, class U>
+typename T::State *get_property_state(U *object)
+{
+    auto state = interface_cast<IPropertyState>(object);
+    return state ? state->template get_property_state<T>() : nullptr;
+}
+
 /** @brief Interface for querying object metadata: static member descriptors and runtime instances. */
 class IMetadata : public Interface<IMetadata, IPropertyState>
 {
