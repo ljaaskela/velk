@@ -43,10 +43,10 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | Document | Contents |
 |---|---|
 | [Quick start](#quick-start) | Getting started |
-| [Architecture](doc/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
-| [Guide](doc/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation |
-| [Memory layout](doc/memory-layout.md) | Object sizes, per-member overhead, base type layouts |
-| [STRATA_INTERFACE](doc/strata-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
+| [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
+| [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation |
+| [Memory layout](docs/memory-layout.md) | Object sizes, per-member overhead, base type layouts |
+| [STRATA_INTERFACE](docs/strata-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
 ## Project structure
 
@@ -54,7 +54,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 strata/
   CMakeLists.txt
   README.md               This file
-  doc/                    Documentation
+  docs/                   Documentation
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
     memory-layout.md      Object memory layout and sizes
@@ -65,8 +65,8 @@ strata/
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
     src/                  DLL internals (compiled into strata.dll)
-  demo/                 Feature demonstration
-  test/                 Unit tests (GoogleTest)
+  demo/                   Feature demonstration
+  test/                   Unit tests (GoogleTest)
 ```
 
 ## Building
