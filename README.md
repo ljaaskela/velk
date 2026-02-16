@@ -37,6 +37,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | **Functions** | Overridable virtual functions with optional typed parameters |
 | **Deferred invocation** | Queue function calls and event handlers for batch execution during `instance().update()` |
 | **Extensible** | Implement custom `IAny` types for used-defined types, external or shared data storage |
+| **High performance** | Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups |
 
 ## Documentation
 
@@ -54,10 +55,12 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 strata/
   CMakeLists.txt
   README.md               This file
+  benchmark/              Benchmarks (Google Benchmark)
+  demo/                   Feature demonstration
   docs/                   Documentation
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
-    performance.md        Operation costs and memory layout
+    performance.md        Performance and memory usage
     strata-interface.md   STRATA_INTERFACE macro reference
   strata/
     include/              Public API (consumers depend only on these headers)
@@ -65,7 +68,6 @@ strata/
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
     src/                  DLL internals (compiled into strata.dll)
-  demo/                   Feature demonstration
   test/                   Unit tests (GoogleTest)
 ```
 
@@ -82,11 +84,14 @@ Output:
 * `build/bin/Release/strata.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
+* `build/bin/Release/strata_benchmark.exe` (benchmark)
 
 ## Testing
 
-Unit tests use [GoogleTest 1.14.0](https://github.com/google/googletest), vendored as a tarball in `test/third_party/`. It is extracted into the build directory automatically during CMake configuration.
+Unit tests use [GoogleTest 1.14.0](https://github.com/google/googletest) (vendored in `test/third_party/`).
+Benchmarks use [Google Benchmark 1.9.1](https://github.com/google/benchmark) (vendored in `benchmark/third_party/`).
 
+Both are extracted into the build directory automatically during CMake configuration.
 
 ## Quick start
 
