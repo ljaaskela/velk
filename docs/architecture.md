@@ -1,5 +1,21 @@
 # Architecture
 
+This document describes the general architecture and code division in Strata.
+
+## Contents
+
+- [Layers](#layers)
+- [interface/](#interface)
+- [ext/](#ext)
+- [api/](#api)
+- [src/](#src)
+- [Type hierarchy across layers](#type-hierarchy-across-layers)
+  - [Interface inheritance](#interface-inheritance)
+  - [ext/ class hierarchy](#ext-class-hierarchy)
+- [Key types](#key-types)
+
+## Layers
+
 The library is organized in four layers:
 
 ```mermaid

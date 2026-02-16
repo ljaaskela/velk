@@ -2,6 +2,18 @@
 
 This guide covers advanced topics beyond the basics shown in the [README](../README.md).
 
+## Contents
+
+- [Virtual function dispatch](#virtual-function-dispatch)
+  - [Function arguments](#function-arguments)
+  - [Typed lambda parameters](#typed-lambda-parameters)
+- [Properties with change notifications](#properties-with-change-notifications)
+- [Custom Any types](#custom-any-types)
+- [Direct state access](#direct-state-access)
+- [Deferred invocation](#deferred-invocation)
+  - [Defer at the call site](#defer-at-the-call-site)
+  - [Deferred event handlers](#deferred-event-handlers)
+
 ## Virtual function dispatch
 
 `STRATA_INTERFACE` supports three function forms. `(FN, Name)` generates a zero-arg virtual `fn_Name()`. `(FN, Name, (T1, a1), ...)` generates a typed virtual `fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs`. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
