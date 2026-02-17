@@ -5,6 +5,7 @@
 #include <api/event.h>
 #include <api/function.h>
 #include <api/property.h>
+#include <api/traits.h>
 #include <array_view.h>
 #include <common.h>
 #include <ext/any.h>
@@ -278,8 +279,7 @@ inline ReturnValue invoke_event(const IInterface *o,
  * @param name Name of the function to query.
  * @param args Two or more IAny-convertible arguments.
  */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
+template<class... Args, detail::require_any_args<Args...> = 0>
 IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
@@ -301,8 +301,7 @@ FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 } // namespace detail
 
 /** @brief Invokes a named function with multiple value arguments. */
-template<class... Args, std::enable_if_t<
-    (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
+template<class... Args, detail::require_value_args<Args...> = 0>
 IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
