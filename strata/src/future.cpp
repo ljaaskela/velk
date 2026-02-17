@@ -1,4 +1,5 @@
 #include "future.h"
+#include <api/callback.h>
 #include <api/strata.h>
 
 namespace strata {
@@ -73,6 +74,19 @@ void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result)
         task.args = std::make_shared<IStrata::DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
     }
+}
+
+IFuture::Ptr FutureImpl::then(const IFunction::ConstPtr& fn, InvokeType type)
+{
+    auto chained = instance().create_future();
+    auto* internal = interface_cast<IFutureInternal>(chained);
+    Callback wrapper([internal, chained, fn](FnArgs args) -> IAny::Ptr {
+        auto result = fn->invoke(args);
+        if (internal) internal->set_result(result.get());
+        return nullptr;
+    });
+    add_continuation(wrapper, type);
+    return chained;
 }
 
 } // namespace strata

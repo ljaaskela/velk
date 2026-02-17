@@ -15,10 +15,28 @@ inline Promise make_promise();
 
 namespace detail {
 
-/** @brief Maps a callable return type to the corresponding Future value type. */
-template<class R>
-using future_return_t = std::conditional_t<
-    std::is_void_v<R> || std::is_same_v<R, ReturnValue>, void, R>;
+/**
+ * @brief Maps a callable type to the corresponding Future value type.
+ *
+ * FnArgs callables (returning ReturnValue or IAny::Ptr) produce void.
+ * Typed callables returning void or ReturnValue produce void.
+ * Other typed callables produce their return type.
+ */
+template<class Callable, class = void>
+struct future_return { using type = void; };
+
+template<class Callable>
+struct future_return<Callable, std::enable_if_t<
+    !std::is_invocable_v<Callable, FnArgs> &&
+    has_callable_traits_v<Callable> &&
+    !std::is_void_v<typename callable_traits<Callable>::return_type> &&
+    !std::is_same_v<typename callable_traits<Callable>::return_type, ReturnValue>>>
+{
+    using type = typename callable_traits<Callable>::return_type;
+};
+
+template<class Callable>
+using future_return_t = typename future_return<Callable>::type;
 
 } // namespace detail
 
@@ -159,76 +177,21 @@ inline Promise make_promise()
     return Promise(instance().create_future());
 }
 
-// then() implementation (needs Promise and make_promise)
-
-namespace detail {
-
-/**
- * @brief Shared implementation for Future<T>::then and Future<void>::then.
- *
- * Creates a new promise, wraps the callable so that resolving happens
- * automatically when the continuation completes, and returns the chained future.
- */
-template<class F>
-auto future_then(const IFuture::Ptr& future, F&& callable, InvokeType type)
-{
-    using Callable = std::decay_t<F>;
-
-    if constexpr (std::is_invocable_r_v<ReturnValue, Callable, FnArgs> ||
-                   std::is_invocable_r_v<IAny::Ptr, Callable, FnArgs>) {
-        // FnArgs callable: chain as Future<void>
-        auto promise = make_promise();
-        auto result = promise.get_future<void>();
-        if (future) {
-            Callback cb([p = std::move(promise), f = Callable(std::forward<F>(callable))]
-                        (FnArgs args) mutable -> IAny::Ptr {
-                f(args);
-                p.complete();
-                return nullptr;
-            });
-            future->add_continuation(cb, type);
-        }
-        return result;
-    } else {
-        static_assert(has_callable_traits_v<Callable>, "callable must have a detectable operator()");
-        using Traits = callable_traits<Callable>;
-        using R = typename Traits::return_type;
-        using FR = future_return_t<R>;
-
-        auto promise = make_promise();
-        auto result = promise.get_future<FR>();
-        if (future) {
-            Callback cb([p = std::move(promise), f = Callable(std::forward<F>(callable))]
-                        (FnArgs args) mutable -> IAny::Ptr {
-                if constexpr (std::is_void_v<R> || std::is_same_v<R, ReturnValue>) {
-                    invoke_typed_impl<Callable, typename Traits::args_tuple>(
-                        f, args, std::make_index_sequence<Traits::arity>{});
-                    p.complete();
-                } else {
-                    p.set_value(invoke_typed_impl<Callable, typename Traits::args_tuple>(
-                        f, args, std::make_index_sequence<Traits::arity>{}));
-                }
-                return nullptr;
-            });
-            future->add_continuation(cb, type);
-        }
-        return result;
-    }
-}
-
-} // namespace detail
-
 template<class T>
 template<class F>
 auto Future<T>::then(F&& callable, InvokeType type)
 {
-    return detail::future_then(future_, std::forward<F>(callable), type);
+    using FR = detail::future_return_t<std::decay_t<F>>;
+    Callback cb(std::forward<F>(callable));
+    return Future<FR>(future_ ? future_->then(cb, type) : nullptr);
 }
 
 template<class F>
 auto Future<void>::then(F&& callable, InvokeType type)
 {
-    return detail::future_then(future_, std::forward<F>(callable), type);
+    using FR = detail::future_return_t<std::decay_t<F>>;
+    Callback cb(std::forward<F>(callable));
+    return Future<FR>(future_ ? future_->then(cb, type) : nullptr);
 }
 
 } // namespace strata

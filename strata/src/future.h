@@ -23,6 +23,7 @@ public: // IFuture
     void wait() const override;
     const IAny* get_result() const override;
     void add_continuation(const IFunction::ConstPtr& fn, InvokeType type) override;
+    IFuture::Ptr then(const IFunction::ConstPtr& fn, InvokeType type) override;
 
 public: // IFutureInternal
     ReturnValue set_result(const IAny* result) override;
