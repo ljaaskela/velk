@@ -24,6 +24,7 @@ public:
     IProperty::Ptr create_property(Uid type, const IAny::Ptr &value, int32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
     void update() const override;
+    IFuture::Ptr create_future() const override;
 
 private:
     struct Entry {

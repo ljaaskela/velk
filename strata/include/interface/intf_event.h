@@ -41,14 +41,18 @@ public:
  */
 inline ReturnValue invoke_event(const IEvent::ConstPtr &event, FnArgs args)
 {
-    return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+    if (!event) return ReturnValue::INVALID_ARGUMENT;
+    event->invoke(args);
+    return ReturnValue::SUCCESS;
 }
 
 /** @brief Invokes an event with a single IAny argument. */
 inline ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *arg)
 {
     FnArgs args{&arg, 1};
-    return event ? event->invoke(args) : ReturnValue::INVALID_ARGUMENT;
+    if (!event) return ReturnValue::INVALID_ARGUMENT;
+    event->invoke(args);
+    return ReturnValue::SUCCESS;
 }
 
 } // namespace strata

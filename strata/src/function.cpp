@@ -17,31 +17,27 @@ void FunctionImpl::release_owned_context()
     context_deleter_ = nullptr;
 }
 
-ReturnValue FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
+IAny::Ptr FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
 {
     return reinterpret_cast<IFunction::CallableFn*>(ctx)(args);
 }
 
-ReturnValue FunctionImpl::invoke(FnArgs args, InvokeType type) const
+IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
 {
     if (type == Deferred) {
         IStrata::DeferredTask task;
         task.fn = get_self<IFunction>();
         task.args = std::make_shared<IStrata::DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue result = ReturnValue::NOTHING_TO_DO;
+    IAny::Ptr result;
     if (target_fn_) {
         result = target_fn_(target_context_, args);
     }
     invoke_handlers(args);
-
-    if (target_fn_) {
-        return result;
-    }
-    return handlers_.empty() ? ReturnValue::NOTHING_TO_DO : ReturnValue::SUCCESS;
+    return result;
 }
 
 array_view<IFunction::ConstPtr> FunctionImpl::immediate_handlers() const
@@ -56,6 +52,7 @@ array_view<IFunction::ConstPtr> FunctionImpl::deferred_handlers() const
 
 void FunctionImpl::invoke_handlers(FnArgs args) const
 {
+    // Ignoring all return values as different handlers might return different results
     for (const auto &h : immediate_handlers()) {
         h->invoke(args);
     }

@@ -21,6 +21,7 @@ struct ClassInfo
 // Forward declarations for built-in implementation classes.
 class PropertyImpl;
 class FunctionImpl;
+class FutureImpl;
 
 /** @brief Compile-time class identifiers for built-in object types. */
 namespace ClassId {
@@ -30,6 +31,8 @@ inline constexpr Uid Property = type_uid<PropertyImpl>();
 inline constexpr Uid Function = type_uid<FunctionImpl>();
 /** @brief Default event object implementation (same as Function). */
 inline constexpr Uid Event = Function;
+/** @brief Default future object implementation. */
+inline constexpr Uid Future = type_uid<FutureImpl>();
 }
 
 /**

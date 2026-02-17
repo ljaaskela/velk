@@ -13,6 +13,12 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 - [Deferred invocation](#deferred-invocation)
   - [Defer at the call site](#defer-at-the-call-site)
   - [Deferred event handlers](#deferred-event-handlers)
+- [Futures and promises](#futures-and-promises)
+  - [Basic usage](#basic-usage)
+  - [Continuations](#continuations)
+  - [Then chaining](#then-chaining)
+  - [Type transforms](#type-transforms)
+  - [Thread safety](#thread-safety)
 
 ## Virtual function dispatch
 
@@ -31,9 +37,9 @@ sequenceDiagram
     IFunction->>Trampoline: target_fn_(context, FnArgs)
     Note over Trampoline: FnBind extracts typed<br>args from FnArgs
     Trampoline->>MyWidget: fn_add(int 10, float 3.f)
-    MyWidget-->>Trampoline: ReturnValue::SUCCESS
-    Trampoline-->>IFunction: ReturnValue::SUCCESS
-    IFunction-->>Caller: ReturnValue::SUCCESS
+    MyWidget-->>Trampoline: IAny::Ptr (result)
+    Trampoline-->>IFunction: IAny::Ptr
+    IFunction-->>Caller: IAny::Ptr
 ```
 
 ```cpp
@@ -50,19 +56,19 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    ReturnValue fn_reset() override {
+    IAny::Ptr fn_reset() override {
         std::cout << "reset!" << std::endl;
-        return ReturnValue::SUCCESS;
+        return nullptr;         // nullptr = void result
     }
 
-    ReturnValue fn_add(int x, float y) override {
+    IAny::Ptr fn_add(int x, float y) override {
         std::cout << x + y << std::endl;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_process(FnArgs args) override {
+    IAny::Ptr fn_process(FnArgs args) override {
         // manual unpacking via FunctionContext or Any<const T>
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 };
 
@@ -79,18 +85,18 @@ Each `fn_Name` is pure virtual, so implementing classes must override it. An exp
 
 ### Function arguments
 
-For **typed-arg** functions (`(FN, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `INVALID_ARGUMENT`.
+For **typed-arg** functions (`(FN, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
 
 For **FN_RAW** functions, arguments arrive as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`. Use `FunctionContext` to validate the expected argument count:
 
 ```cpp
-ReturnValue fn_process(FnArgs args) override {
+IAny::Ptr fn_process(FnArgs args) override {
     if (auto ctx = FunctionContext(args, 2)) {
         auto a = ctx.arg<float>(0);
         auto b = ctx.arg<int>(1);
         // ...
     }
-    return ReturnValue::SUCCESS;
+    return nullptr;
 }
 ```
 
@@ -119,7 +125,7 @@ const IAny* ptrs[] = {x, y};
 fn.invoke(FnArgs{ptrs, 2});
 ```
 
-Void-returning lambdas are supported — `Callback` wraps them to return `ReturnValue::SUCCESS`:
+Void-returning lambdas are supported — `Callback` wraps them to return `nullptr`:
 
 ```cpp
 Callback fn([&](float value) {
@@ -140,11 +146,11 @@ The three constructor forms are mutually exclusive via SFINAE:
 
 | Callable type | Constructor |
 |---|---|
-| `ReturnValue(*)(FnArgs)` (raw function pointer) | `Callback(CallbackFn*)` |
-| Callable with `(FnArgs) -> ReturnValue` | Capturing lambda ctor |
+| `IAny::Ptr(*)(FnArgs)` (raw function pointer) | `Callback(CallbackFn*)` |
+| Callable with `(FnArgs) -> ReturnValue` or `(FnArgs) -> IAny::Ptr` | Capturing lambda ctor |
 | Callable with typed params (any return) | Typed lambda ctor |
 
-When fewer arguments are provided than the lambda expects, `invoke()` returns `INVALID_ARGUMENT`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
+`invoke()` returns `IAny::Ptr` — `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
 
 ## Properties with change notifications
 
@@ -265,3 +271,157 @@ instance().update();        // deferredHandler runs here
 ```
 
 Arguments are cloned when a task is queued, so the original `IAny` does not need to outlive the call. Deferred tasks that themselves produce deferred work will re-queue, and will be handled when `update()` is called the next time.
+
+## Futures and promises
+
+Strata provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side — it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
+
+```mermaid
+sequenceDiagram
+    participant Producer
+    participant Promise
+    participant Future
+    participant Continuation
+
+    Producer->>Promise: set_value(42)
+    Promise->>Future: result ready
+    Future->>Continuation: invoke(result)
+    Continuation-->>Future: IAny::Ptr
+```
+
+### Basic usage
+
+Create a promise, hand out its future, and resolve it later:
+
+```cpp
+#include <api/future.h>
+
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+// Consumer side
+future.wait();                          // blocks until ready
+int value = future.get_result().get_value();
+
+// Producer side (possibly from another thread)
+promise.set_value(42);                  // resolves the future
+```
+
+For void futures (signaling completion without a value):
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<void>();
+
+promise.complete();                     // resolves without a value
+```
+
+Resolving twice returns `NOTHING_TO_DO` and the first value persists:
+
+```cpp
+promise.set_value(1);                   // SUCCESS
+promise.set_value(2);                   // NOTHING_TO_DO — first value wins
+```
+
+### Continuations
+
+Attach a callback that fires when the future resolves. If the future is already ready, the continuation fires immediately:
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+// FnArgs continuation — receives the result as args[0]
+future.then([](FnArgs args) -> ReturnValue {
+    if (auto ctx = FunctionContext(args, 1)) {
+        std::cout << "got: " << ctx.arg<int>(0).get_value() << std::endl;
+    }
+    return ReturnValue::SUCCESS;
+});
+
+// Typed continuation — arguments are auto-extracted
+future.then([](int value) {
+    std::cout << "got: " << value << std::endl;
+});
+
+promise.set_value(42);                  // fires both continuations
+```
+
+Deferred continuations are queued for `instance().update()`:
+
+```cpp
+future.then([](int value) {
+    std::cout << value << std::endl;
+}, Deferred);
+
+promise.set_value(42);                  // continuation is queued, not fired
+instance().update();                    // continuation fires here
+```
+
+### Then chaining
+
+`.then()` returns a new `Future` that resolves with the continuation's return value. This enables fluent chaining:
+
+```cpp
+auto promise = make_promise();
+
+auto result = promise.get_future<int>()
+    .then([](int v) -> int { return v * 2; })
+    .then([](int v) -> int { return v + 1; });
+
+promise.set_value(5);
+// result is Future<int>, resolves to 11: (5 * 2) + 1
+```
+
+Void-returning continuations produce `Future<void>`:
+
+```cpp
+auto done = promise.get_future<int>()
+    .then([](int v) { std::cout << v << std::endl; });
+// done is Future<void>
+```
+
+### Type transforms
+
+Continuations can change the value type between chain steps:
+
+```cpp
+auto promise = make_promise();
+
+// int -> float
+auto result = promise.get_future<int>()
+    .then([](int v) -> float { return v * 1.5f; });
+
+promise.set_value(10);
+// result is Future<float>, resolves to 15.f
+```
+
+Chaining from a void future is also supported:
+
+```cpp
+auto promise = make_promise();
+auto result = promise.get_future<void>()
+    .then([]() -> int { return 42; });
+
+promise.complete();
+// result is Future<int>, resolves to 42
+```
+
+### Thread safety
+
+`Promise` and `Future` are safe to use across threads. `wait()` blocks until the result is available, and multiple threads can wait on the same future:
+
+```cpp
+auto promise = make_promise();
+auto future = promise.get_future<int>();
+
+std::thread consumer([&] {
+    future.wait();                      // blocks until ready
+    int v = future.get_result().get_value();
+});
+
+promise.set_value(42);                  // unblocks the consumer
+consumer.join();
+```
+
+Resolution, waiting, and continuation dispatch are all mutex-protected internally. Continuations added after resolution fire immediately (for `Immediate` type) or are queued (for `Deferred` type).

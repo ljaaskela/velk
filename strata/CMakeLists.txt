@@ -20,6 +20,8 @@ src/function.cpp
     include/uid.h
     src/metadata_container.cpp
     src/metadata_container.h
+    src/future.cpp
+    src/future.h
     src/strata_impl.cpp
     src/strata_impl.h
     src/strata.cpp
@@ -30,6 +32,7 @@ src/function.cpp
     include/interface/refcnt_ptr.h
     include/interface/intf_function.h
     include/interface/intf_event.h
+    include/interface/intf_future.h
     include/interface/intf_property.h
     include/interface/intf_object_factory.h
     include/interface/intf_strata.h
@@ -39,6 +42,7 @@ src/function.cpp
     include/api/callback.h
     include/api/event.h
     include/api/property.h
+    include/api/future.h
     include/api/function.h
     include/api/function_context.h
     include/api/strata.h

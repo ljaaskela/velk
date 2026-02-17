@@ -96,18 +96,18 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset() override {
-        return ReturnValue::SUCCESS;
+    IAny::Ptr fn_reset() override {
+        return nullptr;
     }
 
-    ReturnValue fn_add(int x, float y) override {
+    IAny::Ptr fn_add(int x, float y) override {
         // x and y are extracted from FnArgs automatically
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_serialize(FnArgs args) override {
+    IAny::Ptr fn_serialize(FnArgs args) override {
         // manual arg unpacking via FunctionContext or Any<const T>
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 };
 ```
@@ -162,12 +162,12 @@ public:
         detail::PropBind<State, &State::width>::kind;
 
     // 5a. Zero-arg FN: virtual + FnBind trampoline
-    virtual ReturnValue fn_reset() = 0;
+    virtual IAny::Ptr fn_reset() = 0;
     static constexpr FunctionKind _strata_fnkind_reset =
         detail::FnBind<&_strata_intf_type::fn_reset>::kind;
 
     // 5b. Typed-arg FN: virtual with typed params + FnBind trampoline + FnArgDesc array
-    virtual ReturnValue fn_add(int x, float y) = 0;
+    virtual IAny::Ptr fn_add(int x, float y) = 0;
     static constexpr FnArgDesc _strata_fnargs_add[] = {
         {"x", type_uid<int>()}, {"y", type_uid<float>()}
     };
@@ -176,7 +176,7 @@ public:
         {_strata_fnargs_add, 2} };
 
     // 5c. FN_RAW: virtual with FnArgs + FnRawBind trampoline (no type extraction)
-    virtual ReturnValue fn_process(FnArgs) = 0;
+    virtual IAny::Ptr fn_process(FnArgs) = 0;
     static constexpr FunctionKind _strata_fnkind_process =
         detail::FnRawBind<&_strata_intf_type::fn_process>::kind;
 

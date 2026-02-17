@@ -1,5 +1,6 @@
 #include "strata_impl.h"
 #include "function.h"
+#include "future.h"
 #include "metadata_container.h"
 #include "property.h"
 #include <ext/any.h>
@@ -12,6 +13,7 @@ void RegisterTypes(IStrata &strata)
 {
     strata.register_type<PropertyImpl>();
     strata.register_type<FunctionImpl>();
+    strata.register_type<FutureImpl>();
 
     strata.register_type<ext::AnyValue<float>>();
     strata.register_type<ext::AnyValue<double>>();
@@ -140,6 +142,11 @@ void StrataImpl::update() const
             task.fn->invoke(task.args ? task.args->view() : FnArgs{});
         }
     }
+}
+
+IFuture::Ptr StrataImpl::create_future() const
+{
+    return interface_pointer_cast<IFuture>(create(ClassId::Future));
 }
 
 } // namespace strata

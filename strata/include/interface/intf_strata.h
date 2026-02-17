@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include <interface/intf_future.h>
 #include <interface/intf_object.h>
 #include <interface/intf_object_factory.h>
 #include <interface/intf_property.h>
@@ -82,6 +83,8 @@ public:
     virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
     /** @brief Executes all queued deferred tasks. */
     virtual void update() const = 0;
+    /** @brief Creates a new future/promise pair. */
+    virtual IFuture::Ptr create_future() const = 0;
     /**
      * @brief Creates a property for type T with an optional initial value.
      * @tparam T The value type for the property.

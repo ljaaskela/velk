@@ -34,7 +34,8 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | **Typed properties** | `Property<T>` with get/set and automatic change notifications |
 | **Direct state access** | Read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
 | **Events** | Observable events with multiple handlers, immediate or deferred |
-| **Functions** | Overridable virtual functions with optional typed parameters |
+| **Functions** | Overridable virtual functions with optional typed parameters, returning typed results via `IAny::Ptr` |
+| **Futures** | Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution |
 | **Deferred invocation** | Queue function calls and event handlers for batch execution during `instance().update()` |
 | **Extensible** | Implement custom `IAny` types for used-defined types, external or shared data storage |
 | **High performance** | Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups |
@@ -45,7 +46,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 |---|---|
 | [Quick start](#quick-start) | Getting started |
 | [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
-| [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation |
+| [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation, futures and promises |
 | [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
 | [STRATA_INTERFACE](docs/strata-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
@@ -130,13 +131,13 @@ public:
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
     // Implementations of the IMyWidget static metadata-defined functions "reset" and "resize"
-    ReturnValue fn_reset() override {
-        return ReturnValue::SUCCESS;
+    IAny::Ptr fn_reset() override {
+        return nullptr;
     }
-    ReturnValue fn_resize(float w, float h) override {
+    IAny::Ptr fn_resize(float w, float h) override {
         width().set_value(w);   // width property as defined in STRATA_INTERFACE
         height().set_value(h);
-        return ReturnValue::SUCCESS;
+        return nullptr;         // nullptr = void result
     }
 
     // Implementation of the pure virtual non-metadata function defined in IMyWidget
@@ -159,9 +160,9 @@ public:
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     // Implementations for the functions defined in IMyWidget and ISerializable static metadata
-    ReturnValue fn_reset() override { /* ... */ return ReturnValue::SUCCESS; }                  // zero-arg
-    ReturnValue fn_resize(float w, float h) override { /* ... */ return ReturnValue::SUCCESS; } // typed args
-    ReturnValue fn_serialize() override { /* ... */ return ReturnValue::SUCCESS; }              // from ISerializable
+    IAny::Ptr fn_reset() override { /* ... */ return nullptr; }                  // zero-arg
+    IAny::Ptr fn_resize(float w, float h) override { /* ... */ return nullptr; } // typed args
+    IAny::Ptr fn_serialize() override { /* ... */ return nullptr; }              // from ISerializable
 
     // Non-metadata paint() from IMyWidget
     void paint() override {}

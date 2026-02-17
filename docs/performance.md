@@ -22,18 +22,18 @@ This document covers runtime performance and memory usage related topics.
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
 | **Property get** | 1 virtual call + `memcpy` | ~8 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~9 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property set** | 1 virtual call + `memcpy` | ~10 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
-| **Function invoke** | 1 indirect call | ~9 ns | `target_fn_(target_context_, args)` — context/function-pointer pair, no virtual dispatch |
-| **Typed-arg trampoline** | Arg extraction + indirect call | ~34 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
-| **Raw function invoke** | 1 indirect call | ~11 ns | `FnRawBind` passes `FnArgs` through unchanged — no extraction overhead |
+| **Function invoke** | 1 indirect call | ~11 ns | `target_fn_(target_context_, args)` — context/function-pointer pair, no virtual dispatch |
+| **Typed-arg trampoline** | Arg extraction + indirect call | ~38 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
+| **Raw function invoke** | 1 indirect call | ~12 ns | `FnRawBind` passes `FnArgs` through unchanged — no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~13 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~205 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **Event dispatch (deferred)** | Clone + queue | ~209 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~5 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~845 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~872 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~84 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 2 heap allocations | ~160 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
+| **Object creation** | 2 heap allocations | ~164 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 

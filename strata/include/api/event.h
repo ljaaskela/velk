@@ -75,13 +75,17 @@ public:
     /** @brief Invokes the event with no arguments (null-safe). */
     ReturnValue invoke(InvokeType type = Immediate) const
     {
-        return event_ ? event_->invoke({}, type) : ReturnValue::INVALID_ARGUMENT;
+        if (!event_) return ReturnValue::INVALID_ARGUMENT;
+        event_->invoke({}, type);
+        return ReturnValue::SUCCESS;
     }
 
     /** @brief Invokes the event with the given @p args (null-safe). */
     ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const
     {
-        return event_ ? event_->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+        if (!event_) return ReturnValue::INVALID_ARGUMENT;
+        event_->invoke(args, type);
+        return ReturnValue::SUCCESS;
     }
 
 private:

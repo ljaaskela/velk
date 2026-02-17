@@ -62,17 +62,21 @@ struct typed_trampoline {
     using ArgsTuple = typename Traits::args_tuple;
     static constexpr size_t Arity = Traits::arity;
 
-    static ReturnValue invoke(void* c, FnArgs args)
+    static IAny::Ptr invoke(void* c, FnArgs args)
     {
         if constexpr (Arity > 0) {
-            if (args.count < Arity) return ReturnValue::INVALID_ARGUMENT;
+            if (args.count < Arity) return nullptr;
         }
         auto& fn = *static_cast<Callable*>(c);
-        if constexpr (std::is_void_v<typename Traits::return_type>) {
+        using R = typename Traits::return_type;
+        if constexpr (std::is_void_v<R> || std::is_same_v<R, ReturnValue>) {
             invoke_typed_impl<Callable, ArgsTuple>(fn, args, std::make_index_sequence<Arity>{});
-            return ReturnValue::SUCCESS;
-        } else {
+            return nullptr;
+        } else if constexpr (std::is_same_v<R, IAny::Ptr>) {
             return invoke_typed_impl<Callable, ArgsTuple>(fn, args, std::make_index_sequence<Arity>{});
+        } else {
+            auto result = invoke_typed_impl<Callable, ArgsTuple>(fn, args, std::make_index_sequence<Arity>{});
+            return Any<R>(result).clone();
         }
     }
 
@@ -105,11 +109,12 @@ private:
 
     template<class F>
     static constexpr bool is_fnargs_callable_v =
-        is_callable_v<F> && std::is_invocable_r_v<ReturnValue, Decay<F>, FnArgs>;
+        is_callable_v<F> && (std::is_invocable_r_v<ReturnValue, Decay<F>, FnArgs> ||
+                             std::is_invocable_r_v<IAny::Ptr, Decay<F>, FnArgs>);
 
     template<class F>
     static constexpr bool is_typed_callable_v =
-        is_callable_v<F> && !std::is_invocable_r_v<ReturnValue, Decay<F>, FnArgs> &&
+        is_callable_v<F> && !is_fnargs_callable_v<F> &&
         detail::has_callable_traits_v<Decay<F>>;
 
 public:
@@ -136,8 +141,13 @@ public:
         fn_ = instance().create<IFunction>(ClassId::Function);
         if (auto internal = interface_cast<IFunctionInternal>(fn_)) {
             auto* ctx = new Callable(std::forward<F>(callable));
-            auto* trampoline = +[](void* c, FnArgs args) -> ReturnValue {
-                return (*static_cast<Callable*>(c))(args);
+            auto* trampoline = +[](void* c, FnArgs args) -> IAny::Ptr {
+                if constexpr (std::is_invocable_r_v<IAny::Ptr, Callable, FnArgs>) {
+                    return (*static_cast<Callable*>(c))(args);
+                } else {
+                    (*static_cast<Callable*>(c))(args);
+                    return nullptr;
+                }
             };
             auto* deleter = +[](void* c) {
                 delete static_cast<Callable*>(c);
@@ -172,11 +182,11 @@ public:
 
     /** @brief Invokes the function with no arguments.
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    ReturnValue invoke(InvokeType type = Immediate) const { return fn_->invoke({}, type); }
+    IAny::Ptr invoke(InvokeType type = Immediate) const { return fn_->invoke({}, type); }
     /** @brief Invokes the function with the given @p args.
      *  @param args Arguments for invocation.
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const { return fn_->invoke(args, type); }
+    IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const { return fn_->invoke(args, type); }
 
 private:
     IFunction::Ptr fn_;
