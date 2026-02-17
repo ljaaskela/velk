@@ -3,11 +3,11 @@
 
 #include <api/any.h>
 #include <api/strata.h>
+#include <api/traits.h>
 #include <common.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
-#include <tuple>
 #include <type_traits>
 #include <utility>
 
@@ -15,41 +15,7 @@ namespace strata {
 
 namespace detail {
 
-// --- callable_traits: extract return type and parameter types from a callable's operator() ---
-
-template<class R, class... Args>
-struct callable_traits_base {
-    using return_type = R;
-    using args_tuple = std::tuple<Args...>;
-    static constexpr size_t arity = sizeof...(Args);
-};
-
-template<class F, class = void>
-struct callable_traits; // SFINAE-friendly primary (undefined)
-
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...)> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const noexcept> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) noexcept> : callable_traits_base<R, Args...> {};
-
-template<class F>
-struct callable_traits<F, std::void_t<decltype(&F::operator())>>
-    : callable_traits<decltype(&F::operator())> {};
-
-template<class F, class = void>
-inline constexpr bool has_callable_traits_v = false;
-
-template<class F>
-inline constexpr bool has_callable_traits_v<F, std::void_t<typename callable_traits<F>::return_type>> = true;
-
 // --- Typed parameter unpacking for auto-unpack Callback constructor ---
-
-template<class T>
-using decay_param_t = std::remove_const_t<std::decay_t<T>>;
 
 template<class Callable, class ArgsTuple, size_t... Is>
 decltype(auto) invoke_typed_impl(Callable& callable, FnArgs args, std::index_sequence<Is...>)
@@ -134,7 +100,7 @@ public:
      * The callable is heap-allocated and owned by the underlying IFunction.
      * Only raw function pointers cross the DLL boundary.
      */
-    template<class F, std::enable_if_t<is_fnargs_callable_v<F>, int> = 0>
+    template<class F, detail::require<is_fnargs_callable_v<F>> = 0>
     Callback(F&& callable)
     {
         using Callable = std::decay_t<F>;
@@ -162,7 +128,7 @@ public:
      * Automatically unpacks FnArgs into typed values using Any<const T>.
      * Supports both void and ReturnValue return types.
      */
-    template<class F, std::enable_if_t<is_typed_callable_v<F>, int> = 0>
+    template<class F, detail::require<is_typed_callable_v<F>> = 0>
     Callback(F&& callable)
     {
         using Callable = std::decay_t<F>;

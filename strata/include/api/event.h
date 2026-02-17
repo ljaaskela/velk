@@ -53,7 +53,7 @@ public:
      * evt.add_handler([](int x, float y) { std::cout << x + y << std::endl; });
      * @endcode
      */
-    template<class F, std::enable_if_t<!std::is_convertible_v<F, const IFunction::ConstPtr&>, int> = 0>
+    template<class F, detail::require<!std::is_convertible_v<F, const IFunction::ConstPtr&>> = 0>
     ReturnValue add_handler(F&& callable, InvokeType type = Immediate) const
     {
         Callback cb(std::forward<F>(callable));

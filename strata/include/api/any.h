@@ -2,6 +2,7 @@
 #define API_ANY_H
 
 #include <api/strata.h>
+#include <api/traits.h>
 #include <cassert>
 #include <common.h>
 #include <type_traits>
@@ -60,25 +61,25 @@ public:
     static constexpr Uid TYPE_UID = type_uid<std::remove_const_t<T>>();
 
     /** @brief Wraps an existing mutable IAny pointer (read-write). */
-    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    template<bool RW = IsReadWrite, detail::require<RW> = 0>
     constexpr Any(const IAny::Ptr &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
-    template<bool RO = IsReadOnly, std::enable_if_t<RO, int> = 0>
+    template<bool RO = IsReadOnly, detail::require<RO> = 0>
     constexpr Any(const IAny::ConstPtr &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps a const IAny reference (read-only). */
-    template<bool RO = IsReadOnly, std::enable_if_t<RO, int> = 0>
+    template<bool RO = IsReadOnly, detail::require<RO> = 0>
     constexpr Any(const IAny &any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
-    template<bool RO = IsReadOnly, std::enable_if_t<RO, int> = 0>
+    template<bool RO = IsReadOnly, detail::require<RO> = 0>
     constexpr Any(const IAny *any) noexcept
     {
         if (any) {
@@ -107,7 +108,7 @@ public:
     /** @brief Implicit conversion to a const IAny pointer. */
     operator const IAny *() const noexcept { return any_.get(); }
     /** @brief Implicit conversion to a mutable IAny pointer (read-write only). */
-    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    template<bool RW = IsReadWrite, detail::require<RW> = 0>
     operator IAny *() noexcept { return any_.get(); }
     /** @brief Returns a const reference to the underlying IAny. */
     operator const IAny &() const noexcept { return *(any_.get()); }
@@ -117,11 +118,11 @@ public:
     /** @brief Returns the underlying const IAny pointer. */
     const IAny *get_any_interface() const noexcept { return any_.get(); }
     /** @brief Returns the underlying mutable IAny pointer (read-write only). */
-    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    template<bool RW = IsReadWrite, detail::require<RW> = 0>
     IAny *get_any_interface() noexcept { return any_.get(); }
 
     /** @brief Copies the value from @p other into the managed IAny (read-write only). */
-    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    template<bool RW = IsReadWrite, detail::require<RW> = 0>
     bool copy_from(const IAny &other) { return any_ && any_->copy_from(other); }
 
     /** @brief Returns the type id of the any value. */
@@ -140,7 +141,7 @@ public:
         return value;
     }
     /** @brief Overwrites the stored value with @p value (read-write only). */
-    template<bool RW = IsReadWrite, std::enable_if_t<RW, int> = 0>
+    template<bool RW = IsReadWrite, detail::require<RW> = 0>
     void set_value(const T &value) noexcept
     {
         if (any_) {
