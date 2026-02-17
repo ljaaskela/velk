@@ -1,4 +1,4 @@
-#include <api/strata.h>
+#include <api/velk.h>
 
 #include <api/any.h>
 #include <api/callback.h>
@@ -9,14 +9,14 @@
 #include <ext/object.h>
 #include <interface/intf_external_any.h>
 #include <interface/intf_property.h>
-#include <interface/intf_strata.h>
+#include <interface/intf_velk.h>
 #include <interface/types.h>
 #include <iostream>
 
 using std::cout;
 using std::endl;
 using std::string;
-using namespace strata;
+using namespace velk;
 
 // Custom data
 struct Data
@@ -63,7 +63,7 @@ private:
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, float, width, 100.f),
         (PROP, float, height, 50.f),
         (EVT, on_clicked),
@@ -75,7 +75,7 @@ public:
 class ISerializable : public Interface<ISerializable>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, string, name, ""),
         (FN_RAW, serialize)
     )
@@ -179,7 +179,7 @@ void demo_static_metadata()
 
     auto& r = instance();
 
-    // --- Static metadata via Strata (no instance needed) ---
+    // --- Static metadata via Velk (no instance needed) ---
     cout << "MyWidget static metadata:" << endl;
     if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
         cout << "  Class: " << info->name << " (" << info->members.size() << " members)" << endl;
@@ -292,7 +292,7 @@ void demo_interfaces(IObject::Ptr& widget)
     cout << "=== demo_interfaces done ===" << endl;
 }
 
-// Construct Uid from hex ints and string, verify constexpr parsing and STRATA_UID.
+// Construct Uid from hex ints and string, verify constexpr parsing and VELK_UID.
 void demo_uid()
 {
     cout << endl << "=== demo_uid ===" << endl;
@@ -311,13 +311,13 @@ void demo_uid()
     cout << "  from ints:   " << a << endl;
     cout << "  from string: " << b << endl;
 
-    // Verify STRATA_UID macro on Interface template
+    // Verify VELK_UID macro on Interface template
     static_assert(ISerializable::UID == type_uid<ISerializable>(), "auto UID should match type_uid");
     constexpr Uid customUid("a0b1c2d3-e4f5-6789-abcd-ef0123456789");
     // A hypothetical interface with a fixed UID:
-    // class IFixed : public Interface<IFixed, STRATA_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")> {};
+    // class IFixed : public Interface<IFixed, VELK_UID("a0b1c2d3-e4f5-6789-abcd-ef0123456789")> {};
     // would have IFixed::UID == customUid
-    cout << "  STRATA_UID:  " << customUid << endl;
+    cout << "  VELK_UID:  " << customUid << endl;
 
     cout << "=== demo_uid done ===" << endl;
 }

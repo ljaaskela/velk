@@ -5,11 +5,11 @@
 #include <api/event.h>
 #include <api/function.h>
 #include <api/property.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <ext/object.h>
 #include <interface/intf_metadata.h>
 
-using namespace strata;
+using namespace velk;
 
 // ---------------------------------------------------------------------------
 // Benchmark interface + implementation
@@ -18,7 +18,7 @@ using namespace strata;
 class IBenchWidget : public Interface<IBenchWidget>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, float, value, 0.f),
         (EVT, on_changed),
         (FN, void, do_nothing),

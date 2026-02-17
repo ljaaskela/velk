@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <api/any.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <ext/any.h>
 #include <interface/intf_any.h>
 
-using namespace strata;
+using namespace velk;
 
 TEST(Any, FloatConstructAndGetValue)
 {

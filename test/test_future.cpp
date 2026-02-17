@@ -3,13 +3,13 @@
 #include <api/any.h>
 #include <api/callback.h>
 #include <api/future.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <interface/intf_future.h>
 #include <interface/types.h>
 
 #include <thread>
 
-using namespace strata;
+using namespace velk;
 
 // --- Basic Promise/Future ---
 

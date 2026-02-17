@@ -1,11 +1,11 @@
-# Doxyfile for Strata
+# Doxyfile for Velk
 
-PROJECT_NAME           = "Strata"
+PROJECT_NAME           = "Velk"
 PROJECT_BRIEF          = "C++17 component object model with typed properties, events, and compile-time metadata"
 OUTPUT_DIRECTORY       = .
 
 # Input
-INPUT                  = ../strata
+INPUT                  = ../velk
 RECURSIVE              = YES
 FILE_PATTERNS          = *.h *.cpp
 EXCLUDE_PATTERNS       = */build/*
@@ -14,7 +14,7 @@ EXCLUDE_PATTERNS       = */build/*
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
-PREDEFINED             = STRATA_EXPORT=
+PREDEFINED             = VELK_EXPORT=
 
 # Extraction
 EXTRACT_ALL            = YES

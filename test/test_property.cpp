@@ -3,10 +3,10 @@
 #include <api/any.h>
 #include <api/callback.h>
 #include <api/property.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <interface/intf_property.h>
 
-using namespace strata;
+using namespace velk;
 
 // ReadWrite property
 

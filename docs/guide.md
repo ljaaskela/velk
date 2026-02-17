@@ -22,7 +22,7 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 
 ## Virtual function dispatch
 
-`STRATA_INTERFACE` supports three function forms. `(FN, RetType, Name)` generates a zero-arg virtual `RetType fn_Name()`. `(FN, RetType, Name, (T1, a1), ...)` generates a typed virtual `RetType fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs` and return value wrapping. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
+`VELK_INTERFACE` supports three function forms. `(FN, RetType, Name)` generates a zero-arg virtual `RetType fn_Name()`. `(FN, RetType, Name, (T1, a1), ...)` generates a typed virtual `RetType fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs` and return value wrapping. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
 
 ```mermaid
 sequenceDiagram
@@ -46,7 +46,7 @@ sequenceDiagram
 class IMyWidget : public Interface<IMyWidget>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, float, width, 0.f),
         (FN, void, reset),                       // virtual void fn_reset()
         (FN, float, add, (int, x), (float, y)),  // virtual float fn_add(int x, float y)
@@ -198,7 +198,7 @@ auto* ps = interface_cast<IPropertyState>(widget);
 // Typed access: returns IMyWidget::State*
 auto* state = ps->get_property_state<IMyWidget>();
 
-// State fields are initialized with STRATA_INTERFACE defaults
+// State fields are initialized with VELK_INTERFACE defaults
 state->width;   // 100.f
 state->height;  // 50.f
 
@@ -222,13 +222,13 @@ auto* ss = ps->get_property_state<ISerializable>();   // ISerializable::State*
 
 ## Deferred invocation
 
-Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::strata::instance().update()` is called.
+Functions and event handlers support deferred execution via the `InvokeType` enum (`Immediate` or `Deferred`). Deferred work is queued and executed when `::velk::instance().update()` is called.
 
 ```mermaid
 sequenceDiagram
     participant Caller
     participant Event
-    participant IStrata
+    participant IVelk
     participant Immediate as Immediate Handler
     participant Deferred as Deferred Handler
 
@@ -240,10 +240,10 @@ sequenceDiagram
 
     Note over Caller: ... later ...
 
-    Caller->>IStrata: update()
-    IStrata->>Deferred: invoke(cloned args)
-    Deferred-->>IStrata: SUCCESS
-    IStrata-->>Caller: done
+    Caller->>IVelk: update()
+    IVelk->>Deferred: invoke(cloned args)
+    Deferred-->>IVelk: SUCCESS
+    IVelk-->>Caller: done
 ```
 
 ### Defer at the call site
@@ -273,7 +273,7 @@ Arguments are cloned when a task is queued, so the original `IAny` does not need
 
 ## Futures and promises
 
-Strata provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side — it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
+Velk provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side — it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
 
 ```mermaid
 sequenceDiagram

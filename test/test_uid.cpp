@@ -3,7 +3,7 @@
 #include <common.h>
 #include <uid.h>
 
-using namespace strata;
+using namespace velk;
 
 TEST(Uid, ConstructFromTwoUint64)
 {
