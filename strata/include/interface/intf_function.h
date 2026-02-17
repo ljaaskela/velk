@@ -37,14 +37,14 @@ class IFunction : public Interface<IFunction>
 {
 public:
     /** @brief Function pointer type for invoke callbacks. */
-    using CallableFn = ReturnValue(FnArgs);
+    using CallableFn = IAny::Ptr(FnArgs);
     /**
      * @brief Called to invoke the function.
      * @param args Call args as a non-owning view.
      * @param type Immediate executes now; Deferred queues for the next update() call.
-     * @return Function return value.
+     * @return Typed result (nullptr = void/no result).
      */
-    virtual ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const = 0;
+    virtual IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const = 0;
 };
 
 /**
@@ -59,7 +59,7 @@ class IFunctionInternal : public Interface<IFunctionInternal>
 {
 public:
     /** @brief Function pointer type for bound trampoline callbacks. */
-    using BoundFn = ReturnValue(void* context, FnArgs);
+    using BoundFn = IAny::Ptr(void* context, FnArgs);
     /** @brief Function pointer type for deleting an owned context. */
     using ContextDeleter = void(void*);
 
@@ -92,16 +92,16 @@ public:
  * @param args Arguments for invocation.
  * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-inline ReturnValue invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
 {
-    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(args, type) : nullptr;
 }
 
 /** @brief Invokes a function with a single IAny argument. */
-inline ReturnValue invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
 {
     FnArgs args{&arg, 1};
-    return fn ? fn->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(args, type) : nullptr;
 }
 
 } // namespace strata

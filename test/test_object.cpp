@@ -60,28 +60,28 @@ public:
     int lastAddResult = 0;
     int processCallCount = 0;
 
-    ReturnValue fn_reset() override
+    IAny::Ptr fn_reset() override
     {
         resetCallCount++;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_serialize() override
+    IAny::Ptr fn_serialize() override
     {
         serializeCallCount++;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_add(int x, int y) override
+    IAny::Ptr fn_add(int x, int y) override
     {
         lastAddResult = x + y;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_process(FnArgs) override
+    IAny::Ptr fn_process(FnArgs) override
     {
         processCallCount++;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 };
 

@@ -84,22 +84,22 @@ public:
 // MyWidget concrete class implementation, implements IMyWidget and ISerializable
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    ReturnValue fn_reset() override
+    IAny::Ptr fn_reset() override
     {
         cout << "  MyWidget::fn_reset called!" << endl;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_add(int x, float y) override
+    IAny::Ptr fn_add(int x, float y) override
     {
         cout << "  MyWidget::fn_add(" << x << ", " << y << ") = " << (x + y) << endl;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 
-    ReturnValue fn_serialize(FnArgs) override
+    IAny::Ptr fn_serialize(FnArgs) override
     {
         cout << "  MyWidget::fn_serialize called (raw)!" << endl;
-        return ReturnValue::SUCCESS;
+        return nullptr;
     }
 };
 

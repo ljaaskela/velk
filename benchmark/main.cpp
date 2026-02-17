@@ -29,9 +29,9 @@ public:
 
 class BenchWidget : public ext::Object<BenchWidget, IBenchWidget>
 {
-    ReturnValue fn_do_nothing() override { return ReturnValue::SUCCESS; }
-    ReturnValue fn_add(int, float) override { return ReturnValue::SUCCESS; }
-    ReturnValue fn_raw_fn(FnArgs) override { return ReturnValue::SUCCESS; }
+    IAny::Ptr fn_do_nothing() override { return nullptr; }
+    IAny::Ptr fn_add(int, float) override { return nullptr; }
+    IAny::Ptr fn_raw_fn(FnArgs) override { return nullptr; }
 };
 
 // ---------------------------------------------------------------------------

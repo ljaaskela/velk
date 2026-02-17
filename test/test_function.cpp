@@ -66,7 +66,7 @@ TEST(Callback,LambdaCallbackInvoked)
 
     auto result = fn.invoke();
     EXPECT_TRUE(called);
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
 }
 
 TEST(Callback,InvokeWithArgs)
@@ -202,7 +202,7 @@ TEST(Callback,TypedLambdaTwoParams)
     Any<int> b(42);
     const IAny* ptrs[] = {a, b};
     auto result = fn.invoke(FnArgs{ptrs, 2});
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received_a, 3.14f);
     EXPECT_EQ(received_b, 42);
 }
@@ -218,7 +218,7 @@ TEST(Callback,TypedLambdaVoidReturn)
     Any<float> a(2.5f);
     const IAny* ptrs[] = {a};
     auto result = fn.invoke(FnArgs{ptrs, 1});
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received, 2.5f);
 }
 
@@ -231,7 +231,7 @@ TEST(Callback,TypedLambdaInsufficientArgs)
     Any<float> a(1.f);
     const IAny* ptrs[] = {a};
     auto result = fn.invoke(FnArgs{ptrs, 1});
-    EXPECT_EQ(result, ReturnValue::INVALID_ARGUMENT);
+    EXPECT_EQ(result, nullptr);
 }
 
 TEST(Callback,TypedLambdaZeroArity)
@@ -243,7 +243,7 @@ TEST(Callback,TypedLambdaZeroArity)
     });
 
     auto result = fn.invoke();
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
     EXPECT_TRUE(called);
 }
 
@@ -259,7 +259,7 @@ TEST(Callback,TypedLambdaExtraArgsIgnored)
     Any<int> b(99);
     const IAny* ptrs[] = {a, b};
     auto result = fn.invoke(FnArgs{ptrs, 2});
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
     EXPECT_FLOAT_EQ(received, 1.5f);
 }
 
@@ -274,7 +274,7 @@ TEST(Callback,TypedLambdaTypeMismatchGetsDefault)
     Any<float> a(3.14f); // float, not int
     const IAny* ptrs[] = {a};
     auto result = fn.invoke(FnArgs{ptrs, 1});
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
     EXPECT_EQ(received, 0); // default int
 }
 
@@ -303,7 +303,7 @@ TEST(Callback,TypedLambdaMutable)
     });
 
     auto result = fn.invoke();
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
 }
 
 TEST(Callback,FnArgsLambdaStillWorks)
@@ -317,7 +317,7 @@ TEST(Callback,FnArgsLambdaStillWorks)
 
     auto result = fn.invoke();
     EXPECT_TRUE(called);
-    EXPECT_EQ(result, ReturnValue::SUCCESS);
+    EXPECT_EQ(result, nullptr);
 }
 
 // --- Event handler add/remove ---

@@ -22,7 +22,7 @@ namespace strata {
 enum class MemberKind : uint8_t { Property, Event, Function };
 
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
-using FnTrampoline = ReturnValue(*)(void* self, FnArgs args);
+using FnTrampoline = IAny::Ptr(*)(void* self, FnArgs args);
 
 /** @brief Kind-specific data for Property members. */
 struct PropertyKind {
@@ -219,12 +219,12 @@ public:
  * @param name Name of the function to query.
  * @param args Function arguments.
  */
-inline ReturnValue invoke_function(const IInterface *o,
+inline IAny::Ptr invoke_function(const IInterface *o,
                                    std::string_view name,
                                    FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_function(meta->get_function(name), args) : ReturnValue::INVALID_ARGUMENT;
+    return meta ? invoke_function(meta->get_function(name), args) : nullptr;
 }
 
 /**
@@ -233,7 +233,7 @@ inline ReturnValue invoke_function(const IInterface *o,
  * @param name Function name to look up.
  * @param arg Single argument to pass.
  */
-inline ReturnValue invoke_function(const IInterface *o,
+inline IAny::Ptr invoke_function(const IInterface *o,
                                    std::string_view name,
                                    const IAny *arg)
 {
@@ -279,11 +279,11 @@ inline ReturnValue invoke_event(const IInterface *o,
  */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
     auto* meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_function(meta->get_function(name), FnArgs{ptrs, sizeof...(Args)}) : ReturnValue::INVALID_ARGUMENT;
+    return meta ? invoke_function(meta->get_function(name), FnArgs{ptrs, sizeof...(Args)}) : nullptr;
 }
 
 // Variadic invoke_function: value args (name-based)
@@ -302,13 +302,13 @@ FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 /** @brief Invokes a named function with multiple value arguments. */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
     const IAny* ptrs[sizeof...(Args)];
     auto fnArgs = detail::make_fn_args(tup, ptrs, std::index_sequence_for<Args...>{});
     auto* meta = interface_cast<IMetadata>(o);
-    return meta ? invoke_function(meta->get_function(name), fnArgs) : ReturnValue::INVALID_ARGUMENT;
+    return meta ? invoke_function(meta->get_function(name), fnArgs) : nullptr;
 }
 
 /** @brief Internal helpers for STRATA_INTERFACE macro expansion. */
@@ -337,8 +337,8 @@ T extract_arg(const IAny* any) {
  * @param fn Pointer-to-member for the virtual method to call.
  */
 template<class Intf, class... Args, size_t... Is>
-ReturnValue interface_trampoline_impl(void* self, FnArgs args,
-    ReturnValue(Intf::*fn)(Args...), std::index_sequence<Is...>)
+IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
+    IAny::Ptr(Intf::*fn)(Args...), std::index_sequence<Is...>)
 {
     return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
 }
@@ -357,11 +357,11 @@ ReturnValue interface_trampoline_impl(void* self, FnArgs args,
  * @return The virtual method's return value, or INVALID_ARGUMENT if too few args.
  */
 template<class Intf, class... Args>
-ReturnValue interface_trampoline(void* self, FnArgs args,
-    ReturnValue(Intf::*fn)(Args...))
+IAny::Ptr interface_trampoline(void* self, FnArgs args,
+    IAny::Ptr(Intf::*fn)(Args...))
 {
     if constexpr (sizeof...(Args) > 0) {
-        if (args.count < sizeof...(Args)) return ReturnValue::INVALID_ARGUMENT;
+        if (args.count < sizeof...(Args)) return nullptr;
     }
     return interface_trampoline_impl(self, args, fn, std::index_sequence_for<Args...>{});
 }
@@ -458,7 +458,7 @@ struct PropBind
 template<auto Fn>
 struct FnBind
 {
-    static ReturnValue trampoline(void* self, FnArgs args) {
+    static IAny::Ptr trampoline(void* self, FnArgs args) {
         return interface_trampoline(self, args, Fn);
     }
     static constexpr FunctionKind kind{&trampoline, {}};
@@ -486,10 +486,10 @@ template<auto Fn>
 struct FnRawBind
 {
     template<class Intf>
-    static ReturnValue call(void* self, FnArgs args, ReturnValue(Intf::*fn)(FnArgs)) {
+    static IAny::Ptr call(void* self, FnArgs args, IAny::Ptr(Intf::*fn)(FnArgs)) {
         return (static_cast<Intf*>(self)->*fn)(args);
     }
-    static ReturnValue trampoline(void* self, FnArgs args) {
+    static IAny::Ptr trampoline(void* self, FnArgs args) {
         return call(self, args, Fn);
     }
     static constexpr FunctionKind kind{&trampoline, {}};
@@ -647,9 +647,9 @@ struct FnRawBind
 #define _STRATA_TRAMPOLINE_EVT(Name)
 
 #define _STRATA_TRAMPOLINE_FN_0(Name) \
-    virtual ::strata::ReturnValue fn_##Name() = 0;
+    virtual ::strata::IAny::Ptr fn_##Name() = 0;
 #define _STRATA_TRAMPOLINE_FN_N(Name, ...) \
-    virtual ::strata::ReturnValue fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0;
+    virtual ::strata::IAny::Ptr fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0;
 
 #define _STRATA_TFN_1(Name)       _STRATA_TRAMPOLINE_FN_0(Name)
 #define _STRATA_TFN_2(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
@@ -664,7 +664,7 @@ struct FnRawBind
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_TFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 #define _STRATA_TRAMPOLINE_FN_RAW(Name) \
-    virtual ::strata::ReturnValue fn_##Name(::strata::FnArgs) = 0;
+    virtual ::strata::IAny::Ptr fn_##Name(::strata::FnArgs) = 0;
 
 #define _STRATA_TRAMPOLINE(Tag, ...) _STRATA_EXPAND(_STRATA_CAT(_STRATA_TRAMPOLINE_, Tag)(__VA_ARGS__))
 

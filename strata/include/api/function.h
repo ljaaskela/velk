@@ -32,17 +32,17 @@ public:
 
     /** @brief Invokes the function with no arguments (null-safe).
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    ReturnValue invoke(InvokeType type = Immediate) const
+    IAny::Ptr invoke(InvokeType type = Immediate) const
     {
-        return fn_ ? fn_->invoke({}, type) : ReturnValue::INVALID_ARGUMENT;
+        return fn_ ? fn_->invoke({}, type) : nullptr;
     }
 
     /** @brief Invokes the function with the given @p args (null-safe).
      *  @param args Arguments for invocation.
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const
+    IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const
     {
-        return fn_ ? fn_->invoke(args, type) : ReturnValue::INVALID_ARGUMENT;
+        return fn_ ? fn_->invoke(args, type) : nullptr;
     }
 
 private:
@@ -58,10 +58,10 @@ private:
  */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
+IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
-    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Args)}) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Args)}) : nullptr;
 }
 
 // Variadic invoke_function: value args (auto-wrapped in Any<T>)
@@ -69,10 +69,10 @@ ReturnValue invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 namespace detail {
 
 template<class FnPtr, class Tuple, size_t... Is>
-ReturnValue invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence<Is...>)
+IAny::Ptr invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence<Is...>)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(std::get<Is>(tup))...};
-    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Is)}) : ReturnValue::INVALID_ARGUMENT;
+    return fn ? fn->invoke(FnArgs{ptrs, sizeof...(Is)}) : nullptr;
 }
 
 } // namespace detail
@@ -84,7 +84,7 @@ ReturnValue invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequen
  */
 template<class... Args, std::enable_if_t<
     (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...), int> = 0>
-ReturnValue invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
+IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
     return detail::invoke_with_any_tuple(fn, tup, std::index_sequence_for<Args...>{});

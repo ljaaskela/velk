@@ -17,7 +17,7 @@ public:
     ~FunctionImpl();
 
 public: // IFunction
-    ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const override;
+    IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const override;
 
 public: // IFunctionInternal
     void set_invoke_callback(IFunction::CallableFn *fn) override;
@@ -30,7 +30,7 @@ public: // IEvent
     bool has_handlers() const override;
 
 private:
-    static ReturnValue callback_trampoline(void* ctx, FnArgs args);
+    static IAny::Ptr callback_trampoline(void* ctx, FnArgs args);
     void invoke_handlers(FnArgs args) const;
     array_view<IFunction::ConstPtr> immediate_handlers() const;
     array_view<IFunction::ConstPtr> deferred_handlers() const;

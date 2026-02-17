@@ -174,16 +174,17 @@ auto future_then(const IFuture::Ptr& future, F&& callable, InvokeType type)
 {
     using Callable = std::decay_t<F>;
 
-    if constexpr (std::is_invocable_r_v<ReturnValue, Callable, FnArgs>) {
+    if constexpr (std::is_invocable_r_v<ReturnValue, Callable, FnArgs> ||
+                   std::is_invocable_r_v<IAny::Ptr, Callable, FnArgs>) {
         // FnArgs callable: chain as Future<void>
         auto promise = make_promise();
         auto result = promise.get_future<void>();
         if (future) {
             Callback cb([p = std::move(promise), f = Callable(std::forward<F>(callable))]
-                        (FnArgs args) mutable -> ReturnValue {
-                auto ret = f(args);
+                        (FnArgs args) mutable -> IAny::Ptr {
+                f(args);
                 p.complete();
-                return ret;
+                return nullptr;
             });
             future->add_continuation(cb, type);
         }
@@ -198,7 +199,7 @@ auto future_then(const IFuture::Ptr& future, F&& callable, InvokeType type)
         auto result = promise.get_future<FR>();
         if (future) {
             Callback cb([p = std::move(promise), f = Callable(std::forward<F>(callable))]
-                        (FnArgs args) mutable -> ReturnValue {
+                        (FnArgs args) mutable -> IAny::Ptr {
                 if constexpr (std::is_void_v<R> || std::is_same_v<R, ReturnValue>) {
                     invoke_typed_impl<Callable, typename Traits::args_tuple>(
                         f, args, std::make_index_sequence<Traits::arity>{});
@@ -207,7 +208,7 @@ auto future_then(const IFuture::Ptr& future, F&& callable, InvokeType type)
                     p.set_value(invoke_typed_impl<Callable, typename Traits::args_tuple>(
                         f, args, std::make_index_sequence<Traits::arity>{}));
                 }
-                return ReturnValue::SUCCESS;
+                return nullptr;
             });
             future->add_continuation(cb, type);
         }
