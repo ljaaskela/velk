@@ -21,4 +21,4 @@ add_subdirectory(
 )
 
 add_executable(benchmarks main.cpp)
-target_link_libraries(benchmarks PRIVATE strata benchmark::benchmark benchmark::benchmark_main)
+target_link_libraries(benchmarks PRIVATE velk benchmark::benchmark benchmark::benchmark_main)

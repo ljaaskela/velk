@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the general architecture and code division in Strata.
+This document describes the general architecture and code division in Velk.
 
 ## Contents
 
@@ -30,7 +30,7 @@ columns 1
 ```
 
 ```
-strata/
+velk/
   include/               Public headers (available to DLL consumers)
     interface/           Abstract interfaces (pure virtual)
     ext/                 CRTP helpers and template implementations for application-defined objects/types
@@ -48,13 +48,13 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 |---|---|
 | `intf_interface.h` | `IInterface` root with UID-based `get_interface()` and ref-counting; `Interface<T>` CRTP with auto UID |
 | `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
-| `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `STRATA_INTERFACE` macro |
+| `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `VELK_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
 | `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
-| `intf_strata.h` | `IStrata` for type registration and object creation |
+| `intf_velk.h` | `IVelk` for type registration and object creation |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -78,7 +78,7 @@ User-facing typed wrappers.
 
 | Header | Description |
 |---|---|
-| `strata.h` | `instance()` singleton access |
+| `velk.h` | `instance()` singleton access |
 | `property.h` | `ConstProperty<T>` read-only and `Property<T>` typed property wrappers |
 | `any.h` | `Any<T>` typed any wrapper |
 | `callback.h` | `Callback` creator with lambda support (constructs new IFunction instances) |
@@ -92,11 +92,11 @@ Internal runtime implementations (compiled into the DLL).
 
 | File | Description |
 |---|---|
-| `strata_impl.cpp/h` | `StrataImpl` implementing `IStrata` |
+| `velk_impl.cpp/h` | `VelkImpl` implementing `IVelk` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
-| `strata.cpp` | DLL entry point, exports `instance()` |
+| `velk.cpp` | DLL entry point, exports `instance()` |
 
 ## Type hierarchy across layers
 
@@ -153,7 +153,7 @@ classDiagram
     class IExternalAny {
         <<interface>>
     }
-    class IStrata {
+    class IVelk {
         <<interface>>
         register/create/update
     }
@@ -171,7 +171,7 @@ classDiagram
     IFunction <|-- IEvent
 
     IInterface <|-- IExternalAny
-    IInterface <|-- IStrata
+    IInterface <|-- IVelk
 ```
 
 ### ext/ class hierarchy
@@ -224,7 +224,7 @@ classDiagram
     AnyCore <|-- AnyRef
 ```
 
-Each concept in Strata has types at up to three layers. The naming follows a consistent pattern:
+Each concept in Velk has types at up to three layers. The naming follows a consistent pattern:
 
 - **`I` prefix** — pure virtual interface (ABI contract)
 - **`Core` suffix** — minimal CRTP base (extend for custom behavior)
@@ -256,8 +256,8 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 
 | Class | Role | When to use |
 |-------|------|-------------|
-| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `StrataImpl`) |
-| `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `STRATA_INTERFACE` |
+| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkImpl`) |
+| `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `VELK_INTERFACE` |
 
 ## Key types
 
@@ -273,7 +273,7 @@ Each concept in Strata has types at up to three layers. The naming follows a con
 | `InvokeType` | Enum (`Immediate`, `Deferred`) controlling execution timing |
 | `FnArgs` | Non-owning view of function arguments (`{const IAny* const* data, size_t count}`) with bounds-checked `operator[]` |
 | `FunctionContext` | Lightweight view over `FnArgs` with count validation and typed `arg<T>(i)` access |
-| `DeferredTask` | Nested struct in `IStrata` pairing an `IFunction::ConstPtr` with a cloned `std::vector<IAny::Ptr>` of args |
+| `DeferredTask` | Nested struct in `IVelk` pairing an `IFunction::ConstPtr` with a cloned `std::vector<IAny::Ptr>` of args |
 | `ConstProperty<T>` | Read-only typed property with `get_value()` and change events (returned by `RPROP` accessors) |
 | `Property<T>` | Typed property with `get_value()`/`set_value()` and change events |
 | `Any<T>` | Typed view over `IAny`; `IAny::clone()` creates a deep copy via the type's factory |

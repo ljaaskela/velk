@@ -5,12 +5,12 @@
 #include <api/event.h>
 #include <api/function.h>
 #include <api/function_context.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <interface/intf_event.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
-using namespace strata;
+using namespace velk;
 
 // --- FnArgs ---
 

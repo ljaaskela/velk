@@ -28,7 +28,7 @@ add_executable(tests
     test_uid.cpp
 )
 
-target_link_libraries(tests PRIVATE strata GTest::gtest_main)
+target_link_libraries(tests PRIVATE velk GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(tests)

@@ -1,13 +1,11 @@
-# Strata
+# Velk
 
-[![CI](https://github.com/ljaaskela/strata/actions/workflows/ci.yml/badge.svg)](https://github.com/ljaaskela/strata/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/ljaaskela/strata/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/strata/actions/workflows/codeql.yml)
+[![CI](https://github.com/ljaaskela/velk/actions/workflows/ci.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml)
 
-Strata is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
+Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
 
-Strata is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
-
-The name *Strata* (plural of *stratum*, meaning layers) reflects the library's layered architecture: abstract interfaces at the bottom, CRTP helpers and template implementations in the middle, and user-facing typed wrappers on top.
+Velk is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
 
 ## Table of contents
 
@@ -30,7 +28,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 |---|---|
 | **Interfaces** | Define abstract contracts with properties, events, and functions |
 | **Type registry** | Register types, create instances by UID, query class info, directly from [type registry](#query-metadata-without-instance) or from [an object](#query-metadata-from-object).|
-| **Compile-time metadata** | Declare members with `STRATA_INTERFACE`, introspect at compile time or runtime |
+| **Compile-time metadata** | Declare members with `VELK_INTERFACE`, introspect at compile time or runtime |
 | **Type-erased values** | `Any<T>` wrappers over a generic `IAny` container |
 | **Typed properties** | `Property<T>` with get/set and automatic change notifications |
 | **Direct state access** | Read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
@@ -49,12 +47,12 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
 | [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation, futures and promises |
 | [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
-| [STRATA_INTERFACE](docs/strata-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
+| [VELK_INTERFACE](docs/velk-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
 ## Project structure
 
 ```
-strata/
+velk/
   CMakeLists.txt
   README.md               This file
   benchmark/              Benchmarks (Google Benchmark)
@@ -63,13 +61,13 @@ strata/
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
     performance.md        Performance and memory usage
-    strata-interface.md   STRATA_INTERFACE macro reference
-  strata/
+    velk-interface.md     VELK_INTERFACE macro reference
+  velk/
     include/              Public API (consumers depend only on these headers)
       interface/          Abstract interfaces (ABI contracts)
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
-    src/                  DLL internals (compiled into strata.dll)
+    src/                  DLL internals (compiled into velk.dll)
   test/                   Unit tests (GoogleTest)
 ```
 
@@ -83,7 +81,7 @@ cmake --build build --config Release
 ```
 
 Output: 
-* `build/bin/Release/strata.dll` (shared library)
+* `build/bin/Release/velk.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
 * `build/bin/Release/benchmarks.exe` (benchmarks)
@@ -99,7 +97,7 @@ Both are extracted into the build directory automatically during CMake configura
 
 ### Define an interface
 
-Use `STRATA_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods. Use `RPROP` for read-only properties that can be observed but not written through the public API.
+Use `VELK_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods. Use `RPROP` for read-only properties that can be observed but not written through the public API.
 
 ```cpp
 #include <interface/intf_metadata.h>
@@ -108,7 +106,7 @@ class IMyWidget : public Interface<IMyWidget>
 {
 public:
     // Static interface metadata: 2 writable properties, 1 read-only property, 1 event and 2 functions
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, float, width, 100.f),
         (PROP, float, height, 100.f),
         (RPROP, int, id, 0),
@@ -135,7 +133,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget>
     void fn_reset() override {
     }
     void fn_resize(float w, float h) override {
-        width().set_value(w);   // width property as defined in STRATA_INTERFACE
+        width().set_value(w);   // width property as defined in VELK_INTERFACE
         height().set_value(h);
     }
 
@@ -150,7 +148,7 @@ Multiple interfaces are supported:
 class ISerializable : public Interface<ISerializable>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, std::string, name, ""),
         (FN, void, serialize)
     )
@@ -194,7 +192,7 @@ if (widget) {
 
 ### Query metadata without instance
 
-Static metadata is available from Strata without creating an instance:
+Static metadata is available from Velk without creating an instance:
 
 ```cpp
 if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {  // lookup by UID
@@ -226,7 +224,7 @@ This is useful for bulk operations like serialization or snapshotting (`memcpy` 
 ```cpp
 auto widget = s.create(MyWidget::get_class_uid());
 if (auto* state = get_property_state<IMyWidget>(widget.get())) {// IMyWidget::State*
-    // State struct generated through STRATA_INTERFACE in IMyWidget declaration
+    // State struct generated through VELK_INTERFACE in IMyWidget declaration
     // struct IWidget::State { 
     //   float width { 100.f };
     //   float height { 100.f };

@@ -4,21 +4,21 @@
 #include <api/callback.h>
 #include <api/function_context.h>
 #include <api/property.h>
-#include <api/strata.h>
+#include <api/velk.h>
 #include <ext/object.h>
 #include <interface/intf_event.h>
 #include <interface/intf_metadata.h>
 #include <interface/intf_property.h>
 #include <interface/types.h>
 
-using namespace strata;
+using namespace velk;
 
 // --- Test interfaces and implementation ---
 
 class ITestWidget : public Interface<ITestWidget>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, float, width, 100.f),
         (PROP, float, height, 50.f),
         (RPROP, int, id, 42),
@@ -30,7 +30,7 @@ public:
 class ITestSerializable : public Interface<ITestSerializable>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (PROP, int, version, 1),
         (FN, void, serialize)
     )
@@ -39,7 +39,7 @@ public:
 class ITestMath : public Interface<ITestMath>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (FN, int, add, (int, x), (int, y))
     )
 };
@@ -47,7 +47,7 @@ public:
 class ITestRaw : public Interface<ITestRaw>
 {
 public:
-    STRATA_INTERFACE(
+    VELK_INTERFACE(
         (FN_RAW, process)
     )
 };
@@ -119,11 +119,11 @@ TEST_F(ObjectTest, InterfaceCastSucceeds)
 
 TEST_F(ObjectTest, InterfaceCastFailsForNonImplemented)
 {
-    // IStrata is not implemented by TestWidget
+    // IVelk is not implemented by TestWidget
     auto obj = instance().create<IObject>(TestWidget::get_class_uid());
     ASSERT_TRUE(obj);
 
-    auto* bad = interface_cast<IStrata>(obj);
+    auto* bad = interface_cast<IVelk>(obj);
     EXPECT_EQ(bad, nullptr);
 }
 
