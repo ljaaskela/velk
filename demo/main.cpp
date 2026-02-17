@@ -67,8 +67,8 @@ public:
         (PROP, float, width, 100.f),
         (PROP, float, height, 50.f),
         (EVT, on_clicked),
-        (FN, reset),
-        (FN, add, (int, x), (float, y))
+        (FN, void, reset),
+        (FN, void, add, (int, x), (float, y))
     )
 };
 
@@ -84,16 +84,14 @@ public:
 // MyWidget concrete class implementation, implements IMyWidget and ISerializable
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    IAny::Ptr fn_reset() override
+    void fn_reset() override
     {
         cout << "  MyWidget::fn_reset called!" << endl;
-        return nullptr;
     }
 
-    IAny::Ptr fn_add(int x, float y) override
+    void fn_add(int x, float y) override
     {
         cout << "  MyWidget::fn_add(" << x << ", " << y << ") = " << (x + y) << endl;
-        return nullptr;
     }
 
     IAny::Ptr fn_serialize(FnArgs) override

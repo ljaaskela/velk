@@ -21,16 +21,16 @@ public:
     STRATA_INTERFACE(
         (PROP, float, value, 0.f),
         (EVT, on_changed),
-        (FN, do_nothing),
-        (FN, add, (int, x), (float, y)),
+        (FN, void, do_nothing),
+        (FN, void, add, (int, x), (float, y)),
         (FN_RAW, raw_fn)
     )
 };
 
 class BenchWidget : public ext::Object<BenchWidget, IBenchWidget>
 {
-    IAny::Ptr fn_do_nothing() override { return nullptr; }
-    IAny::Ptr fn_add(int, float) override { return nullptr; }
+    void fn_do_nothing() override {}
+    void fn_add(int, float) override {}
     IAny::Ptr fn_raw_fn(FnArgs) override { return nullptr; }
 };
 

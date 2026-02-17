@@ -14,6 +14,7 @@
 
 #include <cstdint>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 
 namespace strata {
@@ -336,11 +337,18 @@ T extract_arg(const IAny* any) {
  * @param args Runtime function arguments.
  * @param fn Pointer-to-member for the virtual method to call.
  */
-template<class Intf, class... Args, size_t... Is>
+template<class Intf, class R, class... Args, size_t... Is>
 IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
-    IAny::Ptr(Intf::*fn)(Args...), std::index_sequence<Is...>)
+    R(Intf::*fn)(Args...), std::index_sequence<Is...>)
 {
-    return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
+    if constexpr (std::is_void_v<R>) {
+        (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
+        return nullptr;
+    } else if constexpr (std::is_same_v<R, IAny::Ptr>) {
+        return (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
+    } else {
+        return Any<R>((static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...)).clone();
+    }
 }
 
 /**
@@ -356,9 +364,9 @@ IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
  * @param fn Pointer-to-member for the virtual method to call.
  * @return The virtual method's return value, or INVALID_ARGUMENT if too few args.
  */
-template<class Intf, class... Args>
+template<class Intf, class R, class... Args>
 IAny::Ptr interface_trampoline(void* self, FnArgs args,
-    IAny::Ptr(Intf::*fn)(Args...))
+    R(Intf::*fn)(Args...))
 {
     if constexpr (sizeof...(Args) > 0) {
         if (args.count < sizeof...(Args)) return nullptr;
@@ -485,9 +493,16 @@ struct FnBind
 template<auto Fn>
 struct FnRawBind
 {
-    template<class Intf>
-    static IAny::Ptr call(void* self, FnArgs args, IAny::Ptr(Intf::*fn)(FnArgs)) {
-        return (static_cast<Intf*>(self)->*fn)(args);
+    template<class Intf, class R>
+    static IAny::Ptr call(void* self, FnArgs args, R(Intf::*fn)(FnArgs)) {
+        if constexpr (std::is_void_v<R>) {
+            (static_cast<Intf*>(self)->*fn)(args);
+            return nullptr;
+        } else if constexpr (std::is_same_v<R, IAny::Ptr>) {
+            return (static_cast<Intf*>(self)->*fn)(args);
+        } else {
+            return Any<R>((static_cast<Intf*>(self)->*fn)(args)).clone();
+        }
     }
     static IAny::Ptr trampoline(void* self, FnArgs args) {
         return call(self, args, Fn);
@@ -608,15 +623,15 @@ struct FnRawBind
         &::strata::detail::FnBind<&_strata_intf_type::fn_##Name>::trampoline, \
         {_strata_fnargs_##Name, _STRATA_NARG(__VA_ARGS__)} };
 
-#define _STRATA_DFN_1(Name)       _STRATA_DEFAULTS_FN_0(Name)
-#define _STRATA_DFN_2(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_3(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_4(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_5(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_6(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_7(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_8(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _STRATA_DFN_9(Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_2(RetType, Name)       _STRATA_DEFAULTS_FN_0(Name)
+#define _STRATA_DFN_3(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_4(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_5(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_6(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_7(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_8(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_9(RetType, Name, ...)  _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _STRATA_DFN_10(RetType, Name, ...) _STRATA_DEFAULTS_FN_N(Name, __VA_ARGS__)
 #define _STRATA_DEFAULTS_FN(...) \
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_DFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
@@ -634,7 +649,7 @@ struct FnRawBind
     ::strata::PropertyDesc(#Name, &INFO, &_strata_propkind_##Name),
 #define _STRATA_META_EVT(Name) \
     ::strata::EventDesc(#Name, &INFO),
-#define _STRATA_META_FN(Name, ...) \
+#define _STRATA_META_FN(RetType, Name, ...) \
     ::strata::FunctionDesc(#Name, &INFO, &_strata_fnkind_##Name),
 #define _STRATA_META_FN_RAW(Name) \
     ::strata::FunctionDesc(#Name, &INFO, &_strata_fnkind_##Name),
@@ -646,20 +661,20 @@ struct FnRawBind
 #define _STRATA_TRAMPOLINE_RPROP(...)
 #define _STRATA_TRAMPOLINE_EVT(Name)
 
-#define _STRATA_TRAMPOLINE_FN_0(Name) \
-    virtual ::strata::IAny::Ptr fn_##Name() = 0;
-#define _STRATA_TRAMPOLINE_FN_N(Name, ...) \
-    virtual ::strata::IAny::Ptr fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0;
+#define _STRATA_TRAMPOLINE_FN_0(RetType, Name) \
+    virtual RetType fn_##Name() = 0;
+#define _STRATA_TRAMPOLINE_FN_N(RetType, Name, ...) \
+    virtual RetType fn_##Name(_STRATA_PARAMS(__VA_ARGS__)) = 0;
 
-#define _STRATA_TFN_1(Name)       _STRATA_TRAMPOLINE_FN_0(Name)
-#define _STRATA_TFN_2(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_3(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_4(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_5(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_6(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_7(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_8(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
-#define _STRATA_TFN_9(Name, ...)  _STRATA_TRAMPOLINE_FN_N(Name, __VA_ARGS__)
+#define _STRATA_TFN_2(RetType, Name)       _STRATA_TRAMPOLINE_FN_0(RetType, Name)
+#define _STRATA_TFN_3(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_4(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_5(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_6(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_7(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_8(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_9(RetType, Name, ...)  _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _STRATA_TFN_10(RetType, Name, ...) _STRATA_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
 #define _STRATA_TRAMPOLINE_FN(...) \
     _STRATA_EXPAND(_STRATA_CAT(_STRATA_TFN_, _STRATA_NARG(__VA_ARGS__))(__VA_ARGS__))
 
@@ -700,7 +715,7 @@ struct FnRawBind
         return ::strata::Event(::strata::get_event( \
             this->template get_interface<::strata::IMetadata>(), #Name)); \
     }
-#define _STRATA_ACC_FN(Name, ...) \
+#define _STRATA_ACC_FN(RetType, Name, ...) \
     ::strata::Function Name() const { \
         return ::strata::Function(::strata::get_function( \
             this->template get_interface<::strata::IMetadata>(), #Name)); \
@@ -725,8 +740,8 @@ struct FnRawBind
  * | Property | @c (PROP, Type, Name, Default)           | A typed property with default value  |
  * | Read-only| @c (RPROP, Type, Name, Default)          | A read-only property with default    |
  * | Event    | @c (EVT, Name)                           | An observable event                  |
- * | Function | @c (FN, Name)                            | Zero-arg function                    |
- * | Function | @c (FN, Name, (T1, a1), (T2, a2), ...)   | Typed-arg function with metadata     |
+ * | Function | @c (FN, RetType, Name)                            | Zero-arg function with return type   |
+ * | Function | @c (FN, RetType, Name, (T1, a1), (T2, a2), ...)   | Typed-arg function with metadata     |
  * | Function | @c (FN_RAW, Name)                        | Raw untyped function (receives FnArgs) |
  *
  * @par What the macro generates
@@ -758,7 +773,7 @@ struct FnRawBind
  *         (PROP, float, width, 0.f),
  *         (PROP, float, height, 0.f),
  *         (EVT, on_clicked),
- *         (FN, reset)          // generates: virtual fn_reset(const IAny*)
+ *         (FN, void, reset)    // generates: virtual void fn_reset()
  *     )
  * };
  * @endcode

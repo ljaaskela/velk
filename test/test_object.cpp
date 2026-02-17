@@ -23,7 +23,7 @@ public:
         (PROP, float, height, 50.f),
         (RPROP, int, id, 42),
         (EVT, on_clicked),
-        (FN, reset)
+        (FN, void, reset)
     )
 };
 
@@ -32,7 +32,7 @@ class ITestSerializable : public Interface<ITestSerializable>
 public:
     STRATA_INTERFACE(
         (PROP, int, version, 1),
-        (FN, serialize)
+        (FN, void, serialize)
     )
 };
 
@@ -40,7 +40,7 @@ class ITestMath : public Interface<ITestMath>
 {
 public:
     STRATA_INTERFACE(
-        (FN, add, (int, x), (int, y))
+        (FN, int, add, (int, x), (int, y))
     )
 };
 
@@ -60,22 +60,20 @@ public:
     int lastAddResult = 0;
     int processCallCount = 0;
 
-    IAny::Ptr fn_reset() override
+    void fn_reset() override
     {
         resetCallCount++;
-        return nullptr;
     }
 
-    IAny::Ptr fn_serialize() override
+    void fn_serialize() override
     {
         serializeCallCount++;
-        return nullptr;
     }
 
-    IAny::Ptr fn_add(int x, int y) override
+    int fn_add(int x, int y) override
     {
         lastAddResult = x + y;
-        return nullptr;
+        return lastAddResult;
     }
 
     IAny::Ptr fn_process(FnArgs) override
@@ -304,6 +302,29 @@ TEST_F(ObjectTest, TypedFunctionInvoke)
     // Invoke via variadic helper
     invoke_function(obj.get(), "add", Any<int>(10), Any<int>(20));
     EXPECT_EQ(raw->lastAddResult, 30);
+}
+
+TEST_F(ObjectTest, TypedFunctionReturnValue)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+
+    // Invoke typed function that returns int
+    auto result = invoke_function(obj.get(), "add", Any<int>(3), Any<int>(7));
+    ASSERT_TRUE(result);
+
+    // The result should be an IAny containing the sum
+    int value = 0;
+    result->get_data(&value, sizeof(int), type_uid<int>());
+    EXPECT_EQ(value, 10);
+}
+
+TEST_F(ObjectTest, VoidFunctionReturnsNull)
+{
+    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+
+    // Invoke void function — should return nullptr
+    auto result = invoke_function(obj.get(), "reset");
+    EXPECT_FALSE(result);
 }
 
 TEST_F(ObjectTest, TypedFunctionArgMetadata)
