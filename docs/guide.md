@@ -22,7 +22,7 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 
 ## Virtual function dispatch
 
-`STRATA_INTERFACE` supports three function forms. `(FN, Name)` generates a zero-arg virtual `fn_Name()`. `(FN, Name, (T1, a1), ...)` generates a typed virtual `fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs`. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
+`STRATA_INTERFACE` supports three function forms. `(FN, RetType, Name)` generates a zero-arg virtual `RetType fn_Name()`. `(FN, RetType, Name, (T1, a1), ...)` generates a typed virtual `RetType fn_Name(T1 a1, ...)` with automatic argument extraction from `FnArgs` and return value wrapping. `(FN_RAW, Name)` generates `fn_Name(FnArgs)` for manual argument handling.
 
 ```mermaid
 sequenceDiagram
@@ -37,7 +37,7 @@ sequenceDiagram
     IFunction->>Trampoline: target_fn_(context, FnArgs)
     Note over Trampoline: FnBind extracts typed<br>args from FnArgs
     Trampoline->>MyWidget: fn_add(int 10, float 3.f)
-    MyWidget-->>Trampoline: IAny::Ptr (result)
+    MyWidget-->>Trampoline: float (native result)
     Trampoline-->>IFunction: IAny::Ptr
     IFunction-->>Caller: IAny::Ptr
 ```
@@ -48,22 +48,21 @@ class IMyWidget : public Interface<IMyWidget>
 public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
-        (FN, reset),                       // virtual fn_reset()
-        (FN, add, (int, x), (float, y)),   // virtual fn_add(int x, float y)
-        (FN_RAW, process)                  // virtual fn_process(FnArgs)
+        (FN, void, reset),                       // virtual void fn_reset()
+        (FN, float, add, (int, x), (float, y)),  // virtual float fn_add(int x, float y)
+        (FN_RAW, process)                         // virtual IAny::Ptr fn_process(FnArgs)
     )
 };
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
-    IAny::Ptr fn_reset() override {
+    void fn_reset() override {
         std::cout << "reset!" << std::endl;
-        return nullptr;         // nullptr = void result
     }
 
-    IAny::Ptr fn_add(int x, float y) override {
+    float fn_add(int x, float y) override {
         std::cout << x + y << std::endl;
-        return nullptr;
+        return x + y;           // wrapped into IAny::Ptr by trampoline
     }
 
     IAny::Ptr fn_process(FnArgs args) override {
@@ -85,7 +84,7 @@ Each `fn_Name` is pure virtual, so implementing classes must override it. An exp
 
 ### Function arguments
 
-For **typed-arg** functions (`(FN, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
+For **typed-arg** functions (`(FN, RetType, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
 
 For **FN_RAW** functions, arguments arrive as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`. Use `FunctionContext` to validate the expected argument count:
 

@@ -34,7 +34,7 @@ The name *Strata* (plural of *stratum*, meaning layers) reflects the library's l
 | **Typed properties** | `Property<T>` with get/set and automatic change notifications |
 | **Direct state access** | Read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
 | **Events** | Observable events with multiple handlers, immediate or deferred |
-| **Functions** | Overridable virtual functions with optional typed parameters, returning typed results via `IAny::Ptr` |
+| **Functions** | Overridable virtual functions with optional typed parameters and native return types, automatically wrapped into `IAny::Ptr` |
 | **Futures** | Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution |
 | **Deferred invocation** | Queue function calls and event handlers for batch execution during `instance().update()` |
 | **Extensible** | Implement custom `IAny` types for used-defined types, external or shared data storage |
@@ -112,8 +112,8 @@ public:
         (PROP, float, height, 100.f),
         (RPROP, int, id, 0),
         (EVT, on_clicked),
-        (FN, reset),
-        (FN, resize, (float, w), (float, h))
+        (FN, void, reset),
+        (FN, void, resize, (float, w), (float, h))
     )
 
     // Regular pure virtual function, part of the interface but not metadata.
@@ -131,13 +131,11 @@ public:
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
     // Implementations of the IMyWidget static metadata-defined functions "reset" and "resize"
-    IAny::Ptr fn_reset() override {
-        return nullptr;
+    void fn_reset() override {
     }
-    IAny::Ptr fn_resize(float w, float h) override {
+    void fn_resize(float w, float h) override {
         width().set_value(w);   // width property as defined in STRATA_INTERFACE
         height().set_value(h);
-        return nullptr;         // nullptr = void result
     }
 
     // Implementation of the pure virtual non-metadata function defined in IMyWidget
@@ -153,16 +151,16 @@ class ISerializable : public Interface<ISerializable>
 public:
     STRATA_INTERFACE(
         (PROP, std::string, name, ""),
-        (FN, serialize)
+        (FN, void, serialize)
     )
 };
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     // Implementations for the functions defined in IMyWidget and ISerializable static metadata
-    IAny::Ptr fn_reset() override { /* ... */ return nullptr; }                  // zero-arg
-    IAny::Ptr fn_resize(float w, float h) override { /* ... */ return nullptr; } // typed args
-    IAny::Ptr fn_serialize() override { /* ... */ return nullptr; }              // from ISerializable
+    void fn_reset() override { /* ... */ }                  // zero-arg
+    void fn_resize(float w, float h) override { /* ... */ } // typed args
+    void fn_serialize() override { /* ... */ }              // from ISerializable
 
     // Non-metadata paint() from IMyWidget
     void paint() override {}

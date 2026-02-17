@@ -14,12 +14,12 @@ This document covers STRATA_INTERFACE macro and its usage, as well as manual opt
 
 ```cpp
 STRATA_INTERFACE(
-    (PROP, Type, Name, Default),          // Property<Type> Name() const
-    (RPROP, Type, Name, Default),         // ConstProperty<Type> Name() const (read-only)
-    (EVT, Name),                          // Event Name() const
-    (FN, Name),                           // virtual fn_Name()          (zero-arg)
-    (FN, Name, (T1, a1), (T2, a2)),       // virtual fn_Name(T1 a1, T2 a2) (typed)
-    (FN_RAW, Name)                        // virtual fn_Name(FnArgs)   (raw untyped)
+    (PROP, Type, Name, Default),              // Property<Type> Name() const
+    (RPROP, Type, Name, Default),             // ConstProperty<Type> Name() const (read-only)
+    (EVT, Name),                              // Event Name() const
+    (FN, RetType, Name),                      // virtual RetType fn_Name()          (zero-arg)
+    (FN, RetType, Name, (T1, a1), (T2, a2)), // virtual RetType fn_Name(T1 a1, T2 a2) (typed)
+    (FN_RAW, Name)                            // virtual fn_Name(FnArgs)   (raw untyped)
 )
 ```
 
@@ -29,9 +29,9 @@ STRATA_INTERFACE(
 
 | Syntax | Virtual generated | Arg metadata | Use case |
 |--------|------------------|--------------|----------|
-| `(FN, reset)` | `fn_reset()` | none | Zero-arg functions |
-| `(FN, add, (int, x), (float, y))` | `fn_add(int x, float y)` | `FnArgDesc` per param | Typed args with reflection |
-| `(FN_RAW, process)` | `fn_process(FnArgs)` | none | Raw untyped args |
+| `(FN, void, reset)` | `void fn_reset()` | none | Zero-arg void functions |
+| `(FN, int, add, (int, x), (float, y))` | `int fn_add(int x, float y)` | `FnArgDesc` per param | Typed args with return value |
+| `(FN_RAW, process)` | `IAny::Ptr fn_process(FnArgs)` | none | Raw untyped args |
 
 All three variants generate:
 1. A pure virtual method (signature depends on variant)
@@ -39,7 +39,9 @@ All three variants generate:
 3. A `MemberDesc` with the trampoline pointer in the metadata array
 4. An accessor `Function Name() const`
 
-For typed-arg functions, the trampoline automatically extracts each argument from `FnArgs` using `IAny::get_data()` with type deduction from the member function pointer. If fewer arguments are provided than expected, the trampoline returns `INVALID_ARGUMENT`. Extra arguments are ignored.
+For `FN` members, `RetType` specifies the native C++ return type of the virtual method. The trampoline wraps the result into `IAny::Ptr` automatically: `void` returns `nullptr`, other types are wrapped via `Any<R>::clone()`. `FN_RAW` always returns `IAny::Ptr`.
+
+For typed-arg functions, the trampoline automatically extracts each argument from `FnArgs` using `IAny::get_data()` with type deduction from the member function pointer. If fewer arguments are provided than expected, the trampoline returns `nullptr`. Extra arguments are ignored.
 
 ## Argument metadata
 
@@ -80,8 +82,8 @@ public:
     STRATA_INTERFACE(
         (PROP, float, width, 0.f),
         (EVT, on_clicked),
-        (FN, reset),                        // zero-arg
-        (FN, add, (int, x), (float, y))     // typed args
+        (FN, void, reset),                        // zero-arg, void return
+        (FN, float, add, (int, x), (float, y))    // typed args, typed return
     )
 };
 
@@ -96,13 +98,14 @@ public:
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    IAny::Ptr fn_reset() override {
-        return nullptr;
+    void fn_reset() override {
+        // void return — trampoline returns nullptr to IFunction::invoke()
     }
 
-    IAny::Ptr fn_add(int x, float y) override {
+    float fn_add(int x, float y) override {
         // x and y are extracted from FnArgs automatically
-        return nullptr;
+        // return value is wrapped into IAny::Ptr by the trampoline
+        return x + y;
     }
 
     IAny::Ptr fn_serialize(FnArgs args) override {
@@ -161,13 +164,13 @@ public:
     static constexpr PropertyKind _strata_propkind_width =
         detail::PropBind<State, &State::width>::kind;
 
-    // 5a. Zero-arg FN: virtual + FnBind trampoline
-    virtual IAny::Ptr fn_reset() = 0;
+    // 5a. Zero-arg FN: virtual with native return type + FnBind trampoline
+    virtual void fn_reset() = 0;
     static constexpr FunctionKind _strata_fnkind_reset =
         detail::FnBind<&_strata_intf_type::fn_reset>::kind;
 
-    // 5b. Typed-arg FN: virtual with typed params + FnBind trampoline + FnArgDesc array
-    virtual IAny::Ptr fn_add(int x, float y) = 0;
+    // 5b. Typed-arg FN: virtual with typed params and return + FnBind trampoline + FnArgDesc array
+    virtual float fn_add(int x, float y) = 0;
     static constexpr FnArgDesc _strata_fnargs_add[] = {
         {"x", type_uid<int>()}, {"y", type_uid<float>()}
     };
