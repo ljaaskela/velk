@@ -17,7 +17,7 @@ namespace velk {
  * - @c bind() for trampoline-based virtual dispatch, used by VELK_INTERFACE
  *   to route @c invoke() calls to @c fn_Name() virtual methods on the interface.
  */
-class IFunctionInternal : public Interface<IFunctionInternal>
+class IFunctionInternal : public Interface<IFunctionInternal, IEvent>
 {
 public:
     /** @brief Sets the callback that will be called when IFunction::invoke is called. */
@@ -43,7 +43,7 @@ public:
     virtual void set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) = 0;
 };
 
-class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal, IEvent>
+class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Function);

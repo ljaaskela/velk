@@ -27,7 +27,7 @@ IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
     if (type == Deferred) {
         IVelk::DeferredTask task;
         task.fn = get_self<IFunction>();
-        task.args = std::make_shared<IVelk::DeferredArgs>(args);
+        task.args = ::velk::make_shared<IVelk::DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
         return nullptr;
     }
@@ -61,7 +61,7 @@ void FunctionImpl::invoke_handlers(FnArgs args) const
         return;
     }
     // Clone args once, share ownership across all deferred tasks
-    auto clonedArgs = std::make_shared<IVelk::DeferredArgs>(args);
+    auto clonedArgs = ::velk::make_shared<IVelk::DeferredArgs>(args);
 
     std::vector<IVelk::DeferredTask> tasks;
     tasks.reserve(deferred.size());

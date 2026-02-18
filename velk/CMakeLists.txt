@@ -12,11 +12,12 @@ endif()
 add_library(velk SHARED
     src/property.cpp
     src/property.h
-src/function.cpp
+    src/function.cpp
     src/function.h
     src/velk_export.h
     include/array_view.h
     include/common.h
+    include/memory.h
     include/string_view.h
     include/uid.h
     src/metadata_container.cpp

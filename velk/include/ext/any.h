@@ -258,7 +258,8 @@ private:
 /** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
 template<class T>
 IAny::Ptr create_any_ref(T* ptr) {
-    return IAny::Ptr(new AnyRef<T>(ptr), [](IAny* p) { p->unref(); });
+    auto* obj = new AnyRef<T>(ptr);
+    return IAny::Ptr(static_cast<IAny*>(obj));
 }
 
 } // namespace velk::ext

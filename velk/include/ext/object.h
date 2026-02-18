@@ -27,7 +27,7 @@ public:
     static constexpr array_view<MemberDesc> class_metadata{metadata.data(), metadata.size()};
 
     Object() = default;
-    ~Object() override = default;
+    ~Object() override { delete meta_; }
 
 public: // IMetadata overrides
     /** @brief Returns the static metadata descriptors, or an empty view if none. */
@@ -57,7 +57,7 @@ public: // IMetadataContainer override
     {
         // Allow one set (called by Velk at construction)
         if (!meta_) {
-            meta_.reset(metadata);
+            meta_ = metadata;
         }
     }
 
@@ -88,7 +88,7 @@ private:
         }
     };
 
-    std::unique_ptr<IMetadata> meta_;
+    IMetadata* meta_{};
     std::tuple<typename InterfaceState<Interfaces>::type...> states_;
 
     template<size_t I>

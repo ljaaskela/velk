@@ -12,6 +12,11 @@ This document describes the general architecture and code division in Velk.
 - [Type hierarchy across layers](#type-hierarchy-across-layers)
   - [Interface inheritance](#interface-inheritance)
   - [ext/ class hierarchy](#ext-class-hierarchy)
+- [ABI stability](#abi-stability)
+  - [STL replacement types](#stl-replacement-types)
+  - [What makes these ABI-safe](#what-makes-these-abi-safe)
+  - [shared_ptr dual mode](#shared_ptr-dual-mode)
+  - [What is NOT replaced](#what-is-not-replaced)
 - [Key types](#key-types)
 
 ## Layers
@@ -259,12 +264,64 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkImpl`) |
 | `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `VELK_INTERFACE` |
 
+## ABI stability
+
+Velk is distributed as a shared library (DLL/.so). Consumers compile against the public headers and link the DLL at runtime. This means every type that crosses the DLL boundary, function parameters, return values, struct members in public interfaces, must have an **identical memory layout** regardless of which compiler, standard library, or build flags the consumer uses.
+
+The C++ Standard Library does not guarantee ABI stability. `std::string_view`, `std::shared_ptr`, `std::span`, and other vocabulary types vary in size, alignment, and internal layout across compiler vendors and even between major versions of the same vendor. Passing an `std::shared_ptr` created by MSVC 2019 to code compiled with MSVC 2022 (or Clang, or a different STL implementation) is undefined behavior if the layouts differ.
+
+Velk' solution to this is to provide its own vocabulary types with fixed, documented layouts. These types are intentionally minimal, they implement only what the library needs, avoiding the full generality (and corresponding complexity) of their STL counterparts.
+
+### STL replacement types
+
+| Velk type | STL equivalent | Layout | Purpose |
+|---|---|---|---|
+| `string_view` | `std::string_view` | `{const char*, size_t}` = 16 bytes | Non-owning string reference in interface signatures and metadata |
+| `array_view<T>` | `std::span<const T>` | `{const T*, size_t}` = 16 bytes | Constexpr view over contiguous data (metadata arrays, member lists) |
+| `shared_ptr<T>` | `std::shared_ptr<T>` | `{T*, control_block*}` = 16 bytes | Shared ownership across DLL boundary with weak reference support |
+| `weak_ptr<T>` | `std::weak_ptr<T>` | `{T*, control_block*}` = 16 bytes | Non-owning observer that can attempt to lock a `shared_ptr` |
+| `refcnt_ptr<T>` | `std::shared_ptr<T>` (intrusive) | `{T*}` = 8 bytes | Lightweight intrusive refcounted pointer (no control block) |
+| `Uid` | — | `{uint64_t, uint64_t}` = 16 bytes | 128-bit type/interface identifier (constexpr FNV-1a or user-specified) |
+
+### What makes these ABI-safe
+
+1. **POD or near-POD layout.** Each type is a simple struct with primitive members (`T*`, `size_t`, `uint64_t`). No virtual functions, no inheritance, no compiler-generated padding surprises. The layout is the same on any C++17 compiler targeting the same platform.
+
+2. **No STL in the interface.** Public interface methods never accept or return STL types. A consumer can use any standard library implementation internally. The DLL boundary only sees Velk types.
+
+3. **Ref-counting lives in the object.** `IInterface` provides `ref()`/`unref()` virtuals. The `shared_ptr` calls these for IInterface-derived types, so the ref-counting logic is always in the DLL. Never duplicated or inlined differently across compilation units.
+
+4. **Control block is DLL-allocated.** The `control_block` is created inside the DLL by `create_control_block()`. Both the DLL and the consumer see the same 24-byte struct, but the DLL owns allocation and deallocation.
+
+### shared_ptr dual mode
+
+Velk's `shared_ptr<T>` operates in two modes depending on `T`:
+
+- **IInterface-derived types**: Intrusive. `shared_ptr` calls `ref()`/`unref()` on the object and only uses the `control_block` for weak reference support. Multiple independent `shared_ptr` instances can be created from raw pointers to the same object. They all share the object's intrusive ref count.
+
+- **Non-IInterface types** (e.g. `shared_ptr<int>`): External. A `control_block` is heap-allocated with a type-erased destructor, similar to `std::shared_ptr`. This mode is used internally but never crosses the DLL boundary.
+
+The mode is selected at compile time via `std::is_convertible_v<T*, IInterface*>`.
+
+### What is NOT replaced
+
+Types that do not cross the DLL boundary can safely use STL types:
+
+- `std::vector`, `std::unique_ptr`, `std::mutex`, `std::atomic` are used in internal implementations compiled into the DLL.
+- `std::string` — used in user `State` structs (the state pointer is passed as `void*` through `IPropertyState`, so the DLL never interprets the layout).
+- `std::tuple` — used in `ext::Object` for the states tuple, but only within user code that compiles against the same headers.
+
 ## Key types
 
 | Type | Role |
 |---|---|
+| `string_view` | ABI-stable non-owning string reference (`{const char*, size_t}`); replaces `std::string_view` at DLL boundaries |
+| `array_view<T>` | ABI-stable constexpr span-like view over contiguous const data (`{const T*, size_t}`); replaces `std::span` |
+| `shared_ptr<T>` | ABI-stable shared ownership pointer (`{T*, control_block*}`); intrusive for IInterface types, external for others |
+| `weak_ptr<T>` | ABI-stable non-owning observer (`{T*, control_block*}`); locks to a `shared_ptr` if the object is still alive |
+| `refcnt_ptr<T>` | Lightweight intrusive refcounted pointer (`{T*}`); calls `ref()`/`unref()` directly, no control block |
+| `control_block` | Shared ref-count block for `shared_ptr`/`weak_ptr` (`{atomic strong, atomic weak, destroy, ptr}` = 24 bytes) |
 | `Uid` | 128-bit identifier for types and interfaces; constexpr FNV-1a from type names or user-specified |
-| `array_view<T>` | Lightweight constexpr span-like view over contiguous const data |
 | `Interface<T, Base>` | CRTP base for interfaces; provides `UID`, `INFO`, smart pointer aliases, `ParentInterface` typedef for dispatch chain walking |
 | `ext::InterfaceDispatch<Interfaces...>` | Implements `get_interface` dispatching across a pack of interfaces and their parent interface chains |
 | `ext::RefCountedDispatch<Interfaces...>` | Extends `InterfaceDispatch` with atomic ref-counting (`ref`/`unref`) |

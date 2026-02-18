@@ -2,7 +2,7 @@
 #define INTF_INTERFACE_H
 
 #include <common.h>
-#include <memory>
+#include <memory.h>
 
 namespace velk {
 
@@ -24,13 +24,13 @@ public:
     /** @brief UID for the root interface (default-constructed, matches nothing specific). */
     static constexpr Uid UID{};
     /** @brief Shared pointer to a mutable IInterface. */
-    using Ptr = std::shared_ptr<IInterface>;
+    using Ptr = shared_ptr<IInterface>;
     /** @brief Shared pointer to a const IInterface. */
-    using ConstPtr = std::shared_ptr<const IInterface>;
+    using ConstPtr = shared_ptr<const IInterface>;
     /** @brief Weak pointer to a mutable IInterface. */
-    using WeakPtr = std::weak_ptr<IInterface>;
+    using WeakPtr = weak_ptr<IInterface>;
     /** @brief Weak pointer to a const IInterface. */
-    using ConstWeakPtr = std::weak_ptr<const IInterface>;
+    using ConstWeakPtr = weak_ptr<const IInterface>;
 
 public:
     /** @brief Returns a pointer to the requested interface, or nullptr if not supported. */
@@ -108,13 +108,13 @@ public:
     /** @brief Static descriptor containing the UID and human-readable name. */
     static constexpr InterfaceInfo INFO { compute_uid(), get_name<T>() };
     /** @brief Shared pointer to a mutable T. */
-    using Ptr = std::shared_ptr<T>;
+    using Ptr = shared_ptr<T>;
     /** @brief Shared pointer to a const T. */
-    using ConstPtr = std::shared_ptr<const T>;
+    using ConstPtr = shared_ptr<const T>;
     /** @brief Weak pointer to a mutable T. */
-    using WeakPtr = std::weak_ptr<T>;
+    using WeakPtr = weak_ptr<T>;
     /** @brief Weak pointer to a const T. */
-    using ConstWeakPtr = std::weak_ptr<const T>;
+    using ConstWeakPtr = weak_ptr<const T>;
     /** @brief Intrusive reference-counting pointer to T. */
     using RefPtr = refcnt_ptr<T>;
     /** @brief The parent interface type (Base), used for interface dispatch walking. */

@@ -30,7 +30,7 @@ public:
 };
 
 /** @brief Internal interface for initializing a property's backing IAny storage. */
-class IPropertyInternal : public Interface<IPropertyInternal>
+class IPropertyInternal : public Interface<IPropertyInternal, IProperty>
 {
 public:
     /**

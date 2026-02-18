@@ -48,7 +48,7 @@ public:
 /**
  * @brief Write-side interface for resolving a future with a value.
  */
-class IFutureInternal : public Interface<IFutureInternal>
+class IFutureInternal : public Interface<IFutureInternal, IFuture>
 {
 public:
     /**

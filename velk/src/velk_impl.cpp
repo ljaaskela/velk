@@ -71,10 +71,6 @@ IInterface::Ptr VelkImpl::create(Uid uid) const
 {
     if (auto *factory = find(uid)) {
         if (auto object = factory->create_instance()) {
-            if (auto shared = object->get_interface<ISharedFromObject>()) {
-                // Object can provide shared_ptr to itself
-                shared->set_self(object);
-            }
             if (auto *meta = interface_cast<IMetadataContainer>(object)) {
                 // Object can contain metadata
                 auto &info = factory->get_class_info();

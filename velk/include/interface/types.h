@@ -41,9 +41,9 @@ template <class T>
 typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
 {
     if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
-        return typename T::Ptr(obj, p); // aliasing constructor: shares ownership, stores adjusted pointer
+        return typename T::Ptr(p, obj.block());
     }
-    return nullptr;
+    return {};
 }
 
 /**
@@ -54,12 +54,12 @@ typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
  * @return A shared_ptr<const T> if the interface is supported, nullptr otherwise.
  */
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-typename T::ConstPtr interface_pointer_cast(const std::shared_ptr<U> &obj)
+typename T::ConstPtr interface_pointer_cast(const shared_ptr<U> &obj)
 {
     if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
-        return typename T::ConstPtr(obj, p); // aliasing constructor
+        return typename T::ConstPtr(p, obj.block());
     }
-    return nullptr;
+    return {};
 }
 
 /**
@@ -93,7 +93,7 @@ T *interface_cast(const IInterface::Ptr &obj)
  * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
  */
 template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-const T *interface_cast(const std::shared_ptr<U> &obj)
+const T *interface_cast(const shared_ptr<U> &obj)
 {
     return obj ? obj->template get_interface<T>() : nullptr;
 }

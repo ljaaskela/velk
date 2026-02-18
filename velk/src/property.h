@@ -9,7 +9,7 @@
 
 namespace velk {
 
-class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IProperty, IPropertyInternal>
+class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IPropertyInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Property);

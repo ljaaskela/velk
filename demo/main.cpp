@@ -480,24 +480,41 @@ void demo_function_context(IObject::Ptr& widget)
     cout << "=== demo_function_context done ===" << endl;
 }
 
-// Print sizeof for key types: state structs, MyWidget, ObjectCore variants.
+// Print sizeof for key types used in docs/performance.md memory layout section.
 void demo_sizes()
 {
     cout << endl << "=== demo_sizes ===" << endl;
 
-    cout << "  sizeof(float)            " << sizeof(float) << endl;
-    cout << "  sizeof(IObject::WeakPtr) " << sizeof(IObject::WeakPtr) << endl;
-    cout << "  sizeof(Any<float>)      " << sizeof(Any<float>) << endl;
-    cout << "  sizeof(AnyValue<float>) " << sizeof(ext::AnyValue<float>) << endl;
-    cout << "  sizeof(Property<float>) " << sizeof(Property<float>) << endl;
-    cout << "  sizeof(MyDataAny)        " << sizeof(MyDataAny) << endl;
-    cout << "  sizeof(IMyWidget::State) = " << sizeof(IMyWidget::State) << endl;
-    cout << "  sizeof(ISerializable::State) = " << sizeof(ISerializable::State) << endl;
-    cout << "  sizeof(MyWidget) = " << sizeof(MyWidget) << endl;
-    cout << "  sizeof(ObjectCore<X>) [minimal] = "
-              << sizeof(ext::ObjectCore<MyWidget>) << endl;
-    cout << "  sizeof(ObjectCore<X, ...4 interfaces>) = "
-              << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << endl;
+    // Smart pointers
+    cout << "Smart pointers:" << endl;
+    cout << "  control_block            " << sizeof(control_block) << endl;
+    cout << "  shared_ptr<IInterface>   " << sizeof(IInterface::Ptr) << endl;
+    cout << "  weak_ptr<IInterface>     " << sizeof(IInterface::WeakPtr) << endl;
+
+    // Base layers
+    cout << "Base layers:" << endl;
+    cout << "  IInterface               " << sizeof(IInterface) << endl;
+    cout << "  RefCountedDispatch<1>    " << sizeof(ext::RefCountedDispatch<IMyWidget>) << endl;
+    cout << "  ObjectCore<X, 1 intf>    " << sizeof(ext::ObjectCore<MyWidget, IMyWidget>) << endl;
+    cout << "  ObjectCore<X, 3 intfs>   "
+         << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << endl;
+
+    // Any types
+    cout << "Any types:" << endl;
+    cout << "  AnyValue<float>          " << sizeof(ext::AnyValue<float>) << endl;
+    cout << "  MyDataAny                " << sizeof(MyDataAny) << endl;
+
+    // MyWidget (Object with states)
+    cout << "MyWidget:" << endl;
+    cout << "  IMyWidget::State         " << sizeof(IMyWidget::State) << endl;
+    cout << "  ISerializable::State     " << sizeof(ISerializable::State) << endl;
+    cout << "  MyWidget                 " << sizeof(MyWidget) << endl;
+
+    // Wrappers
+    cout << "Wrappers:" << endl;
+    cout << "  Any<float>               " << sizeof(Any<float>) << endl;
+    cout << "  Property<float>          " << sizeof(Property<float>) << endl;
+    cout << "  LazyEvent                " << sizeof(ext::LazyEvent) << endl;
 
     cout << "=== demo_sizes done ===" << endl;
 }

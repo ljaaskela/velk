@@ -3,24 +3,11 @@
 #include "property.h"
 
 #include <api/velk.h>
+#include <ext/core_object.h>
 #include <interface/intf_function.h>
 #include <interface/types.h>
 
 namespace velk {
-
-namespace {
-
-template<class T>
-IObject::Ptr make_shared_impl()
-{
-    IObject::Ptr obj(new T, [](IObject* p) { p->unref(); });
-    if (auto* s = obj->template get_interface<ISharedFromObject>()) {
-        s->set_self(obj);
-    }
-    return obj;
-}
-
-} // namespace
 
 MetadataContainer::MetadataContainer(array_view<MemberDesc> members, IInterface* owner)
     : members_(members), owner_(owner)
@@ -37,7 +24,7 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     IInterface::Ptr created;
     switch (desc.kind) {
     case MemberKind::Property: {
-        created = make_shared_impl<PropertyImpl>();
+        created = ext::make_object<PropertyImpl>();
         if (auto *pi = created->get_interface<IPropertyInternal>()) {
             if (auto* pk = desc.propertyKind()) {
                 // Try state-backed ref first
@@ -69,7 +56,7 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     case MemberKind::Event:
         [[fallthrough]];
     case MemberKind::Function:
-        created = make_shared_impl<FunctionImpl>();
+        created = ext::make_object<FunctionImpl>();
         break;
     }
     return created;

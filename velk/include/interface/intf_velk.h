@@ -1,7 +1,6 @@
 #ifndef INTF_VELK_H
 #define INTF_VELK_H
 
-#include <memory>
 #include <vector>
 
 #include <interface/intf_future.h>
@@ -76,7 +75,7 @@ public:
         /** @brief The function to invoke. */
         IFunction::ConstPtr fn;
         /** @brief Cloned function args. Shared across tasks that originated from the same invocation. */
-        std::shared_ptr<DeferredArgs> args;
+        shared_ptr<DeferredArgs> args;
     };
     /**
      * @brief Enqueues tasks to be executed on the next update() call.

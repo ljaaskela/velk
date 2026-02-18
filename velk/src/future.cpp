@@ -71,7 +71,7 @@ void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result)
     } else {
         IVelk::DeferredTask task;
         task.fn = cont.fn;
-        task.args = std::make_shared<IVelk::DeferredArgs>(args);
+        task.args = ::velk::make_shared<IVelk::DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
     }
 }

@@ -13,7 +13,7 @@
 
 namespace velk {
 
-class FutureImpl final : public ext::ObjectCore<FutureImpl, IFuture, IFutureInternal>
+class FutureImpl final : public ext::ObjectCore<FutureImpl, IFutureInternal>
 {
 public:
     VELK_CLASS_UID(ClassId::Future);

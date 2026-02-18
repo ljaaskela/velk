@@ -11,10 +11,23 @@
 
 namespace velk::ext {
 
+/** @brief Creates a new T, initialises its control block, sets self-pointer, and wraps it in a shared_ptr. */
+template<class T>
+IObject::Ptr make_object()
+{
+    auto* obj = new T;
+    auto* block = obj->create_control_block();
+    IObject::Ptr result(static_cast<IObject*>(obj), block, adopt_ref);
+    if (auto* s = obj->template get_interface<ISharedFromObject>()) {
+        s->set_self(result);
+    }
+    return result;
+}
+
 /**
  * @brief Default IObjectFactory implementation that creates instances of FinalClass.
  *
- * Created objects are wrapped in a shared_ptr with a custom deleter that calls unref().
+ * Created objects are wrapped in a shared_ptr that calls unref() on release.
  *
  * @tparam FinalClass The concrete class to instantiate.
  */
@@ -28,8 +41,7 @@ public:
 public:
     IObject::Ptr create_instance() const override
     {
-        // Custom deleter for factory-created shared_ptrs which just decrease refcount
-        return std::shared_ptr<FinalClass>(new FinalClass, [](FinalClass *p) { p->unref(); });
+        return make_object<FinalClass>();
     }
 };
 
