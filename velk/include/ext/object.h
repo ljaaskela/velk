@@ -89,6 +89,11 @@ private:
     };
 
     IMetadata* meta_{};
+    // Heterogeneous storage for each interface's State struct (e.g. IMyWidget::State,
+    // ISerializable::State). Requires std::tuple because each State is a different type
+    // with its own size, alignment, and constructor/destructor. This is safe across the
+    // DLL boundary: the tuple lives inline in the consumer-compiled Object<T> template
+    // and is never passed to or interpreted by the DLL.
     std::tuple<typename InterfaceState<Interfaces>::type...> states_;
 
     template<size_t I>
