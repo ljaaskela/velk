@@ -18,7 +18,7 @@ VELK_INTERFACE(
     (RPROP, Type, Name, Default),             // ConstProperty<Type> Name() const (read-only)
     (EVT, Name),                              // Event Name() const
     (FN, RetType, Name),                      // virtual RetType fn_Name()          (zero-arg)
-    (FN, RetType, Name, (T1, a1), (T2, a2)), // virtual RetType fn_Name(T1 a1, T2 a2) (typed)
+    (FN, RetType, Name, (T1, a1), (T2, a2)),  // virtual RetType fn_Name(T1 a1, T2 a2) (typed)
     (FN_RAW, Name)                            // virtual fn_Name(FnArgs)   (raw untyped)
 )
 ```

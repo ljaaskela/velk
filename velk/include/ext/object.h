@@ -24,6 +24,7 @@ class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
     static constexpr auto metadata = CollectedMetadata<Interfaces...>::value;
+    static constexpr array_view<MemberDesc> class_metadata{metadata.data(), metadata.size()};
 
     Object() = default;
     ~Object() override = default;
@@ -80,7 +81,8 @@ private:
             static constexpr ClassInfo info{
                 FinalClass::get_class_uid(),
                 FinalClass::get_class_name(),
-                {FinalClass::metadata.data(), FinalClass::metadata.size()}
+                FinalClass::class_interfaces,
+                FinalClass::class_metadata
             };
             return info;
         }

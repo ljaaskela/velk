@@ -45,7 +45,11 @@ class DefaultFactory : public ObjectFactory<FinalClass>
 {
     const ClassInfo &get_class_info() const override
     {
-        static constexpr ClassInfo info{FinalClass::get_class_uid(), FinalClass::get_class_name()};
+        static constexpr ClassInfo info{
+            FinalClass::get_class_uid(),
+            FinalClass::get_class_name(),
+            FinalClass::class_interfaces
+        };
         return info;
     }
 };
@@ -72,6 +76,12 @@ public:
     ~ObjectCore() override = default;
 
 public:
+    /** @brief Compile-time list of all interfaces implemented by this class. */
+    static constexpr InterfaceInfo class_interfaces_[] = {
+        ISharedFromObject::INFO, Interfaces::INFO...
+    };
+    static constexpr array_view<InterfaceInfo> class_interfaces{class_interfaces_, 1 + sizeof...(Interfaces)};
+
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr std::string_view get_class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
