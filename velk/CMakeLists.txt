@@ -61,3 +61,15 @@ target_include_directories(velk
 )
 
 target_compile_definitions(velk PRIVATE VELK_EXPORTS)
+
+# No RTTI, no exceptions for the library itself.
+# Strip CMake's default /EHsc and /GR to avoid D9025 override warnings.
+# These string(REPLACE) calls are directory-scoped and only affect targets in this subdirectory.
+if(MSVC)
+    string(REPLACE "/EHsc" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    string(REPLACE "/GR" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
+    target_compile_options(velk PRIVATE /GR- /EHs-c-)
+    target_compile_definitions(velk PRIVATE _HAS_EXCEPTIONS=0)
+else()
+    target_compile_options(velk PRIVATE -fno-rtti -fno-exceptions)
+endif()
