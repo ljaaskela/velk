@@ -35,13 +35,13 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget>
 };
 ```
 
-The UID string is validated at compile time — a malformed or wrong-length string produces a compile error.
+The UID string is validated at compile time; a malformed or wrong-length string produces a compile error.
 
 User-specified UIDs are useful when you want to:
 
 - **Export stable UIDs** in public headers without exposing internal class names.
 - **Create instances by well-known UID** across DLL boundaries, where class names may differ.
-- **Maintain ABI stability** — auto-generated UIDs change if the class is renamed or moved to a different namespace.
+- **Maintain ABI stability**, auto-generated UIDs change if the class is renamed or moved to a different namespace.
 
 For example, the built-in `Property`, `Function` and `Future` objects use this mechanism. Their UIDs are defined in `ClassId` namespace in `types.h`:
 

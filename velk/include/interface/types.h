@@ -15,6 +15,7 @@ struct ClassInfo
 {
     const Uid uid;
     const std::string_view name;
+    const array_view<InterfaceInfo> interfaces; // interfaces implemented by this class
     const array_view<MemberDesc> members; // empty when no metadata
 };
 
