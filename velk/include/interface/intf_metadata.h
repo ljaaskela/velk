@@ -14,7 +14,6 @@
 #include <interface/intf_property.h>
 
 #include <cstdint>
-#include <string_view>
 #include <type_traits>
 #include <utility>
 
@@ -38,7 +37,7 @@ struct PropertyKind {
 
 /** @brief Describes a single argument of a typed function. */
 struct FnArgDesc {
-    std::string_view name;  ///< Parameter name (e.g. "x").
+    string_view name;  ///< Parameter name (e.g. "x").
     Uid typeUid;            ///< type_uid<T>() for the parameter type.
 };
 
@@ -50,7 +49,7 @@ struct FunctionKind {
 
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
 struct MemberDesc {
-    std::string_view name;              ///< Member name used for runtime lookup.
+    string_view name;              ///< Member name used for runtime lookup.
     MemberKind kind;                    ///< Discriminator (Property, Event, or Function).
     const InterfaceInfo* interfaceInfo; ///< Interface that declared this member.
     const void* ext = nullptr;          ///< Points to PropertyKind or FunctionKind based on @c kind.
@@ -74,7 +73,7 @@ struct MemberDesc {
  * @param info Interface that declares this member (may be nullptr).
  * @param pk PropertyKind with typeUid, getDefault, and createRef (may be nullptr).
  */
-constexpr MemberDesc PropertyDesc(std::string_view name, const InterfaceInfo* info = nullptr,
+constexpr MemberDesc PropertyDesc(string_view name, const InterfaceInfo* info = nullptr,
     const PropertyKind* pk = nullptr)
 {
     return {name, MemberKind::Property, info, pk};
@@ -103,7 +102,7 @@ T get_default_value(const MemberDesc& desc) {
  * @param name Member name for runtime lookup.
  * @param info Interface that declares this member (may be nullptr).
  */
-constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info = nullptr)
+constexpr MemberDesc EventDesc(string_view name, const InterfaceInfo* info = nullptr)
 {
     return {name, MemberKind::Event, info};
 }
@@ -114,7 +113,7 @@ constexpr MemberDesc EventDesc(std::string_view name, const InterfaceInfo* info 
  * @param info Interface that declares this member (may be nullptr).
  * @param fk FunctionKind with trampoline and argument descriptors (may be nullptr).
  */
-constexpr MemberDesc FunctionDesc(std::string_view name, const InterfaceInfo* info = nullptr,
+constexpr MemberDesc FunctionDesc(string_view name, const InterfaceInfo* info = nullptr,
     const FunctionKind* fk = nullptr)
 {
     return {name, MemberKind::Function, info, fk};
@@ -163,11 +162,11 @@ public:
     virtual array_view<MemberDesc> get_static_metadata() const = 0;
 
     /** @brief Returns the runtime property instance for the named member, or nullptr. */
-    virtual IProperty::Ptr get_property(std::string_view name) const = 0;
+    virtual IProperty::Ptr get_property(string_view name) const = 0;
     /** @brief Returns the runtime event instance for the named member, or nullptr. */
-    virtual IEvent::Ptr get_event(std::string_view name) const = 0;
+    virtual IEvent::Ptr get_event(string_view name) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
-    virtual IFunction::Ptr get_function(std::string_view name) const = 0;
+    virtual IFunction::Ptr get_function(string_view name) const = 0;
 };
 
 /**
@@ -176,7 +175,7 @@ public:
  * @param name Property name to look up.
  * @return The runtime property instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IProperty::Ptr get_property(const IMetadata* meta, std::string_view name)
+inline IProperty::Ptr get_property(const IMetadata* meta, string_view name)
 {
     return meta ? meta->get_property(name) : nullptr;
 }
@@ -187,7 +186,7 @@ inline IProperty::Ptr get_property(const IMetadata* meta, std::string_view name)
  * @param name Event name to look up.
  * @return The runtime event instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IEvent::Ptr get_event(const IMetadata* meta, std::string_view name)
+inline IEvent::Ptr get_event(const IMetadata* meta, string_view name)
 {
     return meta ? meta->get_event(name) : nullptr;
 }
@@ -198,7 +197,7 @@ inline IEvent::Ptr get_event(const IMetadata* meta, std::string_view name)
  * @param name Function name to look up.
  * @return The runtime function instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IFunction::Ptr get_function(const IMetadata* meta, std::string_view name)
+inline IFunction::Ptr get_function(const IMetadata* meta, string_view name)
 {
     return meta ? meta->get_function(name) : nullptr;
 }
@@ -222,7 +221,7 @@ public:
  * @param args Function arguments.
  */
 inline IAny::Ptr invoke_function(const IInterface *o,
-                                   std::string_view name,
+                                   string_view name,
                                    FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
@@ -236,7 +235,7 @@ inline IAny::Ptr invoke_function(const IInterface *o,
  * @param arg Single argument to pass.
  */
 inline IAny::Ptr invoke_function(const IInterface *o,
-                                   std::string_view name,
+                                   string_view name,
                                    const IAny *arg)
 {
     FnArgs args{&arg, 1};
@@ -250,7 +249,7 @@ inline IAny::Ptr invoke_function(const IInterface *o,
  * @param args Event arguments.
  */
 inline ReturnValue invoke_event(const IInterface *o,
-                                std::string_view name,
+                                string_view name,
                                 FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
@@ -264,7 +263,7 @@ inline ReturnValue invoke_event(const IInterface *o,
  * @param arg Single argument to pass.
  */
 inline ReturnValue invoke_event(const IInterface *o,
-                                std::string_view name,
+                                string_view name,
                                 const IAny *arg)
 {
     FnArgs args{&arg, 1};
@@ -280,7 +279,7 @@ inline ReturnValue invoke_event(const IInterface *o,
  * @param args Two or more IAny-convertible arguments.
  */
 template<class... Args, detail::require_any_args<Args...> = 0>
-IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
     auto* meta = interface_cast<IMetadata>(o);
@@ -302,7 +301,7 @@ FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 
 /** @brief Invokes a named function with multiple value arguments. */
 template<class... Args, detail::require_value_args<Args...> = 0>
-IAny::Ptr invoke_function(const IInterface* o, std::string_view name, const Args&... args)
+IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
     const IAny* ptrs[sizeof...(Args)];

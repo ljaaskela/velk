@@ -18,9 +18,9 @@ public: // IPropertyState (inherited via IMetadata — state lives in the Object
 
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
-    IProperty::Ptr get_property(std::string_view name) const override;
-    IEvent::Ptr get_event(std::string_view name) const override;
-    IFunction::Ptr get_function(std::string_view name) const override;
+    IProperty::Ptr get_property(string_view name) const override;
+    IEvent::Ptr get_event(string_view name) const override;
+    IFunction::Ptr get_function(string_view name) const override;
 
 private:
     array_view<MemberDesc> members_;
@@ -38,7 +38,7 @@ private:
     mutable std::unique_ptr<DynamicMembers> dynamic_;
 
     // Helper: find static member by name+kind, lazily create if needed
-    IInterface::Ptr find_or_create(std::string_view name, MemberKind kind) const;
+    IInterface::Ptr find_or_create(string_view name, MemberKind kind) const;
     IInterface::Ptr create(MemberDesc desc) const;
     void bind(const MemberDesc &m, const IInterface::Ptr &fn) const;
 };

@@ -36,17 +36,17 @@ public: // IMetadata overrides
         return meta_ ? meta_->get_static_metadata() : array_view<MemberDesc>{};
     }
     /** @brief Looks up a property by name, or returns nullptr. */
-    IProperty::Ptr get_property(std::string_view name) const override
+    IProperty::Ptr get_property(string_view name) const override
     {
         return meta_ ? meta_->get_property(name) : nullptr;
     }
     /** @brief Looks up an event by name, or returns nullptr. */
-    IEvent::Ptr get_event(std::string_view name) const override
+    IEvent::Ptr get_event(string_view name) const override
     {
         return meta_ ? meta_->get_event(name) : nullptr;
     }
     /** @brief Looks up a function by name, or returns nullptr. */
-    IFunction::Ptr get_function(std::string_view name) const override
+    IFunction::Ptr get_function(string_view name) const override
     {
         return meta_ ? meta_->get_function(name) : nullptr;
     }
