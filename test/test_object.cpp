@@ -248,6 +248,23 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
     EXPECT_EQ(info->members[4].kind, MemberKind::Function);
 }
 
+TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
+{
+    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    ASSERT_NE(info, nullptr);
+
+    // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
+    // ObjectCore dispatch pack: ISharedFromObject, IMetadataContainer, ITestWidget, ITestSerializable, ITestMath, ITestRaw
+    EXPECT_EQ(info->interfaces.size(), 6u);
+
+    EXPECT_EQ(info->interfaces[0].uid, ISharedFromObject::UID);
+    EXPECT_EQ(info->interfaces[1].uid, IMetadataContainer::UID);
+    EXPECT_EQ(info->interfaces[2].uid, ITestWidget::UID);
+    EXPECT_EQ(info->interfaces[3].uid, ITestSerializable::UID);
+    EXPECT_EQ(info->interfaces[4].uid, ITestMath::UID);
+    EXPECT_EQ(info->interfaces[5].uid, ITestRaw::UID);
+}
+
 TEST_F(ObjectTest, StaticDefaultValues)
 {
     auto* info = instance().get_class_info(TestWidget::get_class_uid());

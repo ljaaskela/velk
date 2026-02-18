@@ -282,4 +282,4 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | `Callback` | Creates and owns an `IFunction` from `ReturnValue(FnArgs)` callbacks or typed lambdas |
 | `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `MemberDesc` | Describes a property, event, or function member |
-| `ClassInfo` | UID, name, and `array_view<MemberDesc>` for a registered class |
+| `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |

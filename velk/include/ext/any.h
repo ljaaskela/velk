@@ -23,6 +23,12 @@ template<class FinalClass, class... Interfaces>
 class AnyBase : public RefCountedDispatch<IAny, Interfaces...>
 {
 public:
+    /** @brief Compile-time list of all interfaces implemented by this class. */
+    static constexpr InterfaceInfo class_interfaces_[] = {
+        IAny::INFO, Interfaces::INFO...
+    };
+    static constexpr array_view<InterfaceInfo> class_interfaces{class_interfaces_, 1 + sizeof...(Interfaces)};
+
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr std::string_view get_class_name() { return get_name<FinalClass>(); }
     /** @brief Returns a default UID (overridden by typed subclasses). */

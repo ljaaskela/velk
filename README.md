@@ -197,7 +197,10 @@ Static metadata is available from Velk without creating an instance:
 
 ```cpp
 if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {  // lookup by UID
-    for (auto& m : info->members) {
+    for (auto& i : info->interfaces) {                             // enumerate interfaces
+        // i.uid, i.name
+    }
+    for (auto& m : info->members) {                                // enumerate members
         // m.name, m.kind, m.interfaceInfo
     }
 }
