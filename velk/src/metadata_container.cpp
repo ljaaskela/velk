@@ -96,7 +96,7 @@ void MetadataContainer::bind(const MemberDesc &m, const IInterface::Ptr &fn) con
     }
 }
 
-IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberKind kind) const
+IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind kind) const
 {
     auto matches = [&](const MemberDesc &m) { return m.kind == kind && m.name == name; };
 
@@ -122,17 +122,17 @@ IInterface::Ptr MetadataContainer::find_or_create(std::string_view name, MemberK
     return created;
 }
 
-IProperty::Ptr MetadataContainer::get_property(std::string_view name) const
+IProperty::Ptr MetadataContainer::get_property(string_view name) const
 {
     return interface_pointer_cast<IProperty>(find_or_create(name, MemberKind::Property));
 }
 
-IEvent::Ptr MetadataContainer::get_event(std::string_view name) const
+IEvent::Ptr MetadataContainer::get_event(string_view name) const
 {
     return interface_pointer_cast<IEvent>(find_or_create(name, MemberKind::Event));
 }
 
-IFunction::Ptr MetadataContainer::get_function(std::string_view name) const
+IFunction::Ptr MetadataContainer::get_function(string_view name) const
 {
     return interface_pointer_cast<IFunction>(find_or_create(name, MemberKind::Function));
 }

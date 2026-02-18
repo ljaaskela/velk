@@ -3,7 +3,7 @@
 
 #include <cstdint>
 #include <ostream>
-#include <string_view>
+#include <string_view.h>
 
 namespace velk {
 
@@ -14,7 +14,7 @@ constexpr bool is_hex_digit(char c)
 }
 
 /** @brief Returns true if @p str is a valid UUID string (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). */
-constexpr bool is_valid_uid_format(std::string_view str)
+constexpr bool is_valid_uid_format(string_view str)
 {
     if (str.size() != 36) return false;
     for (size_t i = 0; i < 36; ++i) {
@@ -42,14 +42,14 @@ struct Uid {
 
     /** @brief Constructs a Uid from a string literal. Validates length at compile time. */
     template<size_t N>
-    constexpr Uid(const char (&str)[N]) : Uid(std::string_view(str, N - 1))
+    constexpr Uid(const char (&str)[N]) : Uid(string_view(str, N - 1))
     {
         static_assert(N == 37, "Uid string must be 36 characters (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
     }
 
     /** @brief Constructs a Uid from a UUID string (e.g. "cc262192-d151-941f-d542-d4c622b50b09").
      *  In constexpr context, a malformed string produces a compile error. */
-    constexpr Uid(std::string_view str) : hi(0), lo(0)
+    constexpr Uid(string_view str) : hi(0), lo(0)
     {
         if (!is_valid_uid_format(str)) {
             // Non-constexpr call makes the compiler reject bad UIDs in constexpr context.
@@ -137,7 +137,7 @@ constexpr Uid fnv128_multiply(Uid x)
  * @param toHash The string to hash.
  * @return The computed 128-bit Uid.
  */
-constexpr Uid make_hash(const std::string_view toHash)
+constexpr Uid make_hash(const string_view toHash)
 {
     // FNV-1a 128-bit: offset basis and prime from the FNV spec
     Uid result{0x6c62272e07bb0142, 0x62b821756295c58d};

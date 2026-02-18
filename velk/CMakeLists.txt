@@ -17,6 +17,7 @@ src/function.cpp
     src/velk_export.h
     include/array_view.h
     include/common.h
+    include/string_view.h
     include/uid.h
     src/metadata_container.cpp
     src/metadata_container.h

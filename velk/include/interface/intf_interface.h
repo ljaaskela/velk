@@ -9,7 +9,7 @@ namespace velk {
 /** @brief Static descriptor for an interface type, providing its UID and name. */
 struct InterfaceInfo {
     Uid uid;
-    std::string_view name;
+    string_view name;
 };
 
 /**

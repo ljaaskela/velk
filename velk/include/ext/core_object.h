@@ -83,7 +83,7 @@ public:
     static constexpr array_view<InterfaceInfo> class_interfaces{class_interfaces_, 1 + sizeof...(Interfaces)};
 
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr std::string_view get_class_name() noexcept { return get_name<FinalClass>(); }
+    static constexpr string_view get_class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
     static constexpr Uid get_class_uid() noexcept
     {

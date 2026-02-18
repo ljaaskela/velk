@@ -26,6 +26,8 @@ add_executable(tests
     test_function.cpp
     test_object.cpp
     test_uid.cpp
+    test_string_view.cpp
+    test_shared_ptr.cpp
 )
 
 target_link_libraries(tests PRIVATE velk GTest::gtest_main)
