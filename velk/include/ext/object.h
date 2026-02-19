@@ -80,7 +80,7 @@ private:
         {
             static constexpr ClassInfo info{
                 FinalClass::get_class_uid(),
-                FinalClass::get_class_name(),
+                FinalClass::get_static_class_name(),
                 FinalClass::class_interfaces,
                 FinalClass::class_metadata
             };

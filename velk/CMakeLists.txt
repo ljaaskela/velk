@@ -47,6 +47,7 @@ add_library(velk SHARED
     include/api/future.h
     include/api/function.h
     include/api/function_context.h
+    include/api/traits.h
     include/api/velk.h
     include/ext/any.h
     include/ext/core_object.h

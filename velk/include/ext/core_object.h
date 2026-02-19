@@ -2,6 +2,7 @@
 #define EXT_CORE_OBJECT_H
 
 #include <common.h>
+#include <api/traits.h>
 #include <ext/interface_dispatch.h>
 #include <ext/refcounted_dispatch.h>
 #include <interface/intf_any.h>
@@ -59,24 +60,35 @@ class DefaultFactory : public ObjectFactory<FinalClass>
     {
         static constexpr ClassInfo info{
             FinalClass::get_class_uid(),
-            FinalClass::get_class_name(),
+            FinalClass::get_static_class_name(),
             FinalClass::class_interfaces
         };
         return info;
     }
 };
 
+// IObject detection: walks ParentInterface chains to check if IObject is already reachable.
+
+/** @brief Selects the RefCountedDispatch base, prepending IObject only if not already reachable. */
+template<bool HasIObject, class... Interfaces>
+struct ObjectCoreBase { using type = RefCountedDispatch<IObject, Interfaces...>; };
+
+template<class... Interfaces>
+struct ObjectCoreBase<true, Interfaces...> { using type = RefCountedDispatch<Interfaces...>; };
+
 /**
  * @brief CRTP base for concrete Velk objects (without metadata).
  *
  * Provides automatic class name/UID generation, self-pointer management,
- * and a static factory for Velk integration.
+ * and a static factory for Velk integration. IObject is added to the
+ * interface pack only if not already reachable through the Interfaces.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class ObjectCore : public RefCountedDispatch<IObject, Interfaces...>
+class ObjectCore : public ObjectCoreBase<
+    (detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
 {
     template<class T, class = void>
     struct has_class_uid : std::false_type {};
@@ -89,7 +101,7 @@ public:
 
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr string_view get_class_name() noexcept { return get_name<FinalClass>(); }
+    static constexpr string_view get_static_class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
     static constexpr Uid get_class_uid() noexcept
     {
@@ -100,14 +112,19 @@ public:
         }
     }
 
+public: // IObject
+    string_view get_class_name() const override
+    {
+        return get_static_class_name();
+    }
+
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
     IObject::Ptr get_self() const override
     {
         auto* block = this->get_block();
-        // No self set, or object already destroyed (strong count reached zero)
-        if (!block || !block->ptr || block->strong.load(std::memory_order_acquire) == 0)
-            return {};
-        return IObject::Ptr(static_cast<IObject*>(block->ptr), block);
+        // No self set, or object already destroyed (strong count reached zero) -> return {}
+        return block && block->ptr && block->strong.load(std::memory_order_acquire) ?
+            IObject::Ptr(static_cast<IObject*>(block->ptr), block) : nullptr;
     }
 
     template<class T>

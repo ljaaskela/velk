@@ -3,6 +3,7 @@
 
 #include <tuple>
 #include <type_traits>
+#include <interface/intf_object.h>
 
 namespace velk {
 
@@ -16,6 +17,17 @@ class IAny; // forward declaration for convertibility checks
  * Future, Any, and the VELK_INTERFACE macro machinery.
  */
 namespace detail {
+
+// IObject introspection
+
+/** @brief Returns true if T is IObject or has IObject as an ancestor via ParentInterface. */
+template<class T>
+constexpr bool has_iobject_in_chain()
+{
+    if constexpr (std::is_same_v<T, IObject>) return true;
+    else if constexpr (std::is_same_v<T, IInterface>) return false;
+    else return has_iobject_in_chain<typename T::ParentInterface>();
+}
 
 // Callable introspection
 

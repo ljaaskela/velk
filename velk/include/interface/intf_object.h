@@ -10,6 +10,9 @@ namespace velk {
 class IObject : public Interface<IObject>
 {
 public:
+    /** @brief Returns the name of the class. */
+    virtual string_view get_class_name() const = 0;
+
     /** @brief Returns a shared_ptr to this object, or empty if not available. */
     virtual Ptr get_self() const = 0;
 };

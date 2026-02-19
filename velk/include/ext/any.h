@@ -14,41 +14,24 @@ namespace velk::ext {
 /**
  * @brief Base class for IAny implementations.
  *
- * Inherits RefCountedDispatch directly with IAny (no ObjectCore or metadata).
+ * Inherits ObjectCore with IAny. Since IAny already has IObject in its parent chain,
+ * ObjectCore detects this and does not add a redundant IObject to the interface pack.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template<class FinalClass, class... Interfaces>
-class AnyBase : public RefCountedDispatch<IAny, Interfaces...>
+class AnyBase : public ObjectCore<FinalClass, IAny, Interfaces...>
 {
 public:
-    /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr string_view get_class_name() { return get_name<FinalClass>(); }
     /** @brief Returns a default UID (overridden by typed subclasses). */
     static constexpr Uid get_class_uid() { return {}; }
-
-    /** @brief Returns a shared_ptr to this object, or empty if expired. */
-    IObject::Ptr get_self() const override
-    {
-        auto* block = this->get_block();
-        if (!block || !block->ptr || block->strong.load(std::memory_order_acquire) == 0)
-            return {};
-        return IObject::Ptr(static_cast<IObject*>(block->ptr), block);
-    }
 
     /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */
     IAny::Ptr clone() const override
     {
         auto clone = FinalClass::get_factory().template create_instance<IAny>();
         return clone && succeeded(clone->copy_from(*this)) ? clone : nullptr;
-    }
-
-    /** @brief Returns the singleton factory for creating instances of FinalClass. */
-    static const IObjectFactory &get_factory()
-    {
-        static DefaultFactory<FinalClass> factory_;
-        return factory_;
     }
 };
 
