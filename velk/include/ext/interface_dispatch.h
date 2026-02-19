@@ -164,9 +164,16 @@ public:
         return static_cast<T *>(get_interface(T::UID));
     }
 
-    /** @brief No-op. Override in a derived class to add reference counting. */
+    /**
+     * @brief No-op. Override in a derived class to add reference counting.
+     *
+     * @warning Objects that use no-op ref/unref must not be wrapped in
+     * velk::shared_ptr, as the pointer will call unref() on release which
+     * does nothing, silently leaking the object. Use RefCountedDispatch
+     * (or implement ref/unref yourself) for shared_ptr-managed objects.
+     */
     void ref() override {}
-    /** @brief No-op. Override in a derived class to add reference counting. */
+    /** @copydoc ref() */
     void unref() override {}
 
 protected:
