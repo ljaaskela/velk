@@ -43,6 +43,18 @@ public:
     virtual void set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) = 0;
 };
 
+/**
+ * @brief Default IFunction/IEvent/IFunctionInternal implementation.
+ *
+ * Supports three dispatch mechanisms for invoke():
+ * 1. **Bound trampoline** (bind()): routes through a static trampoline to a
+ *    virtual fn_Name() method on the owning interface. Used by VELK_INTERFACE.
+ * 2. **Raw callback** (set_invoke_callback()): direct function pointer dispatch.
+ * 3. **Owned callback** (set_owned_callback()): heap-allocated callable with
+ *    type-erased context and deleter. Used by Callback for capturing lambdas.
+ *
+ * As an IEvent, maintains a partitioned handler list (immediate then deferred).
+ */
 class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal>
 {
 public:

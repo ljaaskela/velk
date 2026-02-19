@@ -9,6 +9,14 @@
 
 namespace velk {
 
+/**
+ * @brief Default IProperty/IPropertyInternal implementation.
+ *
+ * Stores a type-erased value via an IAny pointer. Fires on_changed when
+ * set_value/set_data modifies the value. Supports read-only mode via
+ * ObjectFlags::ReadOnly. When the backing IAny implements IExternalAny,
+ * automatically relays its on_data_changed event to the property's on_changed.
+ */
 class PropertyImpl final : public ext::ObjectCore<PropertyImpl, IPropertyInternal>
 {
 public:

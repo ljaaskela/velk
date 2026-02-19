@@ -101,7 +101,7 @@ MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               88  │      │ base (InterfaceDispatch)   16  │
 │   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
-│ refCount + flags              8  │      │ owner_ (pointer)            8  │
+│ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
 │ meta_ (unique_ptr)            8  │      │ dynamic_ (unique_ptr)       8  │
 │ IMyWidget::State              8  │      └────────────────────────────────┘
@@ -127,11 +127,11 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 
 ### Common base layers
 
-Every object starts with the same infrastructure. Multiple inheritance adds one vtable pointer per interface chain (MSVC x64). Each `RefCountedDispatch` stores an `ObjectData` struct containing the intrusive reference count, object flags, and a `control_block*` for `shared_ptr`/`weak_ptr` support.
+Every object starts with the same infrastructure. Multiple inheritance adds one vtable pointer per interface chain (MSVC x64). Each `RefCountedDispatch` stores an `ObjectData` struct containing object flags and a `control_block*` for `shared_ptr`/`weak_ptr` support. The control block's `strong` atomic is the authoritative reference count.
 
 The control block comes in two variants: `control_block` (16 bytes: strong + weak + ptr) for IInterface types, and `external_control_block` (24 bytes) which adds a type-erased `destroy` function pointer for non-IInterface types managed by `shared_ptr`.
 
-- **RefCountedDispatch base** (32 bytes): vptr (8) + MI/alignment padding (8) + refCount (4) + flags (4) + block* (8)
+- **RefCountedDispatch base** (32 bytes): vptr (8) + MI/alignment padding (8) + flags (4) + padding (4) + block* (8)
 - **ObjectCore** adds IObject = **56 bytes** base (with 1 extra interface) for Property, Function, and user objects. `get_self()` reconstructs a `shared_ptr` from `control_block::ptr`.
 - **AnyBase** skips `self_` and uses a single inheritance chain = **32 bytes** base for Any types
 
@@ -149,7 +149,7 @@ AnyValue<float> (40 bytes)
 ┌────────────────────────────┐
 │ vptr                    8  │
 │ (alignment padding)     8  │
-│ refCount + flags        8  │
+│ flags + padding         8  │
 │ block*                  8  │
 │ data_ (float) + pad     8  │
 └────────────────────────────┘
@@ -158,7 +158,7 @@ PropertyImpl (96 bytes)             FunctionImpl (120 bytes)
 ┌────────────────────────────┐      ┌────────────────────────────┐
 │ MI base layout          64 │      │ MI base layout          64 │
 │   (2 vptrs + MI padding)   │      │   (2 vptrs + MI padding)   │
-│ refCount + flags         8 │      │ refCount + flags         8 │
+│ flags + padding          8 │      │ flags + padding          8 │
 │ block*                   8 │      │ block*                   8 │
 │ data_ (shared_ptr)      16 │      │ target_context_          8 │
 │ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │

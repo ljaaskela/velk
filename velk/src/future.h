@@ -13,6 +13,15 @@
 
 namespace velk {
 
+/**
+ * @brief Default IFuture/IFutureInternal implementation.
+ *
+ * Thread-safe future that stores a cloned IAny result. Supports blocking
+ * wait(), lock-free is_ready(), and continuation chaining via then().
+ * Continuations attached before set_result() are stored and fired when
+ * the result arrives. Continuations attached after are fired immediately
+ * (Immediate type) or queued via instance().queue_deferred_tasks() (Deferred type).
+ */
 class FutureImpl final : public ext::ObjectCore<FutureImpl, IFutureInternal>
 {
 public:

@@ -9,6 +9,13 @@
 
 namespace velk {
 
+/**
+ * @brief Singleton implementation of IVelk.
+ *
+ * Manages a sorted registry of object factories (keyed by class UID) and
+ * provides type creation, metadata lookup, deferred task queuing, and
+ * factory methods for properties, functions, futures, and any values.
+ */
 class VelkImpl final : public ext::ObjectCore<VelkImpl, IVelk>
 {
 public:
@@ -30,16 +37,18 @@ public:
                                          IFunction::ContextDeleter* deleter) const override;
 
 private:
+    /** @brief Registry entry mapping a class UID to its factory. */
     struct Entry {
-        Uid uid;
-        const IObjectFactory *factory;
+        Uid uid;                        ///< Class UID.
+        const IObjectFactory *factory;  ///< Factory that creates instances of this class.
         bool operator<(const Entry& o) const { return uid < o.uid; }
     };
 
+    /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
     const IObjectFactory* find(Uid uid) const;
-    std::vector<Entry> types_;
-    mutable std::mutex deferred_mutex_;
-    mutable std::vector<DeferredTask> deferred_queue_;
+    std::vector<Entry> types_;                      ///< Sorted registry of class factories.
+    mutable std::mutex deferred_mutex_;             ///< Guards @c deferred_queue_.
+    mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
 };
 
 } // namespace velk

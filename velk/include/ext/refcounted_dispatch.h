@@ -1,7 +1,6 @@
 #ifndef EXT_REFCOUNTED_DISPATCH_H
 #define EXT_REFCOUNTED_DISPATCH_H
 
-#include <atomic>
 #include <memory.h>
 #include <ext/interface_dispatch.h>
 #include <interface/types.h>
@@ -12,6 +11,10 @@ namespace ext {
 /**
  * @brief Adds intrusive reference counting to InterfaceDispatch.
  *
+ * The reference count lives in the heap-allocated control_block (strong count).
+ * This avoids a redundant per-object atomic and keeps the count accessible
+ * to shared_ptr/weak_ptr without indirection.
+ *
  * @tparam Interfaces The interfaces this object implements.
  */
 template<class... Interfaces>
@@ -19,33 +22,50 @@ class RefCountedDispatch : public InterfaceDispatch<Interfaces...>
 {
 public:
     /** @brief Atomically increments the reference count. */
-    void ref() override { detail::intrusive_ref(data_.refCount, *data_.block); }
+    void ref() override
+    {
+        data_.block->add_ref();
+    }
 
     /** @brief Atomically decrements the reference count; deletes the object at zero. */
     void unref() override
     {
-        auto& block = *data_.block;
-        if (detail::intrusive_unref(data_.refCount, block)) {
+        if (data_.block->release_ref()) {
             delete this;
-            detail::intrusive_post_delete(block);
         }
     }
 
 public:
-    RefCountedDispatch() { data_.block->strong.store(1, std::memory_order_relaxed); }
-    ~RefCountedDispatch() override = default;
+    /** @brief Initializes the strong count to 1 (the object itself holds the initial reference). */
+    RefCountedDispatch()
+    {
+        data_.block->strong.store(1, std::memory_order_relaxed);
+    }
+
+    /**
+     * @brief Marks the object as dead and releases the control block.
+     *
+     * Zeroes the strong count so that any outstanding weak_ptr sees the object
+     * as expired, then releases the "strong group" weak ref on the block.
+     */
+    ~RefCountedDispatch() override
+    {
+        data_.block->strong.store(0, std::memory_order_release);
+        detail::release_control_block(*data_.block);
+    }
 
 public:
     /** @brief Returns the control block for shared_ptr/weak_ptr support. */
     control_block* get_block() const noexcept { return data_.block; }
 
 protected:
+    /** @brief Per-object data: flags and control block pointer. */
     struct ObjectData
     {
-        alignas(4) std::atomic<int32_t> refCount{1};
-        alignas(4) int32_t flags{ObjectFlags::None};
-        control_block* block{new control_block()};
+        control_block* block{new control_block()};  ///< Heap-allocated control block (owns the ref count).
+        int32_t flags{ObjectFlags::None};           ///< Bitwise combination of ObjectFlags.
     };
+    /** @brief Returns a mutable reference to the per-object data. */
     constexpr ObjectData &get_object_data() noexcept { return data_; }
 
 private:

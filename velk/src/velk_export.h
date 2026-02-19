@@ -1,4 +1,12 @@
-
+/**
+ * @file velk_export.h
+ * @brief DLL export/import macros for the Velk shared library.
+ *
+ * Defines VELK_EXPORT to __declspec(dllexport) when building the DLL
+ * (VELK_EXPORTS defined) and __declspec(dllimport) when consuming it.
+ * On non-MSVC platforms, uses __attribute__((visibility("default"))).
+ * Define VELK_STATIC_DEFINE to build as a static library (no export attributes).
+ */
 #ifndef VELK_EXPORT_H
 #define VELK_EXPORT_H
 

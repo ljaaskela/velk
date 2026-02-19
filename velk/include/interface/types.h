@@ -13,10 +13,10 @@ struct MemberDesc; // Forward declaration
 /** @brief Describes a registered class with its UID, name, and static metadata. */
 struct ClassInfo
 {
-    const Uid uid;
-    const string_view name;
-    const array_view<InterfaceInfo> interfaces; // interfaces implemented by this class
-    const array_view<MemberDesc> members; // empty when no metadata
+    const Uid uid;                              ///< Unique identifier for this class.
+    const string_view name;                     ///< Human-readable class name.
+    const array_view<InterfaceInfo> interfaces; ///< Interfaces implemented by this class.
+    const array_view<MemberDesc> members;       ///< Static metadata members (empty when no metadata).
 };
 
 /** @brief Compile-time class identifiers for built-in object types. */

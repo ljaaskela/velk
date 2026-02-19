@@ -9,27 +9,37 @@
 
 namespace velk {
 
-// control_block
-
 /**
  * @brief Shared control block for shared_ptr/weak_ptr (16 bytes).
  *
- * For IInterface types: strong count mirrors the intrusive refCount;
- * ptr stores the IObject* self-pointer (for IObject::get_self).
- * For non-IInterface types: use external_control_block which adds a destroy function.
+ * For IInterface types (intrusive mode): @c strong is the authoritative
+ * reference count for the object, and @c ptr stores the IObject*
+ * self-pointer used by IObject::get_self().
+ *
+ * For non-IInterface types: use external_control_block, which extends
+ * this with a type-erased destroy function.
+ *
+ * @par Weak count semantics
+ * The @c weak count starts at 1, representing the "strong group is alive"
+ * reference. Each weak_ptr adds +1 on construction and -1 on destruction.
+ * When the last strong ref drops, the strong group's +1 is released. The
+ * block is deleted when weak reaches zero.
  */
 struct control_block
 {
     std::atomic<int32_t> strong{0};
-    std::atomic<int32_t> weak{1};           // 1 = "strong group exists"
-    void* ptr{nullptr};                     // IObject* (IInterface) or destroy target (non-IInterface)
+    std::atomic<int32_t> weak{1};           ///< 1 = "strong group exists"
+    void* ptr{nullptr};                     ///< IObject* (IInterface) or destroy target (non-IInterface)
 
-    /** @brief Increments the strong count. */
+    /** @brief Increments the strong count (relaxed). */
     void add_ref() {
         strong.fetch_add(1, std::memory_order_relaxed);
     }
 
-    /** @brief Decrements the strong count. Returns true if this was the last strong ref. */
+    /**
+     * @brief Decrements the strong count (acq_rel).
+     * @return true if this was the last strong ref.
+     */
     bool release_ref()
     {
         if (strong.fetch_sub(1, std::memory_order_acq_rel) == 1) {
@@ -38,7 +48,14 @@ struct control_block
         return false;
     }
 
-    /** @brief CAS loop: increments strong only if > 0. Returns true on success. */
+    /**
+     * @brief Attempts to increment the strong count only if it is currently > 0.
+     *
+     * Used by weak_ptr::lock() to atomically promote a weak reference to a
+     * strong one. Implemented as a CAS loop.
+     *
+     * @return true if the strong count was successfully incremented.
+     */
     bool try_add_ref()
     {
         int32_t old = strong.load(std::memory_order_relaxed);
@@ -51,12 +68,15 @@ struct control_block
         return false;
     }
 
-    /** @brief Increments the weak count. */
+    /** @brief Increments the weak count (relaxed). */
     void add_weak() {
         weak.fetch_add(1, std::memory_order_relaxed);
     }
 
-    /** @brief Decrements the weak count. Returns true if this was the last weak ref (caller must deallocate). */
+    /**
+     * @brief Decrements the weak count (acq_rel).
+     * @return true if this was the last weak ref (caller must deallocate the block).
+     */
     bool release_weak()
     {
         return weak.fetch_sub(1, std::memory_order_acq_rel) == 1;
@@ -66,44 +86,41 @@ struct control_block
 /**
  * @brief Extended control block for non-IInterface types (24 bytes).
  *
- * Adds a type-erased destroy function for the owned object.
+ * Adds a type-erased destroy function pointer. When the last strong ref
+ * drops, @c destroy is called with @c ptr to delete the owned object.
  */
 struct external_control_block : control_block
 {
-    void (*destroy)(void*){nullptr};
+    void (*destroy)(void*){nullptr};        ///< Type-erased destructor for the owned object
 };
-
-// non-templated helpers
 
 namespace detail {
 
-/** @brief Intrusive ref: increments refCount and mirrors to block. */
-inline void intrusive_ref(std::atomic<int32_t>& refCount, control_block& block)
-{
-    refCount++;
-    block.add_ref();
-}
-
-/** @brief Intrusive unref: decrements refCount, returns true if caller should delete itself. */
-inline bool intrusive_unref(std::atomic<int32_t>& refCount, control_block& block)
-{
-    if (--refCount == 0) {
-        block.strong.store(0, std::memory_order_release);
-        return true;
-    }
-    block.release_ref();
-    return false;
-}
-
-/** @brief Called after delete this to release the "strong group" weak ref. */
-inline void intrusive_post_delete(control_block& block)
+/**
+ * @brief Releases the "strong group" weak ref, freeing the block if no weak_ptrs remain.
+ *
+ * Called from ~RefCountedDispatch(). The block is heap-allocated (not embedded
+ * in the object), so it safely outlives the destroyed object when weak_ptrs
+ * still hold references.
+ *
+ * @param block The control block.
+ */
+inline void release_control_block(control_block& block)
 {
     if (block.release_weak()) {
         delete &block;
     }
 }
 
-/** @brief Shared acquire for IInterface types: add weak ref only. Null-safe for shared_ptr(T*). */
+/**
+ * @brief Acquires a shared reference for IInterface types.
+ *
+ * Only adds a weak ref (the intrusive ref() on the object handles strong).
+ * Null-safe: does nothing if @p block is null (for shared_ptr constructed
+ * from a raw IInterface pointer without a block).
+ *
+ * @param block The control block, or nullptr.
+ */
 inline void shared_acquire_intrusive(control_block* block)
 {
     if (block) {
@@ -111,7 +128,13 @@ inline void shared_acquire_intrusive(control_block* block)
     }
 }
 
-/** @brief Shared acquire for non-IInterface types: add strong + weak ref. */
+/**
+ * @brief Acquires a shared reference for non-IInterface types.
+ *
+ * Increments both strong and weak counts.
+ *
+ * @param block The control block, or nullptr.
+ */
 inline void shared_acquire_external(control_block* block)
 {
     if (block) {
@@ -120,7 +143,14 @@ inline void shared_acquire_external(control_block* block)
     }
 }
 
-/** @brief Shared release for IInterface types: release weak ref only (unref handles strong). */
+/**
+ * @brief Releases a shared reference for IInterface types.
+ *
+ * Only releases the weak ref (unref() on the object handles strong).
+ * Frees the block if this was the last weak ref.
+ *
+ * @param block The control block, or nullptr.
+ */
 inline void shared_release_intrusive(control_block* block)
 {
     if (block && block->release_weak()) {
@@ -128,7 +158,15 @@ inline void shared_release_intrusive(control_block* block)
     }
 }
 
-/** @brief Shared release for non-IInterface types: release strong + destroy + weak. */
+/**
+ * @brief Releases a shared reference for non-IInterface types.
+ *
+ * Decrements the strong count; if it reaches zero, calls the type-erased
+ * destroy function. Then decrements the weak count; if it reaches zero,
+ * frees the external_control_block.
+ *
+ * @param block The control block, or nullptr.
+ */
 inline void shared_release_external(control_block* block)
 {
     if (block) {
@@ -142,7 +180,10 @@ inline void shared_release_external(control_block* block)
     }
 }
 
-/** @brief Releases a weak ref on a plain control_block (IInterface). */
+/**
+ * @brief Releases a weak ref on a plain control_block (IInterface types).
+ * @param block The control block, or nullptr.
+ */
 inline void weak_release_intrusive(control_block* block)
 {
     if (block && block->release_weak()) {
@@ -150,7 +191,10 @@ inline void weak_release_intrusive(control_block* block)
     }
 }
 
-/** @brief Releases a weak ref on an external_control_block (non-IInterface). */
+/**
+ * @brief Releases a weak ref on an external_control_block (non-IInterface types).
+ * @param block The control block, or nullptr.
+ */
 inline void weak_release_external(control_block* block)
 {
     if (block && block->release_weak()) {
@@ -160,23 +204,24 @@ inline void weak_release_external(control_block* block)
 
 } // namespace detail
 
-// adopt_ref tag
-
 /** @brief Tag type for adopting an existing reference without incrementing. */
 struct adopt_ref_t {};
+/** @brief Tag value for adopt_ref_t. */
 inline constexpr adopt_ref_t adopt_ref{};
 
-// forward declarations
-
-class IInterface; // forward declaration
+class IInterface;
 
 template<class T> class shared_ptr;
 template<class T> class weak_ptr;
 
-// ptr_base
-
 /**
- * @brief Common base for shared_ptr and weak_ptr holding shared members.
+ * @brief Common base for shared_ptr and weak_ptr.
+ *
+ * Holds the raw pointer and control block pointer shared by both smart
+ * pointer types. Provides swap, release_block, and a const_cast helper
+ * for calling ref()/unref() through const pointers.
+ *
+ * @tparam T The pointed-to type.
  */
 template<class T>
 class ptr_base
@@ -186,6 +231,7 @@ class ptr_base
     template<class U> friend class weak_ptr;
 
 protected:
+    /// True if T derives from IInterface (selects intrusive vs external mode).
     static constexpr bool is_interface =
         std::is_convertible_v<std::remove_const_t<T>*, IInterface*>;
     using mutable_t = std::remove_const_t<T>;
@@ -196,13 +242,14 @@ protected:
     /** @brief Returns a non-const pointer for ref()/unref() calls on const T. */
     mutable_t* mutable_ptr() const { return const_cast<mutable_t*>(ptr_); }
 
+    /** @brief Swaps pointer and block with another ptr_base. */
     void swap(ptr_base& o) noexcept
     {
         std::swap(ptr_, o.ptr_);
         std::swap(block_, o.block_);
     }
 
-    /** @brief Releases the weak ref on the block with correct deallocation for the block type. */
+    /** @brief Releases the weak ref on the block, using the correct deallocator for the block type. */
     void release_block()
     {
         if constexpr (is_interface) {
@@ -212,17 +259,25 @@ protected:
         }
     }
 
-    T* ptr_{};
-    control_block* block_{};
+    T* ptr_{};              ///< Raw pointer to the managed object
+    control_block* block_{};///< Associated control block (may be null for IInterface raw-ptr construction)
 };
 
-// shared_ptr
-
 /**
- * @brief ABI-stable shared pointer.
+ * @brief ABI-stable shared ownership pointer ({T*, control_block*} = 16 bytes).
  *
- * For IInterface-derived types: uses intrusive ref/unref, block obtained from object.
- * For non-IInterface types: uses external control block with type-erased destructor.
+ * Operates in two modes selected at compile time via @c is_interface:
+ *
+ * **Intrusive mode** (IInterface-derived T): calls ref()/unref() on the
+ * object for strong count management. The control block only tracks the
+ * weak count and stores the IObject* self-pointer. Multiple independent
+ * shared_ptr instances can be created from raw pointers to the same object.
+ *
+ * **External mode** (non-IInterface T): allocates an external_control_block
+ * with a type-erased destructor, similar to std::shared_ptr. The control
+ * block owns both the strong and weak counts.
+ *
+ * @tparam T The pointed-to type.
  */
 template<class T>
 class shared_ptr : public ptr_base<T>
@@ -247,6 +302,7 @@ class shared_ptr : public ptr_base<T>
         }
     }
 
+    /** @brief Decrements strong + weak refs and nulls out the pointer. */
     void release()
     {
         if (!ptr_) return;
@@ -264,8 +320,15 @@ public:
     constexpr shared_ptr() = default;
     constexpr shared_ptr(std::nullptr_t) {}
 
-    /** @brief Constructs from raw pointer. Adopts the existing reference (IInterface)
-     *  or creates a new control block (non-IInterface). */
+    /**
+     * @brief Constructs from a raw pointer.
+     *
+     * For IInterface types: adopts the existing intrusive reference (no block).
+     * For non-IInterface types: allocates an external_control_block with a
+     * type-erased destructor.
+     *
+     * @param p Raw pointer to manage (may be null).
+     */
     explicit shared_ptr(T* p)
     {
         if (!p) return;
@@ -279,10 +342,19 @@ public:
         }
     }
 
-    /** @brief Constructs from raw pointer + existing block (aliasing/interface cast). Adds ref. */
+    /**
+     * @brief Constructs from a raw pointer and existing block (aliasing/interface cast).
+     *
+     * Adds a reference. Used by interface_pointer_cast and similar.
+     */
     shared_ptr(T* p, control_block* b) : base(p, b) { acquire(); }
 
-    /** @brief Adopts an existing reference without incrementing ref count. */
+    /**
+     * @brief Adopts an existing reference without incrementing the strong count.
+     *
+     * Only adds a weak ref to the block. Used by make_object() after construction
+     * when the ref count is already 1.
+     */
     shared_ptr(T* p, control_block* b, adopt_ref_t) : base(p, b)
     {
         if (block_) block_->add_weak();
@@ -310,11 +382,11 @@ public:
         return *this;
     }
 
-    /** @brief Converting constructor: shared_ptr<U> -> shared_ptr<T> */
+    /** @brief Converting copy constructor: shared_ptr<U> to shared_ptr<T>. */
     template<class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
     shared_ptr(const shared_ptr<U>& o) : base(o.ptr_, o.block_) { acquire(); }
 
-    /** @brief Converting move constructor: shared_ptr<U> -> shared_ptr<T> */
+    /** @brief Converting move constructor: shared_ptr<U> to shared_ptr<T>. */
     template<class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
     shared_ptr(shared_ptr<U>&& o) noexcept : base(o.ptr_, o.block_)
     {
@@ -328,8 +400,10 @@ public:
 
     explicit operator bool() const { return ptr_ != nullptr; }
 
+    /** @brief Returns the underlying control block. */
     control_block* block() const { return block_; }
 
+    /** @brief Releases ownership and resets to null. */
     void reset()
     {
         release();
@@ -337,7 +411,12 @@ public:
         block_ = nullptr;
     }
 
-    /** @brief Sets the control block (used by ObjectCore after construction). */
+    /**
+     * @brief Replaces the control block.
+     *
+     * Releases the old block's weak ref (if any) and acquires a weak ref
+     * on the new block. Used by ObjectCore after construction.
+     */
     void set_block(control_block* b)
     {
         if (block_) {
@@ -360,10 +439,13 @@ public:
     bool operator!=(const shared_ptr<U>& o) const { return ptr_ != o.get(); }
 };
 
-// weak_ptr
-
 /**
- * @brief ABI-stable weak pointer. Pairs with shared_ptr via control_block.
+ * @brief ABI-stable weak pointer ({T*, control_block*} = 16 bytes).
+ *
+ * Observes an object managed by shared_ptr without preventing destruction.
+ * Use lock() to attempt promotion to a shared_ptr.
+ *
+ * @tparam T The pointed-to type.
  */
 template<class T>
 class weak_ptr : public ptr_base<T>
@@ -376,6 +458,7 @@ class weak_ptr : public ptr_base<T>
     template<class U> friend class weak_ptr;
     template<class U> friend class shared_ptr;
 
+    /** @brief Releases the weak ref and nulls out the pointer. */
     void release()
     {
         if (block_) {
@@ -388,6 +471,7 @@ class weak_ptr : public ptr_base<T>
 public:
     constexpr weak_ptr() = default;
 
+    /** @brief Constructs a weak_ptr observing the same object as @p sp. */
     weak_ptr(const shared_ptr<T>& sp) : base(sp.ptr_, sp.block_)
     {
         if (block_) block_->add_weak();
@@ -426,13 +510,21 @@ public:
         return *this;
     }
 
-    /** @brief Attempts to acquire a shared_ptr. Returns empty if object is gone. */
+    /**
+     * @brief Attempts to promote to a shared_ptr.
+     *
+     * Uses try_add_ref() to atomically increment the strong count only if
+     * the object is still alive. Returns an empty shared_ptr if the object
+     * has been destroyed.
+     *
+     * @return A shared_ptr owning the object, or empty if expired.
+     */
     shared_ptr<T> lock() const
     {
         if (!(block_ && block_->try_add_ref())) {
             return {};
         }
-        // try_add_ref succeeded — we now own one strong ref in the block.
+        // try_add_ref succeeded: we now own one strong ref in the block.
         // Construct a shared_ptr that adopts this ref.
         shared_ptr<T> result;
         result.ptr_ = ptr_;
@@ -444,16 +536,24 @@ public:
         return result;
     }
 
-    /** @brief Returns true if the object has been destroyed. */
+    /**
+     * @brief Returns true if the object has been destroyed.
+     *
+     * Checks whether the strong count has dropped to zero.
+     */
     bool expired() const
     {
         return !block_ || block_->strong.load(std::memory_order_acquire) == 0;
     }
 };
 
-// make_shared
-
-/** @brief Creates a shared_ptr for a newly constructed object. */
+/**
+ * @brief Creates a shared_ptr managing a newly constructed T.
+ * @tparam T The type to construct.
+ * @tparam Args Constructor argument types.
+ * @param args Arguments forwarded to T's constructor.
+ * @return A shared_ptr owning the new object.
+ */
 template<class T, class... Args>
 shared_ptr<T> make_shared(Args&&... args)
 {
