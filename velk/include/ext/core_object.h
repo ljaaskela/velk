@@ -11,15 +11,15 @@
 
 namespace velk::ext {
 
-/** @brief Creates a new T, initialises its control block, sets self-pointer, and wraps it in a shared_ptr. */
+/** @brief Creates a new T, sets self-pointer, and wraps it in a shared_ptr. */
 template<class T>
 IObject::Ptr make_object()
 {
     auto* obj = new T;
-    auto* block = obj->create_control_block();
-    IObject::Ptr result(static_cast<IObject*>(obj), block, adopt_ref);
-    if (auto* s = obj->template get_interface<ISharedFromObject>()) {
-        s->set_self(result);
+    IObject::Ptr result(static_cast<IObject*>(obj), obj->get_block(), adopt_ref);
+    auto* block = obj->get_block();
+    if (block && !block->ptr) {
+        block->ptr = result.get();
     }
     return result;
 }
@@ -76,7 +76,7 @@ class DefaultFactory : public ObjectFactory<FinalClass>
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template<class FinalClass, class... Interfaces>
-class ObjectCore : public RefCountedDispatch<ISharedFromObject, Interfaces...>
+class ObjectCore : public RefCountedDispatch<IObject, Interfaces...>
 {
     template<class T, class = void>
     struct has_class_uid : std::false_type {};
@@ -88,12 +88,6 @@ public:
     ~ObjectCore() override = default;
 
 public:
-    /** @brief Compile-time list of all interfaces implemented by this class. */
-    static constexpr InterfaceInfo class_interfaces_[] = {
-        ISharedFromObject::INFO, Interfaces::INFO...
-    };
-    static constexpr array_view<InterfaceInfo> class_interfaces{class_interfaces_, 1 + sizeof...(Interfaces)};
-
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr string_view get_class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
@@ -106,20 +100,20 @@ public:
         }
     }
 
-    /** @brief Stores a weak self-reference (called once by the factory). */
-    void set_self(const IObject::Ptr &self) override
+    /** @brief Returns a shared_ptr to this object, or empty if expired. */
+    IObject::Ptr get_self() const override
     {
-        if (self_.expired()) { // Only allow one set (called by factory)
-            self_ = self;
-        }
+        auto* block = this->get_block();
+        // No self set, or object already destroyed (strong count reached zero)
+        if (!block || !block->ptr || block->strong.load(std::memory_order_acquire) == 0)
+            return {};
+        return IObject::Ptr(static_cast<IObject*>(block->ptr), block);
     }
-    /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
-    IObject::Ptr get_self() const override { return self_.lock(); }
 
     template<class T>
     typename T::Ptr get_self() const
     {
-        return interface_pointer_cast<T>(self_.lock());
+        return interface_pointer_cast<T>(get_self());
     }
 
 public:
@@ -129,9 +123,6 @@ public:
         static DefaultFactory<FinalClass> factory_;
         return factory_;
     }
-
-private:
-    IObject::WeakPtr self_{};
 };
 
 } // namespace velk::ext

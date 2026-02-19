@@ -21,19 +21,19 @@ This document covers runtime performance and memory usage related topics.
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~14 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~23 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~17 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~22 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~15 ns | `target_fn_(target_context_, args)` — context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged — no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~131 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **Event dispatch (deferred)** | Clone + queue | ~126 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
 | **interface_cast** | Linear scan | ~10 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~687 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~608 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~35 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 2 heap allocations | ~126 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
+| **Object creation** | 2 heap allocations | ~114 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -82,7 +82,7 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
 2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
-3. **Wire self-pointer**: Stores `weak_ptr` to the `shared_ptr` (for `shared_from_object()`)
+3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
 4. **Allocate MetadataContainer**: One `new MetadataContainer(members, owner)` — stores a pointer to the static metadata array and the owning object
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
@@ -94,33 +94,32 @@ An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (ISharedFromObject subsumes IObject, IMetadataContainer subsumes IMetadata and IPropertyState).
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (IObject, IMetadataContainer which subsumes IMetadata and IPropertyState, IMyWidget, ISerializable).
 
 ```
-MyWidget (168 bytes)                        MetadataContainer (72 bytes, heap)
+MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               88  │      │ base (InterfaceDispatch)   16  │
 │   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
 │ refCount + flags              8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
-│ self_ (weak_ptr)             16  │      │ dynamic_ (unique_ptr)       8  │
-│ meta_ (unique_ptr)            8  │      └────────────────────────────────┘
-│ IMyWidget::State              8  │
+│ meta_ (unique_ptr)            8  │      │ dynamic_ (unique_ptr)       8  │
+│ IMyWidget::State              8  │      └────────────────────────────────┘
 │   (width, height: 2× float)      │
 │ ISerializable::State         32  │
 │   (name: std::string)            │
 └──────────────────────────────────┘
 ```
 
-The MI base layout (88 bytes) contains 4 vtable pointers — one per interface chain — plus MSVC multiple-inheritance adjustment padding. The exact layout is compiler-specific; the total is derived from `sizeof(ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>)` = 120 minus ObjectData (16) and self_ (16).
+The MI base layout (88 bytes) contains 4 vtable pointers — one per interface chain — plus MSVC multiple-inheritance adjustment padding. The exact layout is compiler-specific; the total is derived from `sizeof(ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>)` = 104 minus ObjectData (16). The self-pointer (`IObject*`) is stored in `control_block::ptr` rather than inline, so it costs no per-object space beyond the already-allocated block.
 
 Member instances are created lazily — only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`.
 
 | Scenario | MyWidget | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 168 | 72 | 0 | **240 bytes** |
-| 3 members accessed | 168 | 72 | 3 × 24 = 72 | **312 bytes** |
-| All 6 members accessed | 168 | 72 | 6 × 24 = 144 | **384 bytes** |
+| No members accessed | 152 | 72 | 0 | **224 bytes** |
+| 3 members accessed | 152 | 72 | 3 × 24 = 72 | **296 bytes** |
+| All 6 members accessed | 152 | 72 | 6 × 24 = 144 | **368 bytes** |
 
 The `states_` tuple contains one `State` struct per interface that declares properties via `VELK_INTERFACE`. Each `State` struct holds one field per `PROP` member, initialized with its declared default value. Properties backed by state storage use `ext::AnyRef<T>` to read/write directly into these fields.
 
@@ -130,16 +129,18 @@ Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` data shar
 
 Every object starts with the same infrastructure. Multiple inheritance adds one vtable pointer per interface chain (MSVC x64). Each `RefCountedDispatch` stores an `ObjectData` struct containing the intrusive reference count, object flags, and a `control_block*` for `shared_ptr`/`weak_ptr` support.
 
+The control block comes in two variants: `control_block` (16 bytes: strong + weak + ptr) for IInterface types, and `external_control_block` (24 bytes) which adds a type-erased `destroy` function pointer for non-IInterface types managed by `shared_ptr`.
+
 - **RefCountedDispatch base** (32 bytes): vptr (8) + MI/alignment padding (8) + refCount (4) + flags (4) + block* (8)
-- **ObjectCore** adds `self_` weak_ptr (16) = **72 bytes** base (with 1 extra interface) for Property, Function, and user objects
+- **ObjectCore** adds IObject = **56 bytes** base (with 1 extra interface) for Property, Function, and user objects. `get_self()` reconstructs a `shared_ptr` from `control_block::ptr`.
 - **AnyBase** skips `self_` and uses a single inheritance chain = **32 bytes** base for Any types
 
 Measured ObjectCore sizes (MSVC x64):
 
 | Configuration | Interfaces | Size |
 |---|---|---|
-| `ext::ObjectCore<X, I>` (1 extra interface) | 2 (ISharedFromObject + I) | **72 bytes** |
-| `ext::ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>` | 4 | **120 bytes** |
+| `ext::ObjectCore<X, I>` (1 extra interface) | 2 (IObject + I) | **56 bytes** |
+| `ext::ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>` | 4 | **104 bytes** |
 
 ### Base types
 
@@ -153,25 +154,24 @@ AnyValue<float> (40 bytes)
 │ data_ (float) + pad     8  │
 └────────────────────────────┘
 
-PropertyImpl (112 bytes)            FunctionImpl (136 bytes)
+PropertyImpl (96 bytes)             FunctionImpl (120 bytes)
 ┌────────────────────────────┐      ┌────────────────────────────┐
 │ MI base layout          64 │      │ MI base layout          64 │
 │   (2 vptrs + MI padding)   │      │   (2 vptrs + MI padding)   │
 │ refCount + flags         8 │      │ refCount + flags         8 │
 │ block*                   8 │      │ block*                   8 │
-│ self_ (weak_ptr)        16 │      │ self_ (weak_ptr)        16 │
 │ data_ (shared_ptr)      16 │      │ target_context_          8 │
 │ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │
 │ external_ (bool) + pad   8 │      │ owned_context_           8 │
-│ (total verified: 112)      │      │ context_deleter_         8 │
+│ (total verified: 96)       │      │ context_deleter_         8 │
 └────────────────────────────┘      │ handlers_ (vector)      24 │
                                     │ deferred_begin_ + pad    8 │
-                                    │ (total verified: 136)      │
+                                    │ (total verified: 120)      │
                                     └────────────────────────────┘
 ```
 
 Internal interface types use inheritance to reduce MI chains: `IPropertyInternal` inherits `IProperty`, `IFunctionInternal` inherits `IEvent` (which inherits `IFunction`), and `IFutureInternal` inherits `IFuture`. This means each impl class only needs one entry in its interface pack (the Internal variant), halving the MI vptr overhead compared to listing both the public and internal interfaces separately.
 
-- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop — it is lazily created when the object is wrapped in a `shared_ptr` via `create_control_block()`.
+- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop — it is always heap-allocated at construction.
 - **FunctionImpl** implements both `ClassId::Function` and `ClassId::Event`. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. The `handlers_` vector is partitioned: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
 - **PropertyImpl** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.

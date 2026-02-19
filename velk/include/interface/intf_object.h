@@ -10,20 +10,8 @@ namespace velk {
 class IObject : public Interface<IObject>
 {
 public:
-};
-
-/**
- * @brief Interface for objects that can retrieve a shared_ptr to themselves.
- *
- * Similar to std::enable_shared_from_this, but integrated with the Velk interface system.
- */
-class ISharedFromObject : public Interface<ISharedFromObject, IObject>
-{
-public:
-    /** @brief Stores the owning shared_ptr. Called by the factory after creation. */
-    virtual void set_self(const IObject::Ptr &self) = 0;
-    /** @brief Returns a shared_ptr to this object, or nullptr if expired. */
-    virtual IObject::Ptr get_self() const = 0;
+    /** @brief Returns a shared_ptr to this object, or empty if not available. */
+    virtual Ptr get_self() const = 0;
 };
 
 /**
@@ -35,10 +23,8 @@ public:
 template<class T>
 typename T::Ptr interface_pointer_cast(IObject *obj)
 {
-    if (auto s = interface_pointer_cast<ISharedFromObject>(obj)) {
-        return interface_pointer_cast<T>(s->get_self());
-    }
-    return {};
+    if (!obj) return {};
+    return interface_pointer_cast<T>(obj->get_self());
 }
 
 } // namespace velk

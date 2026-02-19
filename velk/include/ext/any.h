@@ -14,7 +14,7 @@ namespace velk::ext {
 /**
  * @brief Base class for IAny implementations.
  *
- * Inherits RefCountedDispatch directly with IObject (no ISharedFromObject or self-pointer).
+ * Inherits RefCountedDispatch directly with IAny (no ObjectCore or metadata).
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces beyond IAny.
@@ -23,16 +23,19 @@ template<class FinalClass, class... Interfaces>
 class AnyBase : public RefCountedDispatch<IAny, Interfaces...>
 {
 public:
-    /** @brief Compile-time list of all interfaces implemented by this class. */
-    static constexpr InterfaceInfo class_interfaces_[] = {
-        IAny::INFO, Interfaces::INFO...
-    };
-    static constexpr array_view<InterfaceInfo> class_interfaces{class_interfaces_, 1 + sizeof...(Interfaces)};
-
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr string_view get_class_name() { return get_name<FinalClass>(); }
     /** @brief Returns a default UID (overridden by typed subclasses). */
     static constexpr Uid get_class_uid() { return {}; }
+
+    /** @brief Returns a shared_ptr to this object, or empty if expired. */
+    IObject::Ptr get_self() const override
+    {
+        auto* block = this->get_block();
+        if (!block || !block->ptr || block->strong.load(std::memory_order_acquire) == 0)
+            return {};
+        return IObject::Ptr(static_cast<IObject*>(block->ptr), block);
+    }
 
     /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */
     IAny::Ptr clone() const override

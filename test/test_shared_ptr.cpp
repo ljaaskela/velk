@@ -239,9 +239,7 @@ TEST(SharedPtrSelf, GetSelfReturnsValidPointer)
 {
     auto obj = instance().create<IObject>(ClassId::Function);
     EXPECT_TRUE(obj);
-    if (auto* shared = obj->get_interface<ISharedFromObject>()) {
-        auto self = shared->get_self();
-        EXPECT_TRUE(self);
-        EXPECT_EQ(self.get(), obj.get());
-    }
+    auto self = obj->get_self();
+    EXPECT_TRUE(self);
+    EXPECT_EQ(self.get(), obj.get());
 }

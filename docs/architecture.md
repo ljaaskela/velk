@@ -52,7 +52,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | Header | Description |
 |---|---|
 | `intf_interface.h` | `IInterface` root with UID-based `get_interface()` and ref-counting; `Interface<T>` CRTP with auto UID |
-| `intf_object.h` | `IObject` base, `ISharedFromObject` for self-pointer |
+| `intf_object.h` | `IObject` base with `get_self()` for shared_ptr retrieval |
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `IMetadataContainer`, `VELK_INTERFACE` macro |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
@@ -119,10 +119,7 @@ classDiagram
 
     class IObject {
         <<interface>>
-    }
-    class ISharedFromObject {
-        <<interface>>
-        shared_from_object()
+        get_self()
     }
     class IAny {
         <<interface>>
@@ -164,7 +161,6 @@ classDiagram
     }
 
     IInterface <|-- IObject
-    IObject <|-- ISharedFromObject
     IObject <|-- IAny
 
     IInterface <|-- IPropertyState

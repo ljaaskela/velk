@@ -12,21 +12,22 @@ namespace velk {
 // control_block
 
 /**
- * @brief Shared control block for shared_ptr/weak_ptr.
+ * @brief Shared control block for shared_ptr/weak_ptr (16 bytes).
  *
  * For IInterface types: strong count mirrors the intrusive refCount;
- * block is lazily created when weak references are needed.
- * For non-IInterface types: block is always created and owns the destroy function.
+ * ptr stores the IObject* self-pointer (for IObject::get_self).
+ * For non-IInterface types: use external_control_block which adds a destroy function.
  */
 struct control_block
 {
     std::atomic<int32_t> strong{0};
     std::atomic<int32_t> weak{1};           // 1 = "strong group exists"
-    void (*destroy)(void*){nullptr};        // null for IInterface types (self-deletes via unref)
-    void* ptr{nullptr};                     // for destroy call (non-IInterface only)
+    void* ptr{nullptr};                     // IObject* (IInterface) or destroy target (non-IInterface)
 
     /** @brief Increments the strong count. */
-    void add_ref() { strong.fetch_add(1, std::memory_order_relaxed); }
+    void add_ref() {
+        strong.fetch_add(1, std::memory_order_relaxed);
+    }
 
     /** @brief Decrements the strong count. Returns true if this was the last strong ref. */
     bool release_ref()
@@ -51,15 +52,25 @@ struct control_block
     }
 
     /** @brief Increments the weak count. */
-    void add_weak() { weak.fetch_add(1, std::memory_order_relaxed); }
-
-    /** @brief Decrements the weak count. Deletes block if it reaches zero. */
-    void release_weak()
-    {
-        if (weak.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-            delete this;
-        }
+    void add_weak() {
+        weak.fetch_add(1, std::memory_order_relaxed);
     }
+
+    /** @brief Decrements the weak count. Returns true if this was the last weak ref (caller must deallocate). */
+    bool release_weak()
+    {
+        return weak.fetch_sub(1, std::memory_order_acq_rel) == 1;
+    }
+};
+
+/**
+ * @brief Extended control block for non-IInterface types (24 bytes).
+ *
+ * Adds a type-erased destroy function for the owned object.
+ */
+struct external_control_block : control_block
+{
+    void (*destroy)(void*){nullptr};
 };
 
 // non-templated helpers
@@ -67,71 +78,84 @@ struct control_block
 namespace detail {
 
 /** @brief Intrusive ref: increments refCount and mirrors to block. */
-inline void intrusive_ref(std::atomic<int32_t>& refCount, control_block* block)
+inline void intrusive_ref(std::atomic<int32_t>& refCount, control_block& block)
 {
     refCount++;
-    if (block) block->add_ref();
+    block.add_ref();
 }
 
 /** @brief Intrusive unref: decrements refCount, returns true if caller should delete itself. */
-inline bool intrusive_unref(std::atomic<int32_t>& refCount, control_block* block)
+inline bool intrusive_unref(std::atomic<int32_t>& refCount, control_block& block)
 {
-    if (block) {
-        if (--refCount == 0) {
-            block->strong.store(0, std::memory_order_release);
-            return true;
-        }
-        block->release_ref();
-    } else if (--refCount == 0) {
+    if (--refCount == 0) {
+        block.strong.store(0, std::memory_order_release);
         return true;
     }
+    block.release_ref();
     return false;
 }
 
 /** @brief Called after delete this to release the "strong group" weak ref. */
-inline void intrusive_post_delete(control_block* block)
+inline void intrusive_post_delete(control_block& block)
 {
-    if (block) block->release_weak();
-}
-
-/** @brief Lazily creates a control block, syncing its strong count with refCount. */
-inline void ensure_block(std::atomic<int32_t>& refCount, control_block*& block)
-{
-    if (!block) {
-        block = new control_block();
-        block->strong.store(refCount.load(std::memory_order_relaxed),
-                            std::memory_order_relaxed);
+    if (block.release_weak()) {
+        delete &block;
     }
 }
 
-/** @brief Shared acquire for IInterface types: add weak ref only. */
+/** @brief Shared acquire for IInterface types: add weak ref only. Null-safe for shared_ptr(T*). */
 inline void shared_acquire_intrusive(control_block* block)
 {
-    if (block) block->add_weak();
+    if (block) {
+        block->add_weak();
+    }
 }
 
 /** @brief Shared acquire for non-IInterface types: add strong + weak ref. */
 inline void shared_acquire_external(control_block* block)
 {
-    if (!block) return;
-    block->add_ref();
-    block->add_weak();
+    if (block) {
+        block->add_ref();
+        block->add_weak();
+    }
 }
 
 /** @brief Shared release for IInterface types: release weak ref only (unref handles strong). */
 inline void shared_release_intrusive(control_block* block)
 {
-    if (block) block->release_weak();
+    if (block && block->release_weak()) {
+        delete block;
+    }
 }
 
 /** @brief Shared release for non-IInterface types: release strong + destroy + weak. */
 inline void shared_release_external(control_block* block)
 {
-    if (!block) return;
-    if (block->release_ref()) {
-        block->destroy(block->ptr);
+    if (block) {
+        auto* ecb = static_cast<external_control_block*>(block);
+        if (block->release_ref()) {
+            ecb->destroy(block->ptr);
+        }
+        if (block->release_weak()) {
+            delete ecb;
+        }
     }
-    block->release_weak();
+}
+
+/** @brief Releases a weak ref on a plain control_block (IInterface). */
+inline void weak_release_intrusive(control_block* block)
+{
+    if (block && block->release_weak()) {
+        delete block;
+    }
+}
+
+/** @brief Releases a weak ref on an external_control_block (non-IInterface). */
+inline void weak_release_external(control_block* block)
+{
+    if (block && block->release_weak()) {
+        delete static_cast<external_control_block*>(block);
+    }
 }
 
 } // namespace detail
@@ -176,6 +200,16 @@ protected:
     {
         std::swap(ptr_, o.ptr_);
         std::swap(block_, o.block_);
+    }
+
+    /** @brief Releases the weak ref on the block with correct deallocation for the block type. */
+    void release_block()
+    {
+        if constexpr (is_interface) {
+            detail::weak_release_intrusive(block_);
+        } else {
+            detail::weak_release_external(block_);
+        }
     }
 
     T* ptr_{};
@@ -237,10 +271,11 @@ public:
         if (!p) return;
         ptr_ = p;
         if constexpr (!is_interface) {
-            block_ = new control_block();
-            block_->strong.store(1, std::memory_order_relaxed);
-            block_->ptr = p;
-            block_->destroy = [](void* obj) { delete static_cast<T*>(obj); };
+            auto* ecb = new external_control_block();
+            ecb->strong.store(1, std::memory_order_relaxed);
+            ecb->ptr = p;
+            ecb->destroy = [](void* obj) { delete static_cast<T*>(obj); };
+            block_ = ecb;
         }
     }
 
@@ -305,9 +340,13 @@ public:
     /** @brief Sets the control block (used by ObjectCore after construction). */
     void set_block(control_block* b)
     {
-        if (block_) block_->release_weak();
+        if (block_) {
+            this->release_block();
+        }
         block_ = b;
-        if (block_) block_->add_weak();
+        if (block_) {
+            block_->add_weak();
+        }
     }
 
     bool operator==(const shared_ptr& o) const { return ptr_ == o.ptr_; }
@@ -339,7 +378,9 @@ class weak_ptr : public ptr_base<T>
 
     void release()
     {
-        if (block_) block_->release_weak();
+        if (block_) {
+            this->release_block();
+        }
         ptr_ = nullptr;
         block_ = nullptr;
     }
@@ -356,7 +397,9 @@ public:
 
     weak_ptr(const weak_ptr& o) : base(o.ptr_, o.block_)
     {
-        if (block_) block_->add_weak();
+        if (block_) {
+            block_->add_weak();
+        }
     }
 
     weak_ptr& operator=(const weak_ptr& o)
@@ -386,7 +429,7 @@ public:
     /** @brief Attempts to acquire a shared_ptr. Returns empty if object is gone. */
     shared_ptr<T> lock() const
     {
-        if (!block_ || !block_->try_add_ref()) {
+        if (!(block_ && block_->try_add_ref())) {
             return {};
         }
         // try_add_ref succeeded — we now own one strong ref in the block.
