@@ -525,13 +525,11 @@ public:
             return {};
         }
         // try_add_ref succeeded: we now own one strong ref in the block.
-        // Construct a shared_ptr that adopts this ref.
+        // Construct a shared_ptr that adopts this ref (no extra ref() needed
+        // for intrusive types since try_add_ref already incremented strong).
         shared_ptr<T> result;
         result.ptr_ = ptr_;
         result.block_ = block_;
-        if constexpr (is_interface) {
-            this->mutable_ptr()->ref();
-        }
         block_->add_weak();
         return result;
     }
