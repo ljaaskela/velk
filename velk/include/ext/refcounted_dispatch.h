@@ -36,11 +36,7 @@ public:
     }
 
 public:
-    /** @brief Initializes the strong count to 1 (the object itself holds the initial reference). */
-    RefCountedDispatch()
-    {
-        data_.block->strong.store(1, std::memory_order_relaxed);
-    }
+    RefCountedDispatch() = default;
 
     /**
      * @brief Marks the object as dead and releases the control block.
@@ -62,8 +58,8 @@ protected:
     /** @brief Per-object data: flags and control block pointer. */
     struct ObjectData
     {
-        control_block* block{new control_block()};  ///< Heap-allocated control block (owns the ref count).
-        int32_t flags{ObjectFlags::None};           ///< Bitwise combination of ObjectFlags.
+        control_block* block{new control_block{1, 1, nullptr}}; ///< Heap-allocated control block (strong=1).
+        int32_t flags{ObjectFlags::None};                       ///< Bitwise combination of ObjectFlags.
     };
     /** @brief Returns a mutable reference to the per-object data. */
     constexpr ObjectData &get_object_data() noexcept { return data_; }
