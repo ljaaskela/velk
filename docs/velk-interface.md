@@ -62,7 +62,7 @@ struct FunctionKind {
 Access via `MemberDesc::functionKind()->args`:
 
 ```cpp
-if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
+if (auto* info = instance().get_class_info(MyWidget::class_id())) {
     for (auto& m : info->members) {
         if (auto* fk = m.functionKind(); fk && !fk->args.empty()) {
             for (auto& arg : fk->args) {
@@ -118,7 +118,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 Invocation works the same for all variants — callers always go through `IFunction::invoke()`:
 
 ```cpp
-auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+auto widget = instance().create<IObject>(MyWidget::class_id());
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
     invoke_function(iw->reset());                            // zero-arg
     invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f)); // typed

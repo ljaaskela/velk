@@ -10,6 +10,9 @@ namespace velk {
 class IObject : public Interface<IObject>
 {
 public:
+    /** @brief Returns the class UID of this object. */
+    virtual Uid get_class_uid() const = 0;
+
     /** @brief Returns the name of the class. */
     virtual string_view get_class_name() const = 0;
 

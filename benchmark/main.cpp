@@ -54,7 +54,7 @@ static void ensureRegistered()
 static void BM_PropertyGetValue(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto prop = iw->value();
     for (auto _ : state) {
@@ -66,7 +66,7 @@ BENCHMARK(BM_PropertyGetValue);
 static void BM_PropertySetValue(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto prop = iw->value();
     float v = 0.f;
@@ -84,7 +84,7 @@ BENCHMARK(BM_PropertySetValue);
 static void BM_DirectStateRead(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* ps = interface_cast<IPropertyState>(obj);
     auto* s = ps->get_property_state<IBenchWidget>();
     s->value = 42.f;
@@ -97,7 +97,7 @@ BENCHMARK(BM_DirectStateRead);
 static void BM_DirectStateWrite(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* ps = interface_cast<IPropertyState>(obj);
     auto* s = ps->get_property_state<IBenchWidget>();
     float v = 0.f;
@@ -116,7 +116,7 @@ BENCHMARK(BM_DirectStateWrite);
 static void BM_FunctionInvoke(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->do_nothing();
     for (auto _ : state) {
@@ -128,7 +128,7 @@ BENCHMARK(BM_FunctionInvoke);
 static void BM_FunctionInvokeTypedArgs(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->add();
     Any<int> arg0(10);
@@ -142,7 +142,7 @@ BENCHMARK(BM_FunctionInvokeTypedArgs);
 static void BM_FunctionInvokeRaw(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     auto fn = iw->raw_fn();
     for (auto _ : state) {
@@ -158,7 +158,7 @@ BENCHMARK(BM_FunctionInvokeRaw);
 static void BM_EventDispatchImmediate(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
     evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::SUCCESS; }, Immediate);
@@ -171,7 +171,7 @@ BENCHMARK(BM_EventDispatchImmediate);
 static void BM_EventDispatchDeferred(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* iw = interface_cast<IBenchWidget>(obj);
     Event evt = iw->on_changed();
     evt.add_handler([](FnArgs) -> ReturnValue { return ReturnValue::SUCCESS; }, Deferred);
@@ -188,7 +188,7 @@ BENCHMARK(BM_EventDispatchDeferred);
 static void BM_InterfaceCast(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     for (auto _ : state) {
         benchmark::DoNotOptimize(interface_cast<IBenchWidget>(obj));
     }
@@ -204,7 +204,7 @@ static void BM_MetadataLookupCold(benchmark::State& state)
     ensureRegistered();
     for (auto _ : state) {
         state.PauseTiming();
-        auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+        auto obj = instance().create<IObject>(BenchWidget::class_id());
         auto* meta = interface_cast<IMetadata>(obj);
         state.ResumeTiming();
         benchmark::DoNotOptimize(meta->get_property("value"));
@@ -215,7 +215,7 @@ BENCHMARK(BM_MetadataLookupCold);
 static void BM_MetadataLookupCached(benchmark::State& state)
 {
     ensureRegistered();
-    auto obj = instance().create<IObject>(BenchWidget::get_class_uid());
+    auto obj = instance().create<IObject>(BenchWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     meta->get_property("value"); // prime the cache
     for (auto _ : state) {
@@ -231,7 +231,7 @@ BENCHMARK(BM_MetadataLookupCached);
 static void BM_ObjectCreate(benchmark::State& state)
 {
     ensureRegistered();
-    auto uid = BenchWidget::get_class_uid();
+    auto uid = BenchWidget::class_id();
     for (auto _ : state) {
         auto obj = instance().create<IObject>(uid);
         benchmark::DoNotOptimize(obj.get());

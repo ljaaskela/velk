@@ -51,7 +51,7 @@ public:
  *
  * Used by ObjectCore and AnyBase where no compile-time metadata array is needed.
  *
- * @tparam FinalClass The concrete class whose get_class_uid()/get_class_name() are used.
+ * @tparam FinalClass The concrete class whose class_id()/class_name() are used.
  */
 template<class FinalClass>
 class DefaultFactory : public ObjectFactory<FinalClass>
@@ -59,8 +59,8 @@ class DefaultFactory : public ObjectFactory<FinalClass>
     const ClassInfo &get_class_info() const override
     {
         static constexpr ClassInfo info{
-            FinalClass::get_class_uid(),
-            FinalClass::get_static_class_name(),
+            FinalClass::class_id(),
+            FinalClass::class_name(),
             FinalClass::class_interfaces
         };
         return info;
@@ -101,9 +101,9 @@ public:
 
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr string_view get_static_class_name() noexcept { return get_name<FinalClass>(); }
+    static constexpr string_view class_name() noexcept { return get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
-    static constexpr Uid get_class_uid() noexcept
+    static constexpr Uid class_id() noexcept
     {
         if constexpr (has_class_uid<FinalClass>::value) {
             return FinalClass::class_uid;
@@ -113,9 +113,14 @@ public:
     }
 
 public: // IObject
+    Uid get_class_uid() const override
+    {
+        return class_id();
+    }
+
     string_view get_class_name() const override
     {
-        return get_static_class_name();
+        return class_name();
     }
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */

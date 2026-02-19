@@ -79,8 +79,8 @@ private:
         const ClassInfo &get_class_info() const override
         {
             static constexpr ClassInfo info{
-                FinalClass::get_class_uid(),
-                FinalClass::get_static_class_name(),
+                FinalClass::class_id(),
+                FinalClass::class_name(),
                 FinalClass::class_interfaces,
                 FinalClass::class_metadata
             };

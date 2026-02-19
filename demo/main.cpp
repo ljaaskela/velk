@@ -181,7 +181,7 @@ void demo_static_metadata()
 
     // --- Static metadata via Velk (no instance needed) ---
     cout << "MyWidget static metadata:" << endl;
-    if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
+    if (auto* info = r.get_class_info(MyWidget::class_id())) {
         cout << "  Class: " << info->name << " (" << info->members.size() << " members)" << endl;
         for (auto& m : info->members) {
             const char* kind = m.kind == MemberKind::Property ? "Property"
@@ -200,7 +200,7 @@ void demo_static_metadata()
 
     // --- Static defaults (no instance needed) ---
     cout << endl << "  Static metadata defaults:" << endl;
-    if (auto* info = r.get_class_info(MyWidget::get_class_uid())) {
+    if (auto* info = r.get_class_info(MyWidget::class_id())) {
         for (auto& m : info->members) {
             if (auto* pk = m.propertyKind()) {
                 auto* def = pk->getDefault ? pk->getDefault() : nullptr;
@@ -274,7 +274,7 @@ void demo_interfaces(IObject::Ptr& widget)
         invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f));
 
         // Inspect typed arg metadata
-        if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
+        if (auto* info = instance().get_class_info(MyWidget::class_id())) {
             for (auto& m : info->members) {
                 if (auto* fk = m.functionKind()) {
                     if (!fk->args.empty()) {
@@ -399,7 +399,7 @@ void demo_direct_state()
     // --- State-backed property storage ---
     cout << "State-backed property storage:" << endl;
     {
-        auto widget2 = r.create<IObject>(MyWidget::get_class_uid());
+        auto widget2 = r.create<IObject>(MyWidget::class_id());
         auto* iw = interface_cast<IMyWidget>(widget2);
         auto* ps = interface_cast<IPropertyState>(widget2);
         if (iw && ps) {
@@ -531,7 +531,7 @@ int main()
     demo_change_notifications();
     demo_static_metadata();
 
-    auto widget = r.create<IObject>(MyWidget::get_class_uid());
+    auto widget = r.create<IObject>(MyWidget::class_id());
     demo_runtime_metadata(widget);
     demo_interfaces(widget);
     demo_uid();

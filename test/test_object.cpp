@@ -98,13 +98,13 @@ protected:
 
 TEST_F(ObjectTest, RegisterAndCreate)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     ASSERT_TRUE(obj);
 }
 
 TEST_F(ObjectTest, InterfaceCastSucceeds)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     ASSERT_TRUE(obj);
 
     auto* iw = interface_cast<ITestWidget>(obj);
@@ -120,7 +120,7 @@ TEST_F(ObjectTest, InterfaceCastSucceeds)
 TEST_F(ObjectTest, InterfaceCastFailsForNonImplemented)
 {
     // IVelk is not implemented by TestWidget
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     ASSERT_TRUE(obj);
 
     auto* bad = interface_cast<IVelk>(obj);
@@ -129,7 +129,7 @@ TEST_F(ObjectTest, InterfaceCastFailsForNonImplemented)
 
 TEST_F(ObjectTest, MetadataGetPropertyByName)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -145,7 +145,7 @@ TEST_F(ObjectTest, MetadataGetPropertyByName)
 
 TEST_F(ObjectTest, MetadataGetPropertyReturnsNullForUnknown)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -155,7 +155,7 @@ TEST_F(ObjectTest, MetadataGetPropertyReturnsNullForUnknown)
 
 TEST_F(ObjectTest, MetadataGetEventByName)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -165,7 +165,7 @@ TEST_F(ObjectTest, MetadataGetEventByName)
 
 TEST_F(ObjectTest, MetadataGetFunctionByName)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -178,7 +178,7 @@ TEST_F(ObjectTest, MetadataGetFunctionByName)
 
 TEST_F(ObjectTest, PropertyDefaultsFromInterface)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -192,7 +192,7 @@ TEST_F(ObjectTest, PropertyDefaultsFromInterface)
 
 TEST_F(ObjectTest, PropertySetAndGet)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -202,7 +202,7 @@ TEST_F(ObjectTest, PropertySetAndGet)
 
 TEST_F(ObjectTest, FunctionInvokeViaInterface)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -215,7 +215,7 @@ TEST_F(ObjectTest, FunctionInvokeViaInterface)
 
 TEST_F(ObjectTest, FunctionInvokeByName)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     invoke_function(obj.get(), "reset");
 
     auto* raw = static_cast<TestWidget*>(interface_cast<ITestWidget>(obj));
@@ -225,7 +225,7 @@ TEST_F(ObjectTest, FunctionInvokeByName)
 
 TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // ITestWidget: width, height, id, on_clicked, reset
@@ -250,7 +250,7 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
 
 TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
@@ -271,7 +271,7 @@ TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
 
 TEST_F(ObjectTest, StaticDefaultValues)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f);  // width
@@ -282,7 +282,7 @@ TEST_F(ObjectTest, StaticDefaultValues)
 
 TEST_F(ObjectTest, PropertyStateReadWrite)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     auto* ps = interface_cast<IPropertyState>(obj);
     ASSERT_NE(iw, nullptr);
@@ -308,7 +308,7 @@ TEST_F(ObjectTest, PropertyStateReadWrite)
 
 TEST_F(ObjectTest, TypedFunctionInvoke)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* raw = static_cast<TestWidget*>(interface_cast<ITestWidget>(obj));
     ASSERT_NE(raw, nullptr);
 
@@ -327,7 +327,7 @@ TEST_F(ObjectTest, TypedFunctionInvoke)
 
 TEST_F(ObjectTest, TypedFunctionReturnValue)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
 
     // Invoke typed function that returns int
     auto result = invoke_function(obj.get(), "add", Any<int>(3), Any<int>(7));
@@ -341,7 +341,7 @@ TEST_F(ObjectTest, TypedFunctionReturnValue)
 
 TEST_F(ObjectTest, VoidFunctionReturnsNull)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
 
     // Invoke void function — should return nullptr
     auto result = invoke_function(obj.get(), "reset");
@@ -350,7 +350,7 @@ TEST_F(ObjectTest, VoidFunctionReturnsNull)
 
 TEST_F(ObjectTest, TypedFunctionArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // Find the "add" member
@@ -372,7 +372,7 @@ TEST_F(ObjectTest, TypedFunctionArgMetadata)
 
 TEST_F(ObjectTest, ZeroArgFunctionHasNoArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     const MemberDesc* resetDesc = nullptr;
@@ -388,7 +388,7 @@ TEST_F(ObjectTest, ZeroArgFunctionHasNoArgMetadata)
 
 TEST_F(ObjectTest, FnRawInvoke)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* raw = static_cast<TestWidget*>(interface_cast<ITestWidget>(obj));
     ASSERT_NE(raw, nullptr);
 
@@ -426,7 +426,7 @@ TEST_F(ObjectTest, PropBindCreateRef)
 
 TEST_F(ObjectTest, FnRawHasNoArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::get_class_uid());
+    auto* info = instance().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     const MemberDesc* processDesc = nullptr;
@@ -444,7 +444,7 @@ TEST_F(ObjectTest, FnRawHasNoArgMetadata)
 
 TEST_F(ObjectTest, RPropGetValueReturnsDefault)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     ASSERT_NE(iw, nullptr);
 
@@ -456,7 +456,7 @@ TEST_F(ObjectTest, RPropGetValueReturnsDefault)
 
 TEST_F(ObjectTest, RPropStateWriteReadable)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     auto* ps = interface_cast<IPropertyState>(obj);
     ASSERT_NE(iw, nullptr);
@@ -475,7 +475,7 @@ TEST_F(ObjectTest, RPropStateWriteReadable)
 
 TEST_F(ObjectTest, RPropSetValueReturnsReadOnly)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -494,7 +494,7 @@ TEST_F(ObjectTest, RPropSetValueReturnsReadOnly)
 
 TEST_F(ObjectTest, RPropSetDataReturnsReadOnly)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* meta = interface_cast<IMetadata>(obj);
     ASSERT_NE(meta, nullptr);
 
@@ -516,7 +516,7 @@ TEST_F(ObjectTest, RPropSetDataReturnsReadOnly)
 
 TEST_F(ObjectTest, RPropOnChangedObservable)
 {
-    auto obj = instance().create<IObject>(TestWidget::get_class_uid());
+    auto obj = instance().create<IObject>(TestWidget::class_id());
     auto* iw = interface_cast<ITestWidget>(obj);
     auto* ps = interface_cast<IPropertyState>(obj);
     ASSERT_NE(iw, nullptr);
@@ -564,14 +564,14 @@ protected:
 TEST_F(ClassUidTest, UserSpecifiedClassUid)
 {
     constexpr Uid expected{"a0b1c2d3-e4f5-6789-abcd-ef0123456789"};
-    static_assert(TaggedWidget::get_class_uid() == expected, "User-specified class UID mismatch");
-    EXPECT_EQ(TaggedWidget::get_class_uid(), expected);
+    static_assert(TaggedWidget::class_id() == expected, "User-specified class UID mismatch");
+    EXPECT_EQ(TaggedWidget::class_id(), expected);
 }
 
 TEST_F(ClassUidTest, AutoGeneratedClassUid)
 {
-    EXPECT_EQ(AutoUidWidget::get_class_uid(), type_uid<AutoUidWidget>());
-    EXPECT_NE(AutoUidWidget::get_class_uid(), TaggedWidget::get_class_uid());
+    EXPECT_EQ(AutoUidWidget::class_id(), type_uid<AutoUidWidget>());
+    EXPECT_NE(AutoUidWidget::class_id(), TaggedWidget::class_id());
 }
 
 TEST_F(ClassUidTest, CreateByUserSpecifiedUid)

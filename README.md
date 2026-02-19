@@ -173,13 +173,13 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 auto& s = instance();                                           // global type registry
 s.register_type<MyWidget>();                                    // register factory
 
-auto widget = s.create<IObject>(MyWidget::get_class_uid());     // create by UID
+auto widget = s.create<IObject>(MyWidget::class_id());     // create by UID
 ```
 
 ### Use typed accessors
 
 ```cpp
-auto widget = s.create<IMyWidget>(MyWidget::get_class_uid());
+auto widget = s.create<IMyWidget>(MyWidget::class_id());
 if (widget) {
     auto wp = iw->width();
     wp.set_value(42.f);                                         // set property
@@ -196,7 +196,7 @@ if (widget) {
 Static metadata is available from Velk without creating an instance:
 
 ```cpp
-if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {  // lookup by UID
+if (auto* info = instance().get_class_info(MyWidget::class_id())) {  // lookup by UID
     for (auto& i : info->interfaces) {                             // enumerate interfaces
         // i.uid, i.name
     }
@@ -211,7 +211,7 @@ if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {  // loo
 Runtime metadata is available through `IMetadata` on any instance:
 
 ```cpp
-auto widget = s.create(MyWidget::get_class_uid());
+auto widget = s.create(MyWidget::class_id());
 if (auto* meta = interface_cast<IMetadata>(widget)) {           // query interface for runtime introspection
     auto prop  = meta->get_property("width");                   // lookup by name
     auto event = meta->get_event("on_clicked");                 // lookup by name
@@ -226,7 +226,7 @@ Properties are backed by inline `State` structs. You can bypass the property lay
 This is useful for bulk operations like serialization or snapshotting (`memcpy` for trivially-copyable state).
 
 ```cpp
-auto widget = s.create(MyWidget::get_class_uid());
+auto widget = s.create(MyWidget::class_id());
 if (auto* state = get_property_state<IMyWidget>(widget.get())) {// IMyWidget::State*
     // State struct generated through VELK_INTERFACE in IMyWidget declaration
     // struct IWidget::State { 

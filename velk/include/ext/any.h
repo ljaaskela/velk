@@ -24,9 +24,6 @@ template<class FinalClass, class... Interfaces>
 class AnyBase : public ObjectCore<FinalClass, IAny, Interfaces...>
 {
 public:
-    /** @brief Returns a default UID (overridden by typed subclasses). */
-    static constexpr Uid get_class_uid() { return {}; }
-
     /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */
     IAny::Ptr clone() const override
     {
@@ -54,7 +51,7 @@ public:
     }
 
     /** @brief Returns the UID for the combined type pack. */
-    static constexpr Uid get_class_uid() { return TYPE_UID; }
+    static constexpr Uid class_id() { return TYPE_UID; }
 };
 
 /**
@@ -71,7 +68,7 @@ public:
     virtual const T &get_value() const = 0;
 
     /** @brief Returns the UID for type T. */
-    static constexpr Uid get_class_uid() { return TYPE_UID; }
+    static constexpr Uid class_id() { return TYPE_UID; }
 
     /** @brief Returns a single-element list containing TYPE_UID. */
     array_view<Uid> get_compatible_types() const override

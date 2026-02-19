@@ -23,7 +23,7 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
 
 ## Class UIDs
 
-Every class that inherits from `ObjectCore` or `Object` has a class UID returned by `get_class_uid()`. By default this is auto-generated from the class name via constexpr FNV-1a hashing. You can override it with a stable, user-specified UID using the `VELK_CLASS_UID` macro:
+Every class that inherits from `ObjectCore` or `Object` has a class UID returned by `class_id()` (compile-time) or `get_class_uid()` (virtual, on IObject). By default this is auto-generated from the class name via constexpr FNV-1a hashing. You can override it with a stable, user-specified UID using the `VELK_CLASS_UID` macro:
 
 ```cpp
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
@@ -105,7 +105,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget>
 };
 
 // All forms are invoked through IFunction::invoke()
-auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+auto widget = instance().create<IObject>(MyWidget::class_id());
 if (auto* iw = interface_cast<IMyWidget>(widget)) {
     invoke_function(iw->reset());                               // zero-arg
     invoke_function(iw, "add", Any<int>(10), Any<float>(3.f));  // typed
@@ -224,7 +224,7 @@ public:
 Each interface that declares `PROP` members gets a `State` struct with one field per property, initialized with its declared default. `ext::Object` stores these structs inline, and properties read/write directly into them via `ext::AnyRef<T>`. You can also access the state struct directly through `IPropertyState`, bypassing the property layer entirely.
 
 ```cpp
-auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+auto widget = instance().create<IObject>(MyWidget::class_id());
 auto* iw = interface_cast<IMyWidget>(widget);
 auto* ps = interface_cast<IPropertyState>(widget);
 

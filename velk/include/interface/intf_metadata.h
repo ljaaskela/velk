@@ -793,7 +793,7 @@ struct FnRawBind
  *
  * @par Example: invoking a function
  * @code
- * auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+ * auto widget = instance().create<IObject>(MyWidget::class_id());
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
  *     invoke_function(iw->reset());  // calls MyWidget::fn_reset
  * }
@@ -801,7 +801,7 @@ struct FnRawBind
  *
  * @par Example: using accessors on an instance
  * @code
- * auto widget = instance().create<IObject>(MyWidget::get_class_uid());
+ * auto widget = instance().create<IObject>(MyWidget::class_id());
  * if (auto* iw = interface_cast<IMyWidget>(widget)) {
  *     iw->width().set_value(42.f);
  *     float w = iw->width().get_value();   // 42.f
@@ -812,7 +812,7 @@ struct FnRawBind
  *
  * @par Example: querying static metadata without an instance
  * @code
- * if (auto* info = instance().get_class_info(MyWidget::get_class_uid())) {
+ * if (auto* info = instance().get_class_info(MyWidget::class_id())) {
  *     for (auto& m : info->members) {
  *         // m.name, m.kind, m.interfaceInfo
  *     }
