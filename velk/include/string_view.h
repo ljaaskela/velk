@@ -14,22 +14,36 @@ namespace velk {
 class string_view
 {
 public:
+    /** @brief Default-constructs an empty view (null data, zero size). */
     constexpr string_view() = default;
+
+    /** @brief Constructs from a pointer and explicit length. */
     constexpr string_view(const char* data, size_t size) : data_(data), size_(size) {}
 
     /** @brief Constructs from a string literal (deduces length at compile time). */
     template<size_t N>
     constexpr string_view(const char (&str)[N]) : data_(str), size_(N - 1) {}
 
+    /** @brief Returns a pointer to the underlying character data. */
     constexpr const char* data() const { return data_; }
+    /** @brief Returns the number of characters in the view. */
     constexpr size_t size() const { return size_; }
+    /** @brief Returns true if the view is empty. */
     constexpr bool empty() const { return size_ == 0; }
 
+    /** @brief Returns the character at index @p i (unchecked). */
     constexpr char operator[](size_t i) const { return data_[i]; }
 
+    /** @brief Returns an iterator to the first character. */
     constexpr const char* begin() const { return data_; }
+    /** @brief Returns a past-the-end iterator. */
     constexpr const char* end() const { return data_ + size_; }
 
+    /**
+     * @brief Returns a substring starting at @p pos with at most @p count characters.
+     * @param pos   Start position (clamped to size()).
+     * @param count Maximum length (clamped to remaining characters).
+     */
     constexpr string_view substr(size_t pos, size_t count = npos) const
     {
         if (pos > size_) pos = size_;
@@ -37,6 +51,10 @@ public:
         return {data_ + pos, count};
     }
 
+    /**
+     * @brief Searches for the first occurrence of @p sv starting at @p pos.
+     * @return Position of the match, or npos if not found.
+     */
     constexpr size_t find(string_view sv, size_t pos = 0) const
     {
         if (sv.size_ == 0) return pos <= size_ ? pos : npos;
@@ -51,6 +69,10 @@ public:
         return npos;
     }
 
+    /**
+     * @brief Searches for the last occurrence of @p sv at or before @p pos.
+     * @return Position of the match, or npos if not found.
+     */
     constexpr size_t rfind(string_view sv, size_t pos = npos) const
     {
         if (sv.size_ > size_) return npos;
@@ -67,6 +89,7 @@ public:
         return npos;
     }
 
+    /** @brief Equality comparison (element-wise). */
     constexpr bool operator==(string_view o) const
     {
         if (size_ != o.size_) return false;
@@ -76,8 +99,10 @@ public:
         return true;
     }
 
+    /** @brief Inequality comparison. */
     constexpr bool operator!=(string_view o) const { return !(*this == o); }
 
+    /** @brief Sentinel value returned by find/rfind on failure. */
     static constexpr size_t npos = static_cast<size_t>(-1);
 
     /** @brief Stream output support. */
@@ -89,8 +114,8 @@ public:
     }
 
 private:
-    const char* data_{};
-    size_t size_{};
+    const char* data_{};    ///< Pointer to character data (not necessarily null-terminated).
+    size_t size_{};         ///< Number of characters in the view.
 };
 
 } // namespace velk
