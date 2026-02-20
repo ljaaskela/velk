@@ -117,9 +117,9 @@ Each `fn_Name` is pure virtual, so implementing classes must override it. An exp
 
 ### Function arguments
 
-For **typed-arg** functions (`(FN, RetType, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically — the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
+For **typed-arg** functions (`(FN, RetType, Name, (T1, a1), ...)`), the trampoline extracts typed values from `FnArgs` automatically, the override receives native C++ parameters. If fewer arguments are provided than expected, the trampoline returns `nullptr`.
 
-For **FN_RAW** functions, arguments arrive as `FnArgs` — a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`. Use `FunctionContext` to validate the expected argument count:
+For **FN_RAW** functions, arguments arrive as `FnArgs`, a lightweight non-owning view of `{const IAny* const* data, size_t count}`. Access individual arguments with bounds-checked indexing (`args[i]` returns nullptr if out of range) and check the count with `args.count`. Use `FunctionContext` to validate the expected argument count:
 
 ```cpp
 IAny::Ptr fn_process(FnArgs args) override {
@@ -132,7 +132,7 @@ IAny::Ptr fn_process(FnArgs args) override {
 }
 ```
 
-Callers use variadic `invoke_function` overloads — values are automatically wrapped in `Any<T>`:
+Callers use variadic `invoke_function` overloads, values are automatically wrapped in `Any<T>`:
 
 ```cpp
 invoke_function(iw->reset());                                   // zero-arg
@@ -157,7 +157,7 @@ const IAny* ptrs[] = {x, y};
 fn.invoke(FnArgs{ptrs, 2});
 ```
 
-Void-returning lambdas are supported — `Callback` wraps them to return `nullptr`:
+Void-returning lambdas are supported, `Callback` wraps them to return `nullptr`:
 
 ```cpp
 Callback fn([&](float value) {
@@ -182,7 +182,7 @@ The three constructor forms are mutually exclusive via SFINAE:
 | Callable with `(FnArgs) -> ReturnValue` or `(FnArgs) -> IAny::Ptr` | Capturing lambda ctor |
 | Callable with typed params (any return) | Typed lambda ctor |
 
-`invoke()` returns `IAny::Ptr` — `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
+`invoke()` returns `IAny::Ptr`, `nullptr` for void results, or a typed result. Typed-return lambdas have their result automatically wrapped via `Any<R>`. When fewer arguments are provided than the lambda expects, `invoke()` returns `nullptr`. Extra arguments are ignored. If an argument's type doesn't match the lambda parameter type, the parameter receives a default-constructed value.
 
 ## Properties with change notifications
 
@@ -306,7 +306,7 @@ Arguments are cloned when a task is queued, so the original `IAny` does not need
 
 ## Futures and promises
 
-Velk provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side — it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
+Velk provides `Promise` and `Future<T>` for asynchronous value delivery. A `Promise` is the write side, it resolves a value. A `Future<T>` is the read side, it waits for or reacts to the value. Both are lightweight wrappers around `IFuture` interface backed by `FutureImpl` in the DLL.
 
 ```mermaid
 sequenceDiagram
@@ -352,7 +352,7 @@ Resolving twice returns `NOTHING_TO_DO` and the first value persists:
 
 ```cpp
 promise.set_value(1);                   // SUCCESS
-promise.set_value(2);                   // NOTHING_TO_DO — first value wins
+promise.set_value(2);                   // NOTHING_TO_DO, first value wins
 ```
 
 ### Continuations
@@ -363,7 +363,7 @@ Attach a callback that fires when the future resolves. If the future is already 
 auto promise = make_promise();
 auto future = promise.get_future<int>();
 
-// FnArgs continuation — receives the result as args[0]
+// FnArgs continuation, receives the result as args[0]
 future.then([](FnArgs args) -> ReturnValue {
     if (auto ctx = FunctionContext(args, 1)) {
         std::cout << "got: " << ctx.arg<int>(0).get_value() << std::endl;
@@ -371,7 +371,7 @@ future.then([](FnArgs args) -> ReturnValue {
     return ReturnValue::SUCCESS;
 });
 
-// Typed continuation — arguments are auto-extracted
+// Typed continuation, arguments are auto-extracted
 future.then([](int value) {
     std::cout << "got: " << value << std::endl;
 });

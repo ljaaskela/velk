@@ -14,7 +14,7 @@ add_library(velk SHARED
     src/property.h
     src/function.cpp
     src/function.h
-    src/velk_export.h
+    include/velk_export.h
     include/array_view.h
     include/common.h
     include/memory.h
@@ -63,7 +63,12 @@ target_include_directories(velk
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_compile_definitions(velk PRIVATE VELK_EXPORTS)
+option(VELK_ENABLE_BLOCK_POOL "Enable thread-local control_block pooling" ON)
+
+target_compile_definitions(velk PRIVATE
+    VELK_EXPORTS
+    VELK_ENABLE_BLOCK_POOL=$<BOOL:${VELK_ENABLE_BLOCK_POOL}>
+)
 
 # No RTTI, no exceptions for the library itself.
 # Strip CMake's default /EHsc and /GR to avoid D9025 override warnings.
