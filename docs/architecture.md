@@ -98,7 +98,7 @@ Internal runtime implementations (compiled into the DLL).
 
 | File | Description |
 |---|---|
-| `velk_impl.cpp/h` | `VelkImpl` implementing `IVelk` and `ITypeRegistry` |
+| `velk_instance.cpp/h` | `VelkInstance` implementing `IVelk` and `ITypeRegistry` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
@@ -263,7 +263,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 
 | Class | Role | When to use |
 |-------|------|-------------|
-| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkImpl`) |
+| `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkInstance`) |
 | `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `VELK_INTERFACE` |
 
 ## ABI stability

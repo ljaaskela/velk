@@ -16,7 +16,7 @@ namespace velk {
  * get_function(). Created instances are cached for subsequent lookups.
  *
  * Does not inherit RefCountedDispatch; lifetime is managed by the owning Object
- * (allocated by VelkImpl at construction, deleted in Object's destructor).
+ * (allocated by VelkInstance at construction, deleted in Object's destructor).
  */
 class MetadataContainer final : public ext::InterfaceDispatch<IMetadata>
 {

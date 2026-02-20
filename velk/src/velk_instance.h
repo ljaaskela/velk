@@ -1,5 +1,5 @@
-#ifndef VELK_IMPL_H
-#define VELK_IMPL_H
+#ifndef VELK_INSTANCE_H
+#define VELK_INSTANCE_H
 
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
@@ -16,10 +16,10 @@ namespace velk {
  * provides type creation, metadata lookup, deferred task queuing, and
  * factory methods for properties, functions, futures, and any values.
  */
-class VelkImpl final : public ext::ObjectCore<VelkImpl, IVelk, ITypeRegistry>
+class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegistry>
 {
 public:
-    VelkImpl();
+    VelkInstance();
 
     ITypeRegistry& type_registry() override { return *this; }
     const ITypeRegistry& type_registry() const override { return *this; }
@@ -56,4 +56,4 @@ private:
 
 } // namespace velk
 
-#endif // VELK_IMPL_H
+#endif // VELK_INSTANCE_H

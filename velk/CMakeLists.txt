@@ -24,8 +24,8 @@ add_library(velk SHARED
     src/metadata_container.h
     src/future.cpp
     src/future.h
-    src/velk_impl.cpp
-    src/velk_impl.h
+    src/velk_instance.cpp
+    src/velk_instance.h
     src/velk.cpp
     include/velk/interface/intf_any.h
     include/velk/interface/intf_external_any.h

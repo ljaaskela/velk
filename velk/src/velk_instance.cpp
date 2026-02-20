@@ -1,4 +1,4 @@
-#include "velk_impl.h"
+#include "velk_instance.h"
 #include "function.h"
 #include "future.h"
 #include "metadata_container.h"
@@ -28,12 +28,12 @@ void RegisterTypes(ITypeRegistry &reg)
     reg.register_type<ext::AnyValue<std::string>>();
 }
 
-VelkImpl::VelkImpl()
+VelkInstance::VelkInstance()
 {
     RegisterTypes(*this);
 }
 
-const IObjectFactory* VelkImpl::find(Uid uid) const
+const IObjectFactory* VelkInstance::find(Uid uid) const
 {
     Entry key{uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
@@ -43,7 +43,7 @@ const IObjectFactory* VelkImpl::find(Uid uid) const
     return nullptr;
 }
 
-ReturnValue VelkImpl::register_type(const IObjectFactory &factory)
+ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
 {
     auto &info = factory.get_class_info();
     std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
@@ -57,7 +57,7 @@ ReturnValue VelkImpl::register_type(const IObjectFactory &factory)
     return ReturnValue::SUCCESS;
 }
 
-ReturnValue VelkImpl::unregister_type(const IObjectFactory &factory)
+ReturnValue VelkInstance::unregister_type(const IObjectFactory &factory)
 {
     Entry key{factory.get_class_info().uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
@@ -67,7 +67,7 @@ ReturnValue VelkImpl::unregister_type(const IObjectFactory &factory)
     return ReturnValue::SUCCESS;
 }
 
-IInterface::Ptr VelkImpl::create(Uid uid) const
+IInterface::Ptr VelkInstance::create(Uid uid) const
 {
     if (auto *factory = find(uid)) {
         if (auto object = factory->create_instance()) {
@@ -83,7 +83,7 @@ IInterface::Ptr VelkImpl::create(Uid uid) const
     return {};
 }
 
-const ClassInfo* VelkImpl::get_class_info(Uid classUid) const
+const ClassInfo* VelkInstance::get_class_info(Uid classUid) const
 {
     if (auto *factory = find(classUid)) {
         return &factory->get_class_info();
@@ -91,12 +91,12 @@ const ClassInfo* VelkImpl::get_class_info(Uid classUid) const
     return nullptr;
 }
 
-IAny::Ptr VelkImpl::create_any(Uid type) const
+IAny::Ptr VelkInstance::create_any(Uid type) const
 {
     return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr VelkImpl::create_property(Uid type, const IAny::Ptr &value, int32_t flags) const
+IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr &value, int32_t flags) const
 {
     if (auto property = interface_pointer_cast<IProperty>(create(ClassId::Property))) {
         if (auto pi = property->get_interface<IPropertyInternal>()) {
@@ -118,13 +118,13 @@ IProperty::Ptr VelkImpl::create_property(Uid type, const IAny::Ptr &value, int32
     return {};
 }
 
-void VelkImpl::queue_deferred_tasks(array_view<DeferredTask> tasks) const
+void VelkInstance::queue_deferred_tasks(array_view<DeferredTask> tasks) const
 {
     std::lock_guard lock(deferred_mutex_);
     deferred_queue_.insert(deferred_queue_.end(), tasks.begin(), tasks.end());
 }
 
-void VelkImpl::update() const
+void VelkInstance::update() const
 {
     // Swap the queue under lock, then invoke outside the lock.
     // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
@@ -140,12 +140,12 @@ void VelkImpl::update() const
     }
 }
 
-IFuture::Ptr VelkImpl::create_future() const
+IFuture::Ptr VelkInstance::create_future() const
 {
     return interface_pointer_cast<IFuture>(create(ClassId::Future));
 }
 
-IFunction::Ptr VelkImpl::create_callback(IFunction::CallableFn* fn) const
+IFunction::Ptr VelkInstance::create_callback(IFunction::CallableFn* fn) const
 {
     auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
     if (auto* internal = interface_cast<IFunctionInternal>(func); internal && fn) {
@@ -154,7 +154,7 @@ IFunction::Ptr VelkImpl::create_callback(IFunction::CallableFn* fn) const
     return func;
 }
 
-IFunction::Ptr VelkImpl::create_owned_callback(void* context,
+IFunction::Ptr VelkInstance::create_owned_callback(void* context,
     IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) const
 {
     auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));

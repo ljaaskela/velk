@@ -1,4 +1,4 @@
-#include "velk_impl.h"
+#include "velk_instance.h"
 
 #include <velk/velk_export.h>
 
@@ -7,7 +7,7 @@ namespace velk {
 VELK_EXPORT IVelk &instance()
 {
     // Global IVelk& instance
-    static VelkImpl r;
+    static VelkInstance r;
     return *(r.get_interface<IVelk>());
 }
 
