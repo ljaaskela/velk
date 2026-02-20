@@ -58,7 +58,7 @@ protected:
     /** @brief Per-object data: flags and control block pointer. */
     struct ObjectData
     {
-        control_block* block{new control_block{1, 1, nullptr}}; ///< Heap-allocated control block (strong=1).
+        control_block* block{detail::alloc_control_block()}; ///< Pooled control block (strong=1).
         int32_t flags{ObjectFlags::None};                       ///< Bitwise combination of ObjectFlags.
     };
     /** @brief Returns a mutable reference to the per-object data. */

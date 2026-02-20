@@ -12,8 +12,12 @@ This document covers runtime performance and memory usage related topics.
   - [interface_cast](#interface_cast)
   - [Metadata lookup](#metadata-lookup)
   - [Object creation](#object-creation)
+- [shared_ptr and control blocks](#shared_ptr-and-control-blocks)
+  - [Control block pooling](#control-block-pooling)
 - [Memory layout](#memory-layout)
+  - [Example: Minimal object with 1 member](#example-minimal-object-with-1-member)
   - [Example: MyWidget with 6 members](#example-mywidget-with-6-members)
+  - [Layout notes](#layout-notes)
   - [Common base layers](#common-base-layers)
   - [Base types](#base-types)
 
@@ -21,19 +25,19 @@ This document covers runtime performance and memory usage related topics.
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~17 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~22 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~13 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~17 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
-| **Function invoke** | 1 indirect call | ~15 ns | `target_fn_(target_context_, args)` — context/function-pointer pair, no virtual dispatch |
+| **Function invoke** | 1 indirect call | ~14 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
-| **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged — no extraction overhead |
+| **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~126 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
-| **interface_cast** | Linear scan | ~10 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~608 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
-| **Metadata lookup (cached)** | Cache-first scan | ~35 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 2 heap allocations | ~114 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer` |
+| **Event dispatch (deferred)** | Clone + queue | ~120 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **interface_cast** | Linear scan | ~8 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~528 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cached)** | Cache-first scan | ~28 ns | Subsequent call; scans cached instances first, no allocation |
+| **Object creation** | 1-2 heap allocations | ~86 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -41,7 +45,7 @@ This document covers runtime performance and memory usage related topics.
 
 `Property<T>::get_value()` queries `IPropertyInternal` on the property, gets the backing `IAny`, and calls `get_data(&value, sizeof(T), typeUid)` which copies data to a stack-local variable. `set_value()` follows the reverse path and fires the `on_changed` event if the value changed.
 
-The backing `IAny` is typically an `AnyRef<T>` — a non-owning pointer into the object's inline `State` struct. For trivially-copyable types, `AnyRef<T>::set_value()` uses `memcmp` + `memcpy`. For non-trivial types, it uses direct assignment.
+The backing `IAny` is typically an `AnyRef<T>`, a non-owning pointer into the object's inline `State` struct. For trivially-copyable types, `AnyRef<T>::set_value()` uses `memcmp` + `memcpy`. For non-trivial types, it uses direct assignment.
 
 ### Direct state access
 
@@ -54,7 +58,7 @@ For trivially-copyable state structs, the entire state can be snapshotted or res
 `FunctionImpl` stores a `target_fn_` / `target_context_` pair. Invocation is a single indirect call: `target_fn_(target_context_, args)`. For `VELK_INTERFACE` functions, the context is a pointer to the owning object and `target_fn_` is a static trampoline generated by `FnBind` or `FnRawBind`.
 
 - **Zero-arg / typed-arg (`FN`)**: The `FnBind` trampoline extracts typed values from `FnArgs` via `IAny::get_data()` (one per argument), then calls the virtual `fn_Name(...)`.
-- **Raw (`FN_RAW`)**: The `FnRawBind` trampoline passes `FnArgs` through unchanged — no extraction overhead.
+- **Raw (`FN_RAW`)**: The `FnRawBind` trampoline passes `FnArgs` through unchanged, no extraction overhead.
 - **Explicit callback**: `set_invoke_callback()` stores a `CallbackFn*` with a static trampoline that does one `reinterpret_cast` + call.
 
 ### Event dispatch
@@ -62,8 +66,8 @@ For trivially-copyable state structs, the entire state can be snapshotted or res
 Handlers are stored in a single `std::vector` partitioned by invoke type: `[0, deferred_begin_)` for immediate, `[deferred_begin_, size())` for deferred.
 
 - **Immediate handlers**: Invoked in a simple loop. No allocations.
-- **Deferred handlers**: Args are cloned once into a `shared_ptr` (shared across all deferred handlers for that invocation), then queued as `DeferredTask` entries. Queue insertion takes a mutex lock. `instance().update()` swaps the queue under the lock and executes outside it — no nested locking.
-- **No handlers**: The handlers vector is empty — zero heap allocation.
+- **Deferred handlers**: Args are cloned once into a `shared_ptr` (shared across all deferred handlers for that invocation), then queued as `DeferredTask` entries. Queue insertion takes a mutex lock. `instance().update()` swaps the queue under the lock and executes outside it, no nested locking.
+- **No handlers**: The handlers vector is empty, zero heap allocation.
 - **add_handler()**: Linear dedup scan before insertion, `O(H)` where H is handler count.
 
 ### interface_cast
@@ -74,27 +78,137 @@ Complexity is `O(N + P)` where N is the number of interfaces in the pack (typica
 
 ### Metadata lookup
 
-`MetadataContainer::find_or_create(name, kind)` checks the `instances_` cache first — a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
+`MetadataContainer::find_or_create(name, kind)` checks the `instances_` cache first, a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
 
-Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Since applications typically access a subset of declared members, the cache-first scan is shorter than the full members array. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr` — shared across all instances at zero per-object cost.
+Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Since applications typically access a subset of declared members, the cache-first scan is shorter than the full members array. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr`, shared across all instances at zero per-object cost.
 
 ### Object creation
 
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
 2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
 3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
-4. **Allocate MetadataContainer**: One `new MetadataContainer(members, owner)` — stores a pointer to the static metadata array and the owning object
+4. **Allocate MetadataContainer**: One `new MetadataContainer(members, owner)`, stores a pointer to the static metadata array and the owning object
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
+
+### shared_ptr and control blocks
+
+Velk provides its own `shared_ptr<T>` and `weak_ptr<T>` (in `memory.h`) rather than using `std::shared_ptr`. This gives ABI stability across compiler versions and allows two modes of operation selected at compile time:
+
+**Intrusive mode** (IInterface-derived types): The object itself owns the strong reference count via `ref()`/`unref()`. The control block only tracks the weak count and stores the `IObject*` self-pointer. Multiple independent `shared_ptr` instances can be created from raw pointers to the same object without a separate "shared from this" mechanism.
+
+> **Warning:** Intrusive mode requires that the object implements `ref()`/`unref()` with actual reference counting (i.e. derives from `RefCountedDispatch` or provides its own implementation). `InterfaceDispatch` has no-op `ref()`/`unref()` stubs, so wrapping a bare `InterfaceDispatch` object in `shared_ptr` will silently leak: `unref()` does nothing, the strong count never reaches zero, and the object is never deleted.
+
+**External mode** (non-IInterface types): An `external_control_block` is allocated with a type-erased destructor, similar to `std::shared_ptr`. The control block owns both strong and weak counts.
+
+Both modes use the same 16-byte `control_block` layout (two `atomic<int32_t>` counts + one `void*` pointer). External mode extends this to 24 bytes with a `destroy` function pointer.
+
+Every `RefCountedDispatch`-derived object needs a control block. Rather than calling `new`/`delete` for each one, freed blocks are recycled via a per-thread free-list (see [Control block pooling](#control-block-pooling) below). The pooling functions `alloc_control_block` and `dealloc_control_block` are exported from the DLL so that allocation and deallocation always go through the same CRT heap, regardless of which module triggers the operation.
+
+#### Control block pooling
+
+The per-thread pool is a singly-linked free-list that reuses the block's own `ptr` field as a next-pointer. Each thread's pool holds up to 256 blocks (4 KB at 16 bytes/block).
+
+**Performance impact** (AMD Ryzen 7 5800X, MSVC, Release):
+
+| Operation | new/delete | Pooled |
+|---|---|---|
+| Control block alloc + dealloc | ~25 ns | ~6 ns |
+| Object creation (end-to-end) | ~115 ns | ~87 ns |
+
+Pooling is enabled by default and can be controlled via the `VELK_ENABLE_BLOCK_POOL` CMake option.
+
+**Implementation layers:**
+
+The pool uses three layers that work together:
+
+| Layer | Purpose | Hot-path cost |
+|---|---|---|
+| **thread_local cache** | Trivially-destructible `thread_local block_pool*`. Gives near-zero-cost access on the hot path. No destructor is registered, so DLL unload cannot crash. | ~0 ns (compiler TLS access) |
+| **Platform TLS** | Owns the pool lifetime and provides cleanup callbacks (see table below). Populated on first access per thread; the thread_local cache is set from this layer and cleared by the cleanup callback. | ~1-2 ns (API call, cold path only) |
+| **new/delete fallback** | When the pool infrastructure has been torn down (static destruction, DLL unload), `get_pool_ptr()` returns `nullptr` and alloc/dealloc fall through to plain `new`/`delete`. | ~25 ns (heap allocation) |
+
+**Platform TLS details:**
+
+| | Windows | POSIX (Linux, macOS, iOS) | Android |
+|---|---|---|---|
+| **API** | FLS (`FlsAlloc`/`FlsFree`) | `pthread_key_create`/`pthread_key_delete` | `pthread_key_create`/`pthread_key_delete` |
+| **Thread exit cleanup** | FLS callback fires for the exiting thread | pthread destructor fires for the exiting thread | pthread destructor fires for the exiting thread |
+| **Library unload cleanup** | `FlsFree` invokes the callback for *every* thread, draining all pools before the DLL is unmapped | `pthread_key_delete` does *not* invoke callbacks, but glibc/Apple keep the DSO mapped while TLS references exist | `pthread_key_delete` does *not* invoke callbacks; Bionic does not refcount DSOs, but the pthread_key approach avoids the crash because the callback code is not tied to the DSO |
+| **Post-shutdown access** | After `FlsFree`, the FLS index is invalidated; `get_pool_ptr()` returns `nullptr` | After `pthread_key_delete`, `g_key_valid` is set to `false`; `get_pool_ptr()` returns `nullptr` | Same as POSIX |
+| **Granularity** | Fiber-local (each fiber gets its own pool) | Thread-local | Thread-local |
+
+**Why not plain `thread_local`?**
+
+C++ `thread_local` is not used for the pool itself because of two lifetime issues:
+
+- **DLL unload** (Windows, Android): `thread_local` destructors point into the DLL's code. If the DLL is unloaded while other threads are alive, those destructors crash on thread exit. FLS avoids this because `FlsFree` drains all pools before unmapping. On Android, Bionic lacks DSO refcounting for TLS, so the same crash occurs.
+- **Post-destruction access** (MSVC): Accessing a destroyed `thread_local` silently re-constructs it, but the destructor won't fire again, leaking the pool. With FLS/pthread_key, the pool is simply unavailable after cleanup and the fallback path handles it.
+
+These issues do not affect Linux, macOS, or iOS (glibc/Apple runtimes keep the DSO mapped while TLS references exist), but the platform TLS approach is used uniformly for simplicity.
+
+The free list requires no synchronization since each thread has its own pool. Blocks freed on a different thread than they were allocated on join that thread's pool; this is correct but suboptimal in producer/consumer patterns.
+
+**Free-list structure:**
+
+```
+pool->head -> [block A] -> [block B] -> [block C] -> nullptr
+               ptr=B        ptr=C        ptr=nullptr
+```
+
+When a block is in the free list, its `strong`, `weak`, and `ptr` fields are meaningless (no one holds a reference to it). The `ptr` field, which normally stores the `IObject*` self-pointer, is repurposed as the next-link.
+
+**Dealloc** pushes to the front:
+
+```
+block->ptr = head;   // new block points to current head
+head = block;        // new block becomes the head
+
+Before:  head -> [B] -> [C] -> nullptr
+After:   head -> [block] -> [B] -> [C] -> nullptr
+```
+
+**Alloc** pops from the front, reinitializing the block for use:
+
+```
+b = head;                                    // grab the head
+head = static_cast<control_block*>(b->ptr);  // advance head to next
+b->strong = 1; b->weak = 1; b->ptr = nullptr;
+return b;
+
+Before:  head -> [A] -> [B] -> [C] -> nullptr
+After:   head -> [B] -> [C] -> nullptr          (A returned to caller)
+```
+
+If the free list is empty, `alloc_control_block()` falls back to `new control_block{1, 1, nullptr}`.
 
 ## Memory layout
 
 An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
 
+### Example: Minimal object with 1 member
+
+A minimal object implements a single interface with one property. `ext::Object` adds `IMetadataContainer`, giving 3 interfaces in the dispatch pack (IObject, IMetadataContainer, IToggle).
+
+```
+Toggle (96 bytes)                           MetadataContainer (72 bytes, heap)
+┌──────────────────────────────────┐      ┌────────────────────────────────┐
+│ MI base layout               64  │      │ base (InterfaceDispatch)   16  │
+│   (3 vptrs + MI padding)         │      │ members_ (array_view)      16  │
+│ flags + padding               8  │      │ owner_ (pointer)            8  │
+│ block*                        8  │      │ instances_ (vector)        24  │
+│ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
+│ IToggle::State                8  │      └────────────────────────────────┘
+│   (enabled: bool + padding)      │
+└──────────────────────────────────┘
+```
+
+With no members accessed, the total footprint is **168 bytes** (96 object + 72 MetadataContainer). Accessing the one property adds 24 bytes to the `instances_` vector, bringing the total to **192 bytes**.
+
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (IObject, IMetadataContainer which subsumes IMetadata and IPropertyState, IMyWidget, ISerializable).
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (IObject, IMetadataContainer, IMyWidget, ISerializable).
 
 ```
 MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
@@ -103,7 +217,7 @@ MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
 │   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
 │ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
-│ meta_ (unique_ptr)            8  │      │ dynamic_ (unique_ptr)       8  │
+│ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
 │ IMyWidget::State              8  │      └────────────────────────────────┘
 │   (width, height: 2× float)      │
 │ ISerializable::State         32  │
@@ -111,15 +225,19 @@ MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
 └──────────────────────────────────┘
 ```
 
-The MI base layout (88 bytes) contains 4 vtable pointers — one per interface chain — plus MSVC multiple-inheritance adjustment padding. The exact layout is compiler-specific; the total is derived from `sizeof(ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>)` = 104 minus ObjectData (16). The self-pointer (`IObject*`) is stored in `control_block::ptr` rather than inline, so it costs no per-object space beyond the already-allocated block.
+### Layout notes
 
-Member instances are created lazily — only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`.
+The MI base layout contains one vtable pointer per interface chain, plus MSVC multiple-inheritance adjustment padding. The exact layout is compiler-specific; sizes are derived from `sizeof(ObjectCore<...>)` minus ObjectData (16). The self-pointer (`IObject*`) is stored in `control_block::ptr` rather than inline, so it costs no per-object space beyond the already-allocated block.
 
-| Scenario | MyWidget | MetadataContainer | Cached members | Total |
+Member instances are created lazily, only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`.
+
+| Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| No members accessed | 152 | 72 | 0 | **224 bytes** |
-| 3 members accessed | 152 | 72 | 3 × 24 = 72 | **296 bytes** |
-| All 6 members accessed | 152 | 72 | 6 × 24 = 144 | **368 bytes** |
+| Toggle, no members accessed | 96 | 72 | 0 | **168 bytes** |
+| Toggle, 1 member accessed | 96 | 72 | 1 × 24 = 24 | **192 bytes** |
+| MyWidget, no members accessed | 152 | 72 | 0 | **224 bytes** |
+| MyWidget, 3 members accessed | 152 | 72 | 3 × 24 = 72 | **296 bytes** |
+| MyWidget, all 6 members accessed | 152 | 72 | 6 × 24 = 144 | **368 bytes** |
 
 The `states_` tuple contains one `State` struct per interface that declares properties via `VELK_INTERFACE`. Each `State` struct holds one field per `PROP` member, initialized with its declared default value. Properties backed by state storage use `ext::AnyRef<T>` to read/write directly into these fields.
 
@@ -172,6 +290,6 @@ PropertyImpl (96 bytes)             FunctionImpl (120 bytes)
 
 Internal interface types use inheritance to reduce MI chains: `IPropertyInternal` inherits `IProperty`, `IFunctionInternal` inherits `IEvent` (which inherits `IFunction`), and `IFutureInternal` inherits `IFuture`. This means each impl class only needs one entry in its interface pack (the Internal variant), halving the MI vptr overhead compared to listing both the public and internal interfaces separately.
 
-- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop — it is always heap-allocated at construction.
+- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop, it is always heap-allocated at construction.
 - **FunctionImpl** implements both `ClassId::Function` and `ClassId::Event`. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. The `handlers_` vector is partitioned: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
 - **PropertyImpl** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.

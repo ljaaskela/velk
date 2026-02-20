@@ -99,7 +99,7 @@ public:
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
     void fn_reset() override {
-        // void return — trampoline returns nullptr to IFunction::invoke()
+        // void return, trampoline returns nullptr to IFunction::invoke()
     }
 
     float fn_add(int x, float y) override {
@@ -115,7 +115,7 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 };
 ```
 
-Invocation works the same for all variants — callers always go through `IFunction::invoke()`:
+Invocation works the same for all variants, callers always go through `IFunction::invoke()`:
 
 ```cpp
 auto widget = instance().create<IObject>(MyWidget::class_id());

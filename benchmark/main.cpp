@@ -238,3 +238,27 @@ static void BM_ObjectCreate(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ObjectCreate);
+
+// ---------------------------------------------------------------------------
+// Control block allocation: pooled vs raw new/delete
+// ---------------------------------------------------------------------------
+
+static void BM_ControlBlockPooled(benchmark::State& state)
+{
+    for (auto _ : state) {
+        auto* b = detail::alloc_control_block();
+        benchmark::DoNotOptimize(b);
+        detail::dealloc_control_block(b);
+    }
+}
+BENCHMARK(BM_ControlBlockPooled);
+
+static void BM_ControlBlockNewDelete(benchmark::State& state)
+{
+    for (auto _ : state) {
+        auto* b = new control_block{1, 1, nullptr};
+        benchmark::DoNotOptimize(b);
+        delete b;
+    }
+}
+BENCHMARK(BM_ControlBlockNewDelete);

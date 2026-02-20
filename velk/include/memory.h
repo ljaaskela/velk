@@ -6,6 +6,7 @@
 #include <cstdint>
 #include <type_traits>
 #include <utility>
+#include <velk_export.h>
 
 namespace velk {
 
@@ -97,6 +98,30 @@ struct external_control_block : control_block
 namespace detail {
 
 /**
+ * @brief Allocates a control_block, reusing a pooled block when available.
+ *
+ * Implemented in velk.cpp to keep all heap operations within the DLL,
+ * avoiding cross-module new/delete mismatches.
+ *
+ * @param external If true, allocates an external_control_block (24 bytes,
+ *                 not pooled). If false, allocates a control_block (16 bytes,
+ *                 pooled when available).
+ * @return A block initialized with strong=1, weak=1, ptr=nullptr
+ *         (and destroy=nullptr for external blocks).
+ */
+VELK_EXPORT control_block* alloc_control_block(bool external = false);
+
+/**
+ * @brief Returns a control_block to the pool, or frees it if the pool is full.
+ *
+ * @param block The control block to recycle.
+ * @param external Must match the value passed to alloc_control_block.
+ *                 External blocks are deleted as external_control_block
+ *                 (required since control_block has no virtual destructor).
+ */
+VELK_EXPORT void dealloc_control_block(control_block* block, bool external = false);
+
+/**
  * @brief Releases the "strong group" weak ref, freeing the block if no weak_ptrs remain.
  *
  * Called from ~RefCountedDispatch(). The block is heap-allocated (not embedded
@@ -108,53 +133,33 @@ namespace detail {
 inline void release_control_block(control_block& block)
 {
     if (block.release_weak()) {
-        delete &block;
+        dealloc_control_block(&block);
     }
 }
 
 /**
- * @brief Acquires a shared reference for IInterface types.
+ * @brief Releases one weak ref on a pooled control_block (IInterface types).
  *
- * Only adds a weak ref (the intrusive ref() on the object handles strong).
- * Null-safe: does nothing if @p block is null (for shared_ptr constructed
- * from a raw IInterface pointer without a block).
- *
- * @param block The control block, or nullptr.
- */
-inline void shared_acquire_intrusive(control_block* block)
-{
-    if (block) {
-        block->add_weak();
-    }
-}
-
-/**
- * @brief Acquires a shared reference for non-IInterface types.
- *
- * Increments both strong and weak counts.
+ * Used for both shared and weak pointer release on intrusive types, since
+ * strong count management is handled by ref()/unref() on the object itself.
  *
  * @param block The control block, or nullptr.
  */
-inline void shared_acquire_external(control_block* block)
-{
-    if (block) {
-        block->add_ref();
-        block->add_weak();
-    }
-}
-
-/**
- * @brief Releases a shared reference for IInterface types.
- *
- * Only releases the weak ref (unref() on the object handles strong).
- * Frees the block if this was the last weak ref.
- *
- * @param block The control block, or nullptr.
- */
-inline void shared_release_intrusive(control_block* block)
+inline void weak_release_intrusive(control_block* block)
 {
     if (block && block->release_weak()) {
-        delete block;
+        dealloc_control_block(block);
+    }
+}
+
+/**
+ * @brief Releases one weak ref on an external_control_block (non-IInterface types).
+ * @param block The control block, or nullptr.
+ */
+inline void weak_release_external(control_block* block)
+{
+    if (block && block->release_weak()) {
+        dealloc_control_block(block, true);
     }
 }
 
@@ -163,7 +168,7 @@ inline void shared_release_intrusive(control_block* block)
  *
  * Decrements the strong count; if it reaches zero, calls the type-erased
  * destroy function. Then decrements the weak count; if it reaches zero,
- * frees the external_control_block.
+ * frees the external_control_block via the DLL.
  *
  * @param block The control block, or nullptr.
  */
@@ -175,30 +180,8 @@ inline void shared_release_external(control_block* block)
             ecb->destroy(block->ptr);
         }
         if (block->release_weak()) {
-            delete ecb;
+            dealloc_control_block(block, true);
         }
-    }
-}
-
-/**
- * @brief Releases a weak ref on a plain control_block (IInterface types).
- * @param block The control block, or nullptr.
- */
-inline void weak_release_intrusive(control_block* block)
-{
-    if (block && block->release_weak()) {
-        delete block;
-    }
-}
-
-/**
- * @brief Releases a weak ref on an external_control_block (non-IInterface types).
- * @param block The control block, or nullptr.
- */
-inline void weak_release_external(control_block* block)
-{
-    if (block && block->release_weak()) {
-        delete static_cast<external_control_block*>(block);
     }
 }
 
@@ -296,9 +279,10 @@ class shared_ptr : public ptr_base<T>
         if (!ptr_) return;
         if constexpr (is_interface) {
             this->mutable_ptr()->ref();
-            detail::shared_acquire_intrusive(block_);
-        } else {
-            detail::shared_acquire_external(block_);
+            if (block_) block_->add_weak();
+        } else if (block_) {
+            block_->add_ref();
+            block_->add_weak();
         }
     }
 
@@ -308,7 +292,7 @@ class shared_ptr : public ptr_base<T>
         if (!ptr_) return;
         if constexpr (is_interface) {
             this->mutable_ptr()->unref();
-            detail::shared_release_intrusive(block_);
+            detail::weak_release_intrusive(block_);
         } else {
             detail::shared_release_external(block_);
         }
@@ -334,8 +318,8 @@ public:
         if (!p) return;
         ptr_ = p;
         if constexpr (!is_interface) {
-            auto* ecb = new external_control_block();
-            ecb->strong.store(1, std::memory_order_relaxed);
+            auto* ecb = static_cast<external_control_block*>(
+                detail::alloc_control_block(true));
             ecb->ptr = p;
             ecb->destroy = [](void* obj) { delete static_cast<T*>(obj); };
             block_ = ecb;
