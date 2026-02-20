@@ -90,7 +90,7 @@ class ObjectTest : public ::testing::Test
 protected:
     static void SetUpTestSuite()
     {
-        instance().register_type<TestWidget>();
+        instance().type_registry().register_type<TestWidget>();
     }
 };
 
@@ -225,7 +225,7 @@ TEST_F(ObjectTest, FunctionInvokeByName)
 
 TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // ITestWidget: width, height, id, on_clicked, reset
@@ -250,7 +250,7 @@ TEST_F(ObjectTest, StaticMetadataViaGetClassInfo)
 
 TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
@@ -271,7 +271,7 @@ TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
 
 TEST_F(ObjectTest, StaticDefaultValues)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f);  // width
@@ -350,7 +350,7 @@ TEST_F(ObjectTest, VoidFunctionReturnsNull)
 
 TEST_F(ObjectTest, TypedFunctionArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     // Find the "add" member
@@ -372,7 +372,7 @@ TEST_F(ObjectTest, TypedFunctionArgMetadata)
 
 TEST_F(ObjectTest, ZeroArgFunctionHasNoArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     const MemberDesc* resetDesc = nullptr;
@@ -426,7 +426,7 @@ TEST_F(ObjectTest, PropBindCreateRef)
 
 TEST_F(ObjectTest, FnRawHasNoArgMetadata)
 {
-    auto* info = instance().get_class_info(TestWidget::class_id());
+    auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
     const MemberDesc* processDesc = nullptr;
@@ -556,8 +556,8 @@ class ClassUidTest : public ::testing::Test
 protected:
     static void SetUpTestSuite()
     {
-        instance().register_type<TaggedWidget>();
-        instance().register_type<AutoUidWidget>();
+        instance().type_registry().register_type<TaggedWidget>();
+        instance().type_registry().register_type<AutoUidWidget>();
     }
 };
 

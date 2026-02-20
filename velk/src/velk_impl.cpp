@@ -9,23 +9,23 @@
 
 namespace velk {
 
-void RegisterTypes(IVelk &velk)
+void RegisterTypes(ITypeRegistry &reg)
 {
-    velk.register_type<PropertyImpl>();
-    velk.register_type<FunctionImpl>();
-    velk.register_type<FutureImpl>();
+    reg.register_type<PropertyImpl>();
+    reg.register_type<FunctionImpl>();
+    reg.register_type<FutureImpl>();
 
-    velk.register_type<ext::AnyValue<float>>();
-    velk.register_type<ext::AnyValue<double>>();
-    velk.register_type<ext::AnyValue<uint8_t>>();
-    velk.register_type<ext::AnyValue<uint16_t>>();
-    velk.register_type<ext::AnyValue<uint32_t>>();
-    velk.register_type<ext::AnyValue<uint64_t>>();
-    velk.register_type<ext::AnyValue<int8_t>>();
-    velk.register_type<ext::AnyValue<int16_t>>();
-    velk.register_type<ext::AnyValue<int32_t>>();
-    velk.register_type<ext::AnyValue<int64_t>>();
-    velk.register_type<ext::AnyValue<std::string>>();
+    reg.register_type<ext::AnyValue<float>>();
+    reg.register_type<ext::AnyValue<double>>();
+    reg.register_type<ext::AnyValue<uint8_t>>();
+    reg.register_type<ext::AnyValue<uint16_t>>();
+    reg.register_type<ext::AnyValue<uint32_t>>();
+    reg.register_type<ext::AnyValue<uint64_t>>();
+    reg.register_type<ext::AnyValue<int8_t>>();
+    reg.register_type<ext::AnyValue<int16_t>>();
+    reg.register_type<ext::AnyValue<int32_t>>();
+    reg.register_type<ext::AnyValue<int64_t>>();
+    reg.register_type<ext::AnyValue<std::string>>();
 }
 
 VelkImpl::VelkImpl()

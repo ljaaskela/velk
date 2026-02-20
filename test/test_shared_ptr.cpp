@@ -256,7 +256,7 @@ public:
 int TrackableObject::alive_count = 0;
 
 static bool register_trackable = [] {
-    instance().register_type<TrackableObject>();
+    instance().type_registry().register_type<TrackableObject>();
     return true;
 }();
 

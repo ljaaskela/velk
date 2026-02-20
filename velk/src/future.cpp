@@ -69,9 +69,9 @@ void FutureImpl::fire_continuation(const Continuation& cont, const IAny* result)
     if (cont.type == Immediate) {
         cont.fn->invoke(args);
     } else {
-        IVelk::DeferredTask task;
+        DeferredTask task;
         task.fn = cont.fn;
-        task.args = ::velk::make_shared<IVelk::DeferredArgs>(args);
+        task.args = ::velk::make_shared<DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
     }
 }

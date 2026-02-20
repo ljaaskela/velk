@@ -37,6 +37,7 @@ add_library(velk SHARED
     include/velk/interface/intf_future.h
     include/velk/interface/intf_property.h
     include/velk/interface/intf_object_factory.h
+    include/velk/interface/intf_type_registry.h
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
     include/velk/interface/types.h

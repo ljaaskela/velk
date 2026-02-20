@@ -42,7 +42,7 @@ static void ensureRegistered()
 {
     static bool done = false;
     if (!done) {
-        instance().register_type<BenchWidget>();
+        instance().type_registry().register_type<BenchWidget>();
         done = true;
     }
 }

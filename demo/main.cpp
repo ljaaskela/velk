@@ -181,7 +181,7 @@ void demo_static_metadata()
 
     // --- Static metadata via Velk (no instance needed) ---
     cout << "MyWidget static metadata:" << endl;
-    if (auto* info = r.get_class_info(MyWidget::class_id())) {
+    if (auto* info = r.type_registry().get_class_info<MyWidget>()) {
         cout << "  Class: " << info->name << " (" << info->members.size() << " members)" << endl;
         for (auto& m : info->members) {
             const char* kind = m.kind == MemberKind::Property ? "Property"
@@ -200,7 +200,7 @@ void demo_static_metadata()
 
     // --- Static defaults (no instance needed) ---
     cout << endl << "  Static metadata defaults:" << endl;
-    if (auto* info = r.get_class_info(MyWidget::class_id())) {
+    if (auto* info = r.type_registry().get_class_info<MyWidget>()) {
         for (auto& m : info->members) {
             if (auto* pk = m.propertyKind()) {
                 auto* def = pk->getDefault ? pk->getDefault() : nullptr;
@@ -274,7 +274,7 @@ void demo_interfaces(IObject::Ptr& widget)
         invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f));
 
         // Inspect typed arg metadata
-        if (auto* info = instance().get_class_info(MyWidget::class_id())) {
+        if (auto* info = instance().type_registry().get_class_info<MyWidget>()) {
             for (auto& m : info->members) {
                 if (auto* fk = m.functionKind()) {
                     if (!fk->args.empty()) {
@@ -523,8 +523,8 @@ int main()
 {
     auto &r = instance();
 
-    r.register_type<MyDataAny>();
-    r.register_type<MyWidget>();
+    r.type_registry().register_type<MyDataAny>();
+    r.type_registry().register_type<MyWidget>();
 
     demo_properties();
     demo_custom_any();

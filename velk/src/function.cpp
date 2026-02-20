@@ -25,9 +25,9 @@ IAny::Ptr FunctionImpl::callback_trampoline(void* ctx, FnArgs args)
 IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
 {
     if (type == Deferred) {
-        IVelk::DeferredTask task;
+        DeferredTask task;
         task.fn = get_self<IFunction>();
-        task.args = ::velk::make_shared<IVelk::DeferredArgs>(args);
+        task.args = ::velk::make_shared<DeferredArgs>(args);
         instance().queue_deferred_tasks(array_view(&task, 1));
         return nullptr;
     }
@@ -61,9 +61,9 @@ void FunctionImpl::invoke_handlers(FnArgs args) const
         return;
     }
     // Clone args once, share ownership across all deferred tasks
-    auto clonedArgs = ::velk::make_shared<IVelk::DeferredArgs>(args);
+    auto clonedArgs = ::velk::make_shared<DeferredArgs>(args);
 
-    std::vector<IVelk::DeferredTask> tasks;
+    std::vector<DeferredTask> tasks;
     tasks.reserve(deferred.size());
     for (const auto &h : deferred) {
         tasks.push_back({h, clonedArgs});

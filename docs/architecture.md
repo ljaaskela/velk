@@ -59,7 +59,8 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support |
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
-| `intf_velk.h` | `IVelk` for type registration and object creation |
+| `intf_type_registry.h` | `ITypeRegistry` for type registration and class info lookup |
+| `intf_velk.h` | `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -97,7 +98,7 @@ Internal runtime implementations (compiled into the DLL).
 
 | File | Description |
 |---|---|
-| `velk_impl.cpp/h` | `VelkImpl` implementing `IVelk` |
+| `velk_impl.cpp/h` | `VelkImpl` implementing `IVelk` and `ITypeRegistry` |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
@@ -155,9 +156,13 @@ classDiagram
     class IExternalAny {
         <<interface>>
     }
+    class ITypeRegistry {
+        <<interface>>
+        register/unregister/get_class_info
+    }
     class IVelk {
         <<interface>>
-        register/create/update
+        type_registry()/create/update
     }
 
     IInterface <|-- IObject
@@ -172,6 +177,7 @@ classDiagram
     IFunction <|-- IEvent
 
     IInterface <|-- IExternalAny
+    IInterface <|-- ITypeRegistry
     IInterface <|-- IVelk
 ```
 

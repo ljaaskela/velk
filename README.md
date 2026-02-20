@@ -172,8 +172,8 @@ class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 ### Register and create
 
 ```cpp
-auto& s = instance();                                           // global type registry
-s.register_type<MyWidget>();                                    // register factory
+auto& s = instance();                                           // global IVelk
+s.type_registry().register_type<MyWidget>();                    // register factory
 
 auto widget = s.create<IObject>(MyWidget::class_id());     // create by UID
 ```
@@ -198,7 +198,7 @@ if (widget) {
 Static metadata is available from Velk without creating an instance:
 
 ```cpp
-if (auto* info = instance().get_class_info(MyWidget::class_id())) {  // lookup by UID
+if (auto* info = instance().type_registry().get_class_info(MyWidget::class_id())) {  // lookup by UID
     for (auto& i : info->interfaces) {                             // enumerate interfaces
         // i.uid, i.name
     }

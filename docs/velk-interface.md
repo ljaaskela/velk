@@ -62,7 +62,7 @@ struct FunctionKind {
 Access via `MemberDesc::functionKind()->args`:
 
 ```cpp
-if (auto* info = instance().get_class_info(MyWidget::class_id())) {
+if (auto* info = instance().type_registry().get_class_info(MyWidget::class_id())) {
     for (auto& m : info->members) {
         if (auto* fk = m.functionKind(); fk && !fk->args.empty()) {
             for (auto& arg : fk->args) {

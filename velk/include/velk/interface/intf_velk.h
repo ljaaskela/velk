@@ -7,9 +7,48 @@
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_property.h>
+#include <velk/interface/intf_type_registry.h>
 #include <velk/interface/types.h>
 
 namespace velk {
+
+/** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
+struct DeferredArgs : public ::velk::NoCopyMove
+{
+    /** @brief Deep-clones each argument from @p args. */
+    explicit DeferredArgs(FnArgs args)
+    {
+        owned_.reserve(args.count);
+        for (auto *arg : args) {
+            owned_.push_back(arg ? arg->clone() : nullptr);
+        }
+    }
+
+    /** @brief Returns a non-owning FnArgs view. Builds the raw pointer array on first call. */
+    FnArgs view() const
+    {
+        if (owned_.size() && ptrs_.size() != owned_.size()) {
+            ptrs_.resize(owned_.size());
+            for (size_t i = 0; i < owned_.size(); ++i) {
+                ptrs_[i] = owned_[i].get();
+            }
+        }
+        return {ptrs_.data(), ptrs_.size()};
+    }
+
+private:
+    std::vector<IAny::Ptr> owned_;
+    mutable std::vector<const IAny*> ptrs_;
+};
+
+/** @brief Deferred task */
+struct DeferredTask
+{
+    /** @brief The function to invoke. */
+    IFunction::ConstPtr fn;
+    /** @brief Cloned function args. Shared across tasks that originated from the same invocation. */
+    shared_ptr<DeferredArgs> args;
+};
 
 /**
  * @brief Central interface for creating and managing Velk object types.
@@ -26,57 +65,18 @@ namespace velk {
 class IVelk : public Interface<IVelk>
 {
 public:
-    /** @brief Registers an object factory for the type it describes. */
-    virtual ReturnValue register_type(const IObjectFactory &factory) = 0;
-    /** @brief Unregisters a previously registered object factory. */
-    virtual ReturnValue unregister_type(const IObjectFactory &factory) = 0;
+    /** @brief Returns the type registry for registering/querying types. */
+    virtual ITypeRegistry& type_registry() = 0;
+    /** @brief Returns the type registry (const). */
+    virtual const ITypeRegistry& type_registry() const = 0;
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid) const = 0;
-    /** @brief Returns the ClassInfo for a registered type, or nullptr if not found. */
-    virtual const ClassInfo* get_class_info(Uid classUid) const = 0;
     /** @brief Creates a new IAny value container for the given type UID. */
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
     virtual IProperty::Ptr create_property(Uid type,
                                            const IAny::Ptr &value,
                                            int32_t flags = ObjectFlags::None) const = 0;
-    /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
-    struct DeferredArgs : public ::velk::NoCopyMove
-    {
-        /** @brief Deep-clones each argument from @p args. */
-        explicit DeferredArgs(FnArgs args)
-        {
-            owned_.reserve(args.count);
-            for (auto *arg : args) {
-                owned_.push_back(arg ? arg->clone() : nullptr);
-            }
-        }
-
-        /** @brief Returns a non-owning FnArgs view. Builds the raw pointer array on first call. */
-        FnArgs view() const
-        {
-            if (owned_.size() && ptrs_.size() != owned_.size()) {
-                ptrs_.resize(owned_.size());
-                for (size_t i = 0; i < owned_.size(); ++i) {
-                    ptrs_[i] = owned_[i].get();
-                }
-            }
-            return {ptrs_.data(), ptrs_.size()};
-        }
-
-    private:
-        std::vector<IAny::Ptr> owned_;
-        mutable std::vector<const IAny*> ptrs_;
-    };
-
-    /** @brief Deferred task */
-    struct DeferredTask
-    {
-        /** @brief The function to invoke. */
-        IFunction::ConstPtr fn;
-        /** @brief Cloned function args. Shared across tasks that originated from the same invocation. */
-        shared_ptr<DeferredArgs> args;
-    };
     /**
      * @brief Enqueues tasks to be executed on the next update() call.
      * @param tasks The tasks to invoke.
@@ -112,15 +112,6 @@ public:
         return interface_pointer_cast<T>(create(uid));
     }
 
-    /**
-     * @brief Registers a type using its static get_factory() method.
-     * @tparam T An Object-derived class with a static get_factory() method.
-     */
-    template<class T>
-    ReturnValue register_type()
-    {
-        return register_type(T::get_factory());
-    }
 };
 
 } // namespace velk
