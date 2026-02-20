@@ -1,6 +1,6 @@
 #include "future.h"
-#include <api/callback.h>
-#include <api/velk.h>
+#include <velk/api/callback.h>
+#include <velk/api/velk.h>
 
 namespace velk {
 

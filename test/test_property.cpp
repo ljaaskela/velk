@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 
-#include <api/any.h>
-#include <api/callback.h>
-#include <api/property.h>
-#include <api/velk.h>
-#include <interface/intf_property.h>
+#include <velk/api/any.h>
+#include <velk/api/callback.h>
+#include <velk/api/property.h>
+#include <velk/api/velk.h>
+#include <velk/interface/intf_property.h>
 
 using namespace velk;
 

@@ -1,9 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <api/any.h>
-#include <api/velk.h>
-#include <ext/any.h>
-#include <interface/intf_any.h>
+#include <velk/api/any.h>
+#include <velk/api/velk.h>
+#include <velk/ext/any.h>
+#include <velk/interface/intf_any.h>
 
 using namespace velk;
 

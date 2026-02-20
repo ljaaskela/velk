@@ -92,7 +92,9 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
 
-### shared_ptr and control blocks
+---
+
+## shared_ptr and control blocks
 
 Velk provides its own `shared_ptr<T>` and `weak_ptr<T>` (in `memory.h`) rather than using `std::shared_ptr`. This gives ABI stability across compiler versions and allows two modes of operation selected at compile time:
 
@@ -106,7 +108,7 @@ Both modes use the same 16-byte `control_block` layout (two `atomic<int32_t>` co
 
 Every `RefCountedDispatch`-derived object needs a control block. Rather than calling `new`/`delete` for each one, freed blocks are recycled via a per-thread free-list (see [Control block pooling](#control-block-pooling) below). The pooling functions `alloc_control_block` and `dealloc_control_block` are exported from the DLL so that allocation and deallocation always go through the same CRT heap, regardless of which module triggers the operation.
 
-#### Control block pooling
+### Control block pooling
 
 The per-thread pool is a singly-linked free-list that reuses the block's own `ptr` field as a next-pointer. Each thread's pool holds up to 256 blocks (4 KB at 16 bytes/block).
 
@@ -182,6 +184,8 @@ After:   head -> [B] -> [C] -> nullptr          (A returned to caller)
 ```
 
 If the free list is empty, `alloc_control_block()` falls back to `new control_block{1, 1, nullptr}`.
+
+---
 
 ## Memory layout
 

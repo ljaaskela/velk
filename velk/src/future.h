@@ -1,10 +1,10 @@
 #ifndef FUTURE_H
 #define FUTURE_H
 
-#include <common.h>
-#include <ext/core_object.h>
-#include <interface/intf_future.h>
-#include <interface/types.h>
+#include <velk/common.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_future.h>
+#include <velk/interface/types.h>
 
 #include <atomic>
 #include <condition_variable>

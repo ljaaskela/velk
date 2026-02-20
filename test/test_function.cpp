@@ -1,14 +1,14 @@
 #include <gtest/gtest.h>
 
-#include <api/any.h>
-#include <api/callback.h>
-#include <api/event.h>
-#include <api/function.h>
-#include <api/function_context.h>
-#include <api/velk.h>
-#include <interface/intf_event.h>
-#include <interface/intf_function.h>
-#include <interface/types.h>
+#include <velk/api/any.h>
+#include <velk/api/callback.h>
+#include <velk/api/event.h>
+#include <velk/api/function.h>
+#include <velk/api/function_context.h>
+#include <velk/api/velk.h>
+#include <velk/interface/intf_event.h>
+#include <velk/interface/intf_function.h>
+#include <velk/interface/types.h>
 
 using namespace velk;
 

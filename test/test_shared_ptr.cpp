@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
-#include <api/velk.h>
-#include <ext/any.h>
-#include <ext/core_object.h>
-#include <interface/intf_object.h>
-#include <interface/types.h>
-#include <memory.h>
+#include <velk/api/velk.h>
+#include <velk/ext/any.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_object.h>
+#include <velk/interface/types.h>
+#include <velk/memory.h>
 
 using namespace velk;
 

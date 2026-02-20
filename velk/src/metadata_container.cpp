@@ -2,10 +2,10 @@
 #include "function.h"
 #include "property.h"
 
-#include <api/velk.h>
-#include <ext/core_object.h>
-#include <interface/intf_function.h>
-#include <interface/types.h>
+#include <velk/api/velk.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_function.h>
+#include <velk/interface/types.h>
 
 namespace velk {
 

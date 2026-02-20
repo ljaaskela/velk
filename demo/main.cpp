@@ -1,16 +1,16 @@
-#include <api/velk.h>
+#include <velk/api/velk.h>
 
-#include <api/any.h>
-#include <api/callback.h>
-#include <api/function_context.h>
-#include <api/property.h>
-#include <ext/any.h>
-#include <ext/event.h>
-#include <ext/object.h>
-#include <interface/intf_external_any.h>
-#include <interface/intf_property.h>
-#include <interface/intf_velk.h>
-#include <interface/types.h>
+#include <velk/api/any.h>
+#include <velk/api/callback.h>
+#include <velk/api/function_context.h>
+#include <velk/api/property.h>
+#include <velk/ext/any.h>
+#include <velk/ext/event.h>
+#include <velk/ext/object.h>
+#include <velk/interface/intf_external_any.h>
+#include <velk/interface/intf_property.h>
+#include <velk/interface/intf_velk.h>
+#include <velk/interface/types.h>
 #include <iostream>
 
 using std::cout;

@@ -1,6 +1,6 @@
 #include "property.h"
-#include <interface/intf_external_any.h>
-#include <interface/types.h>
+#include <velk/interface/intf_external_any.h>
+#include <velk/interface/types.h>
 
 namespace velk {
 

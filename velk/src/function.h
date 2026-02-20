@@ -1,11 +1,11 @@
 #ifndef FUNCTION_H
 #define FUNCTION_H
 
-#include <common.h>
-#include <ext/core_object.h>
-#include <interface/intf_event.h>
-#include <interface/intf_function.h>
-#include <interface/types.h>
+#include <velk/common.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_event.h>
+#include <velk/interface/intf_function.h>
+#include <velk/interface/types.h>
 
 namespace velk {
 

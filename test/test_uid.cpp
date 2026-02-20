@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include <common.h>
-#include <uid.h>
+#include <velk/common.h>
+#include <velk/uid.h>
 
 using namespace velk;
 

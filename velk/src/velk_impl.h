@@ -1,9 +1,9 @@
 #ifndef VELK_IMPL_H
 #define VELK_IMPL_H
 
-#include <common.h>
-#include <ext/core_object.h>
-#include <interface/intf_velk.h>
+#include <velk/common.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_velk.h>
 #include <mutex>
 #include <vector>
 

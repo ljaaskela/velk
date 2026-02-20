@@ -1,13 +1,13 @@
 #include <benchmark/benchmark.h>
 
-#include <api/any.h>
-#include <api/callback.h>
-#include <api/event.h>
-#include <api/function.h>
-#include <api/property.h>
-#include <api/velk.h>
-#include <ext/object.h>
-#include <interface/intf_metadata.h>
+#include <velk/api/any.h>
+#include <velk/api/callback.h>
+#include <velk/api/event.h>
+#include <velk/api/function.h>
+#include <velk/api/property.h>
+#include <velk/api/velk.h>
+#include <velk/ext/object.h>
+#include <velk/interface/intf_metadata.h>
 
 using namespace velk;
 

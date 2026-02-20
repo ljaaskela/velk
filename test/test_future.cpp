@@ -1,11 +1,11 @@
 #include <gtest/gtest.h>
 
-#include <api/any.h>
-#include <api/callback.h>
-#include <api/future.h>
-#include <api/velk.h>
-#include <interface/intf_future.h>
-#include <interface/types.h>
+#include <velk/api/any.h>
+#include <velk/api/callback.h>
+#include <velk/api/future.h>
+#include <velk/api/velk.h>
+#include <velk/interface/intf_future.h>
+#include <velk/interface/types.h>
 
 #include <thread>
 

@@ -1,11 +1,11 @@
 #ifndef PROPERTY_H
 #define PROPERTY_H
 
-#include <common.h>
-#include <ext/event.h>
-#include <ext/core_object.h>
-#include <interface/intf_property.h>
-#include <interface/types.h>
+#include <velk/common.h>
+#include <velk/ext/event.h>
+#include <velk/ext/core_object.h>
+#include <velk/interface/intf_property.h>
+#include <velk/interface/types.h>
 
 namespace velk {
 

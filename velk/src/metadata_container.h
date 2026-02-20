@@ -1,8 +1,8 @@
 #ifndef METADATA_CONTAINER_H
 #define METADATA_CONTAINER_H
 
-#include <ext/refcounted_dispatch.h>
-#include <interface/intf_metadata.h>
+#include <velk/ext/refcounted_dispatch.h>
+#include <velk/interface/intf_metadata.h>
 #include <memory>
 #include <vector>
 
