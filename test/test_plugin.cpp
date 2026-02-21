@@ -134,13 +134,22 @@ TEST_F(PluginTest, UnloadAutoUnregistersTypes)
     EXPECT_EQ(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
 }
 
-TEST_F(PluginTest, DoubleLoadReturnsError)
+TEST_F(PluginTest, DoubleLoadReturnsNothingToDo)
 {
     auto& reg = velk_.plugin_registry();
 
     ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
-    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin(plugin_));
+    EXPECT_EQ(ReturnValue::NOTHING_TO_DO, reg.load_plugin(plugin_));
     EXPECT_EQ(1, tp_->initCount);
+}
+
+
+TEST_F(PluginTest, InvalidReturnsError)
+{
+    auto& reg = velk_.plugin_registry();
+
+    ASSERT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin({}));
+    EXPECT_EQ(0, tp_->initCount);
 }
 
 TEST_F(PluginTest, UnloadUnknownReturnsError)

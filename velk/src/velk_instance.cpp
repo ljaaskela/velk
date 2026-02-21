@@ -111,21 +111,20 @@ IAny::Ptr VelkInstance::create_any(Uid type) const
 
 IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr &value, int32_t flags) const
 {
-    if (auto property = interface_pointer_cast<IProperty>(create(ClassId::Property))) {
-        if (auto pi = property->get_interface<IPropertyInternal>()) {
-            pi->set_flags(flags);
-            if (value && is_compatible(value, type)) {
-                if (pi->set_any(value)) {
-                    return property;
-                }
-                detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
-                                 "Initial value is of incompatible type");
+    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property));
+    if (auto pi = interface_cast<IPropertyInternal>(property)) {
+        pi->set_flags(flags);
+        if (value && is_compatible(value, type)) {
+            if (pi->set_any(value)) {
+                return property;
             }
-            // Any was not specified for property instance, create new one
-            if (auto any = create_any(type)) {
-                if (pi->set_any(any)) {
-                    return property;
-                }
+            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                             "Initial value is of incompatible type");
+        }
+        // Any was not specified for property instance, create new one
+        if (auto any = create_any(type)) {
+            if (pi->set_any(any)) {
+                return property;
             }
         }
     }
@@ -162,8 +161,10 @@ IFuture::Ptr VelkInstance::create_future() const
 IFunction::Ptr VelkInstance::create_callback(IFunction::CallableFn* fn) const
 {
     auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
-    if (auto* internal = interface_cast<IFunctionInternal>(func); internal && fn) {
-        internal->set_invoke_callback(fn);
+    if (fn) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_invoke_callback(fn);
+        }
     }
     return func;
 }
@@ -172,19 +173,24 @@ IFunction::Ptr VelkInstance::create_owned_callback(void* context,
     IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) const
 {
     auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
-    if (auto* internal = interface_cast<IFunctionInternal>(func)) {
-        internal->set_owned_callback(context, fn, deleter);
+    if (fn && deleter) {
+        if (auto* internal = interface_cast<IFunctionInternal>(func)) {
+            internal->set_owned_callback(context, fn, deleter);
+        }
     }
     return func;
 }
 
 ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
 {
+    if (!plugin) {
+        return ReturnValue::INVALID_ARGUMENT;
+    }
     Uid id = plugin->get_class_uid();
     PluginEntry key{id, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {
-        return ReturnValue::INVALID_ARGUMENT;
+        return ReturnValue::NOTHING_TO_DO; // Already there
     }
     it = plugins_.insert(it, PluginEntry{id, plugin});
 
@@ -254,9 +260,11 @@ void VelkInstance::dispatch(LogLevel level, const char* file, int line,
 {
     if (level < level_) return;
     if (sink_) {
+        // User-defined sink
         sink_->write(level, file, line, message);
         return;
     }
+    // No sink defined, currently writes to stderr regardless of level.
     static const char* level_names[] = {"DEBUG", "INFO", "WARN", "ERROR"};
     auto idx = static_cast<int>(level);
     if (idx < 0 || idx > 3) idx = 3;
