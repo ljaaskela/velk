@@ -1,14 +1,3 @@
-cmake_minimum_required(VERSION 3.14)
-
-project(velk LANGUAGES CXX)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-if(MSVC)
-    add_compile_options(/Zc:preprocessor /wd5105)
-endif()
-
 add_library(velk SHARED
     src/property.cpp
     src/property.h
@@ -64,7 +53,9 @@ add_library(velk SHARED
     )
 
 target_include_directories(velk
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -86,3 +77,31 @@ if(MSVC)
 else()
     target_compile_options(velk PRIVATE -fno-rtti -fno-exceptions)
 endif()
+
+include(GNUInstallDirs)
+include(CMakePackageConfigHelpers)
+
+install(TARGETS velk EXPORT velk-targets
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+)
+
+install(DIRECTORY include/velk
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT velk-targets
+    FILE velk-config.cmake
+    NAMESPACE velk::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/velk
+)
+
+write_basic_package_version_file(
+    "${CMAKE_CURRENT_BINARY_DIR}/velk-config-version.cmake"
+    COMPATIBILITY SameMajorVersion
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/velk-config-version.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/velk
+)

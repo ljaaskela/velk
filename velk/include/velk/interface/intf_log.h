@@ -31,6 +31,9 @@ public:
 /**
  * @brief Logging interface exposed by the velk instance.
  *
+ * Callers should not usually need to handle this interface but rather
+ * use the VELK_LOG macro from api/velk.h instead.
+ *
  * Retrieved via instance().log(). Supports configurable log level
  * and pluggable sink.
  */
@@ -46,8 +49,7 @@ public:
     /**
      * @brief Dispatches a pre-formatted log message to the active sink.
      *
-     * Callers should generally use the VELK_LOG macro or the velk_log()
-     * free function instead of calling this directly.
+     * Callers should generally use the VELK_LOG macro instead of calling this directly.
      */
     virtual void dispatch(LogLevel level, const char* file, int line,
                           const char* message) = 0;
