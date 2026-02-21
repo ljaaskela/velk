@@ -25,7 +25,7 @@ class Plugin : public Object<FinalClass, IPlugin>
 {
 public:
     /** @brief Returns the class name by default. Override for a custom display name. */
-    string_view get_name() const override { return get_class_name(); }
+    string_view get_name() const override { return this->get_class_name(); }
 };
 
 } // namespace velk::ext

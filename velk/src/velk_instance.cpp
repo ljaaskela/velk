@@ -3,6 +3,7 @@
 #include "future.h"
 #include "metadata_container.h"
 #include "property.h"
+#include <algorithm>
 #include <velk/ext/any.h>
 #include <velk/interface/types.h>
 #include <iostream>
