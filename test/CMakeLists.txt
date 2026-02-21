@@ -26,6 +26,7 @@ add_executable(tests
     test_function.cpp
     test_object.cpp
     test_plugin.cpp
+    test_log.cpp
     test_uid.cpp
     test_string_view.cpp
     test_shared_ptr.cpp

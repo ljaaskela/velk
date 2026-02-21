@@ -4,6 +4,8 @@
 #include <vector>
 
 #include <velk/interface/intf_future.h>
+#include <velk/interface/intf_log.h>
+#include <velk/velk_export.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_plugin_registry.h>
@@ -76,6 +78,11 @@ public:
     /** @brief Returns the plugin registry (const). */
     virtual const IPluginRegistry& plugin_registry() const = 0;
 
+    /** @brief Returns the log interface for configuring and emitting log messages. */
+    virtual ILog& log() = 0;
+    /** @brief Returns the log interface (const). */
+    virtual const ILog& log() const = 0;
+
     /**
      * @brief Enqueues tasks to be executed on the next update() call.
      * @param tasks The tasks to invoke.
@@ -120,8 +127,28 @@ public:
     {
         return interface_pointer_cast<T>(create(uid));
     }
-
 };
+
+/**
+ * @brief Registers a type for a given velk instance using its static get_factory() method.
+ * @tparam T An Object-derived class with a static get_factory() method.
+ */
+template<class T>
+ReturnValue register_type(IVelk& instance)
+{
+    return instance.type_registry().register_type(T::get_factory());
+}
+
+/**
+ * @brief Unregisters a previously registered type from a given velk instance using
+ *        its static get_factory() method.
+ * @tparam T An Object-derived class with a static get_factory() method.
+ */
+template<class T>
+ReturnValue unregister_type(IVelk& instance)
+{
+    return instance.type_registry().unregister_type(T::get_factory());
+}
 
 } // namespace velk
 

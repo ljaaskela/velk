@@ -16,7 +16,7 @@ namespace velk {
  * provides type creation, metadata lookup, deferred task queuing, and
  * factory methods for properties, functions, futures, and any values.
  */
-class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegistry, IPluginRegistry>
+class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegistry, IPluginRegistry, ILog>
 {
 public:
     VelkInstance();
@@ -26,6 +26,9 @@ public:
 
     IPluginRegistry& plugin_registry() override { return *this; }
     const IPluginRegistry& plugin_registry() const override { return *this; }
+
+    ILog& log() override { return *this; }
+    const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
     ReturnValue register_type(const IObjectFactory &factory) override;
     ReturnValue unregister_type(const IObjectFactory &factory) override;
@@ -46,6 +49,12 @@ public:
     ReturnValue unload_plugin(Uid pluginId) override;
     IPlugin* find_plugin(Uid pluginId) const override;
     size_t plugin_count() const override;
+
+    void set_sink(const ILogSink::Ptr& sink) override;
+    void set_level(LogLevel level) override;
+    LogLevel get_level() const override;
+    void dispatch(LogLevel level, const char* file, int line,
+                  const char* message) override;
 
 private:
     /** @brief Registry entry mapping a class UID to its factory. */
@@ -70,6 +79,8 @@ private:
     Uid current_owner_;                             ///< Owner context for type registration.
     mutable std::mutex deferred_mutex_;             ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
+    ILogSink::Ptr sink_;                              ///< Custom log sink (empty = default stderr).
+    LogLevel level_{LogLevel::Info};                 ///< Minimum log level.
 };
 
 } // namespace velk

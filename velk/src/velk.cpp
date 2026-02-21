@@ -1,6 +1,8 @@
 #include "velk_instance.h"
 
 #include <velk/velk_export.h>
+#include <cstdarg>
+#include <cstdio>
 
 namespace velk {
 
@@ -9,6 +11,18 @@ VELK_EXPORT IVelk &instance()
     // Global IVelk& instance
     static VelkInstance r;
     return *(r.get_interface<IVelk>());
+}
+
+VELK_EXPORT void detail::velk_log(ILog& log, LogLevel level,
+                                   const char* file, int line,
+                                   const char* fmt, ...)
+{
+    char buf[1024];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, sizeof(buf), fmt, args);
+    va_end(args);
+    log.dispatch(level, file, line, buf);
 }
 
 // Control-block pool
