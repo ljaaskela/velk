@@ -16,13 +16,16 @@ namespace velk {
  * provides type creation, metadata lookup, deferred task queuing, and
  * factory methods for properties, functions, futures, and any values.
  */
-class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegistry>
+class VelkInstance final : public ext::ObjectCore<VelkInstance, IVelk, ITypeRegistry, IPluginRegistry>
 {
 public:
     VelkInstance();
 
     ITypeRegistry& type_registry() override { return *this; }
     const ITypeRegistry& type_registry() const override { return *this; }
+
+    IPluginRegistry& plugin_registry() override { return *this; }
+    const IPluginRegistry& plugin_registry() const override { return *this; }
 
     ReturnValue register_type(const IObjectFactory &factory) override;
     ReturnValue unregister_type(const IObjectFactory &factory) override;
@@ -39,17 +42,32 @@ public:
                                          IFunction::BoundFn* fn,
                                          IFunction::ContextDeleter* deleter) const override;
 
+    ReturnValue load_plugin(const IPlugin::Ptr& plugin) override;
+    ReturnValue unload_plugin(Uid pluginId) override;
+    IPlugin* find_plugin(Uid pluginId) const override;
+    size_t plugin_count() const override;
+
 private:
     /** @brief Registry entry mapping a class UID to its factory. */
     struct Entry {
         Uid uid;                        ///< Class UID.
         const IObjectFactory *factory;  ///< Factory that creates instances of this class.
+        Uid owner;                      ///< Plugin that registered this type (Uid{} = builtin).
         bool operator<(const Entry& o) const { return uid < o.uid; }
+    };
+
+    /** @brief Plugin registry entry. */
+    struct PluginEntry {
+        Uid uid;
+        IPlugin::Ptr plugin;
+        bool operator<(const PluginEntry& o) const { return uid < o.uid; }
     };
 
     /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
     const IObjectFactory* find(Uid uid) const;
     std::vector<Entry> types_;                      ///< Sorted registry of class factories.
+    std::vector<PluginEntry> plugins_;              ///< Sorted registry of loaded plugins.
+    Uid current_owner_;                             ///< Owner context for type registration.
     mutable std::mutex deferred_mutex_;             ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
 };

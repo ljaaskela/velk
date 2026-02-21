@@ -3,6 +3,7 @@
 #include "future.h"
 #include "metadata_container.h"
 #include "property.h"
+#include <algorithm>
 #include <velk/ext/any.h>
 #include <velk/interface/types.h>
 #include <iostream>
@@ -47,10 +48,11 @@ ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
 {
     auto &info = factory.get_class_info();
     std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
-    Entry entry{info.uid, &factory};
+    Entry entry{info.uid, &factory, current_owner_};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
         it->factory = &factory;
+        it->owner = current_owner_;
     } else {
         types_.insert(it, entry);
     }
@@ -162,6 +164,62 @@ IFunction::Ptr VelkInstance::create_owned_callback(void* context,
         internal->set_owned_callback(context, fn, deleter);
     }
     return func;
+}
+
+ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
+{
+    Uid id = plugin->get_class_uid();
+    PluginEntry key{id, {}};
+    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+    if (it != plugins_.end() && it->uid == id) {
+        return ReturnValue::INVALID_ARGUMENT;
+    }
+    it = plugins_.insert(it, PluginEntry{id, plugin});
+
+    current_owner_ = id;
+    ReturnValue rv = plugin->initialize(*this);
+    current_owner_ = Uid{};
+
+    if (failed(rv)) {
+        plugins_.erase(it);
+        return rv;
+    }
+    return ReturnValue::SUCCESS;
+}
+
+ReturnValue VelkInstance::unload_plugin(Uid pluginId)
+{
+    PluginEntry key{pluginId, {}};
+    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+    if (it == plugins_.end() || it->uid != pluginId) {
+        return ReturnValue::INVALID_ARGUMENT;
+    }
+
+    it->plugin->shutdown(*this);
+
+    // Sweep types owned by this plugin
+    types_.erase(
+        std::remove_if(types_.begin(), types_.end(),
+            [&](const Entry& e) { return e.owner == pluginId; }),
+        types_.end());
+
+    plugins_.erase(it);
+    return ReturnValue::SUCCESS;
+}
+
+IPlugin* VelkInstance::find_plugin(Uid pluginId) const
+{
+    PluginEntry key{pluginId, {}};
+    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+    if (it != plugins_.end() && it->uid == pluginId) {
+        return it->plugin.get();
+    }
+    return nullptr;
+}
+
+size_t VelkInstance::plugin_count() const
+{
+    return plugins_.size();
 }
 
 } // namespace velk

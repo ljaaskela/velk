@@ -101,7 +101,7 @@ public:
 
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
-    static constexpr string_view class_name() noexcept { return get_name<FinalClass>(); }
+    static constexpr string_view class_name() noexcept { return ::velk::get_name<FinalClass>(); }
     /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
     static constexpr Uid class_id() noexcept
     {

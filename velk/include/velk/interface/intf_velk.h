@@ -6,6 +6,7 @@
 #include <velk/interface/intf_future.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
+#include <velk/interface/intf_plugin_registry.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
 #include <velk/interface/types.h>
@@ -69,6 +70,21 @@ public:
     virtual ITypeRegistry& type_registry() = 0;
     /** @brief Returns the type registry (const). */
     virtual const ITypeRegistry& type_registry() const = 0;
+
+    /** @brief Returns the plugin registry for loading/unloading plugins. */
+    virtual IPluginRegistry& plugin_registry() = 0;
+    /** @brief Returns the plugin registry (const). */
+    virtual const IPluginRegistry& plugin_registry() const = 0;
+
+    /**
+     * @brief Enqueues tasks to be executed on the next update() call.
+     * @param tasks The tasks to invoke.
+     */
+    virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
+    /** @brief Executes all queued deferred tasks. */
+    virtual void update() const = 0;
+
+
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid) const = 0;
     /** @brief Creates a new IAny value container for the given type UID. */
@@ -77,13 +93,6 @@ public:
     virtual IProperty::Ptr create_property(Uid type,
                                            const IAny::Ptr &value,
                                            int32_t flags = ObjectFlags::None) const = 0;
-    /**
-     * @brief Enqueues tasks to be executed on the next update() call.
-     * @param tasks The tasks to invoke.
-     */
-    virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
-    /** @brief Executes all queued deferred tasks. */
-    virtual void update() const = 0;
     /** @brief Creates a new future/promise pair. */
     virtual IFuture::Ptr create_future() const = 0;
     /** @brief Creates a callback-backed IFunction from a raw function pointer. */

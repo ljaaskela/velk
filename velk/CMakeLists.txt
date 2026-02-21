@@ -38,6 +38,8 @@ add_library(velk SHARED
     include/velk/interface/intf_property.h
     include/velk/interface/intf_object_factory.h
     include/velk/interface/intf_type_registry.h
+    include/velk/interface/intf_plugin.h
+    include/velk/interface/intf_plugin_registry.h
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
     include/velk/interface/types.h
@@ -55,6 +57,7 @@ add_library(velk SHARED
     include/velk/ext/metadata.h
     include/velk/ext/object.h
     include/velk/ext/event.h
+    include/velk/ext/plugin.h
     include/velk/ext/interface_dispatch.h
     include/velk/ext/refcounted_dispatch.h
     )
