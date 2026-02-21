@@ -60,7 +60,9 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
 | `intf_type_registry.h` | `ITypeRegistry` for type registration and class info lookup |
-| `intf_velk.h` | `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` |
+| `intf_plugin.h` | `PluginInfo`, `PluginDependency`, `IPlugin` interface, version helpers (`make_version`, `version_major/minor/patch`) |
+| `intf_plugin_registry.h` | `IPluginRegistry` for loading/unloading plugins by instance or from shared libraries |
+| `intf_velk.h` | `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
 | `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
@@ -77,6 +79,7 @@ CRTP helpers and template implementations.
 | `metadata.h` | `ext::TypeMetadata<T>`, `ext::CollectedMetadata<Interfaces...>` constexpr metadata collection |
 | `any.h` | `ext::AnyBase`, `ext::AnyMulti<Types...>`, `ext::AnyCore<T>`, `ext::AnyValue<T>` |
 | `event.h` | `ext::LazyEvent` helper for deferred event creation |
+| `plugin.h` | `ext::Plugin<T>` CRTP base for plugins; `VELK_PLUGIN_UID/NAME/VERSION/DEPS` macros; `VELK_PLUGIN` export macro |
 
 ## api/
 
@@ -98,7 +101,9 @@ Internal runtime implementations (compiled into the DLL).
 
 | File | Description |
 |---|---|
-| `velk_instance.cpp/h` | `VelkInstance` implementing `IVelk` and `ITypeRegistry` |
+| `velk_instance.cpp/h` | `VelkInstance` implementing `IVelk`, `ITypeRegistry`, and `IPluginRegistry` |
+| `library_handle.h` | Platform-abstracted shared library loading (`LoadLibrary`/`dlopen`) |
+| `platform.h` | Platform-specific OS includes (`windows.h`, `dlfcn.h`, `pthread.h`) |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
@@ -162,11 +167,20 @@ classDiagram
     }
     class IVelk {
         <<interface>>
-        type_registry()/create/update
+        type_registry()/plugin_registry()/create/update
+    }
+    class IPlugin {
+        <<interface>>
+        initialize/shutdown
+    }
+    class IPluginRegistry {
+        <<interface>>
+        load/unload/find plugin
     }
 
     IInterface <|-- IObject
     IObject <|-- IAny
+    IObject <|-- IPlugin
 
     IInterface <|-- IPropertyState
     IPropertyState <|-- IMetadata
@@ -178,6 +192,7 @@ classDiagram
 
     IInterface <|-- IExternalAny
     IInterface <|-- ITypeRegistry
+    IInterface <|-- IPluginRegistry
     IInterface <|-- IVelk
 ```
 
@@ -202,6 +217,9 @@ classDiagram
         meta_ unique_ptr
         states_ tuple
     }
+    class Plugin~Final~ {
+        plugin_info()
+    }
 
     class AnyBase~Final, Interfaces...~ {
         clone, factory
@@ -223,6 +241,7 @@ classDiagram
 
     RefCountedDispatch <|-- ObjectCore
     ObjectCore <|-- Object
+    Object <|-- Plugin
 
     RefCountedDispatch <|-- AnyBase
     AnyBase <|-- AnyMulti
@@ -249,6 +268,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | **Property** | `IProperty` | — | `ConstProperty<T>`, `Property<T>` |
 | **Function** | `IFunction` | — | `Function` (wrapper), `Callback` (creator) |
 | **Event** | `IEvent` | `ext::LazyEvent` | `Event` (wrapper) |
+| **Plugin** | `IPlugin`, `IPluginRegistry` | `ext::Plugin<Final>` | — |
 
 **Any hierarchy** (ext/) — three levels for different extension points:
 
@@ -265,6 +285,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 |-------|------|-------------|
 | `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkInstance`) |
 | `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `VELK_INTERFACE` |
+| `ext::Plugin<Final>` | Plugin base with static metadata | Plugin implementations |
 
 ## ABI stability
 
@@ -340,5 +361,8 @@ Types that do not cross the DLL boundary can safely use STL types:
 | `Event` | Lightweight wrapper around an existing `IEvent` pointer (returned by `EVT` accessors) |
 | `Callback` | Creates and owns an `IFunction` from `ReturnValue(FnArgs)` callbacks or typed lambdas |
 | `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
+| `ext::Plugin<T>` | CRTP base for plugin implementations; collects static metadata (name, version, dependencies) via SFINAE |
+| `PluginInfo` | Static plugin descriptor: factory, name, version, dependencies; accessible without an instance via `Plugin<T>::plugin_info()` |
+| `PluginDependency` | Plugin dependency entry: UID and optional minimum version |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |
