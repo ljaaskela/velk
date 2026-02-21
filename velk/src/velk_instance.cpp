@@ -184,14 +184,28 @@ IFunction::Ptr VelkInstance::create_owned_callback(void* context,
 
 ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
 {
-    for (auto dep : info.dependencies) {
-        if (!find_plugin(dep)) {
+    for (auto& dep : info.dependencies) {
+        auto* plugin = find_plugin(dep.uid);
+        if (!plugin) {
             detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
                              "Plugin '%.*s' has unmet dependency: %016llx%016llx",
                              static_cast<int>(info.name.size()),
                              info.name.data(),
-                             static_cast<unsigned long long>(dep.hi),
-                             static_cast<unsigned long long>(dep.lo));
+                             static_cast<unsigned long long>(dep.uid.hi),
+                             static_cast<unsigned long long>(dep.uid.lo));
+            return ReturnValue::FAIL;
+        }
+        if (dep.min_version && plugin->get_version() < dep.min_version) {
+            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                             "Plugin '%.*s' requires version %u.%u.%u, got %u.%u.%u",
+                             static_cast<int>(info.name.size()),
+                             info.name.data(),
+                             version_major(dep.min_version),
+                             version_minor(dep.min_version),
+                             version_patch(dep.min_version),
+                             version_major(plugin->get_version()),
+                             version_minor(plugin->get_version()),
+                             version_patch(plugin->get_version()));
             return ReturnValue::FAIL;
         }
     }

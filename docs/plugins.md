@@ -6,7 +6,9 @@ Velk supports plugins as a way to modularly register types and extend the runtim
 
 - [Writing a plugin](#writing-a-plugin)
   - [Plugin metadata](#plugin-metadata)
+  - [Versioning](#versioning)
   - [Dependencies](#dependencies)
+  - [Versioned dependencies](#versioned-dependencies)
 - [Loading plugins](#loading-plugins)
   - [Inline plugins](#inline-plugins)
   - [From a shared library](#from-a-shared-library)
@@ -58,8 +60,35 @@ public:
 |---|---|---|
 | `VELK_PLUGIN_UID(str)` | Sets a stable class UID from a UUID string | Auto-generated from class name |
 | `VELK_PLUGIN_NAME(str)` | Sets a human-readable display name | Class name |
+| `VELK_PLUGIN_VERSION(major, minor, patch)` | Sets the plugin version | 0 (unversioned) |
 
-Both are optional. Without `VELK_PLUGIN_UID`, the UID is derived from the C++ class name via constexpr FNV-1a, which changes if the class is renamed. Use an explicit UID for plugins that need ABI stability across versions.
+All are optional. Without `VELK_PLUGIN_UID`, the UID is derived from the C++ class name via constexpr FNV-1a, which changes if the class is renamed. Use an explicit UID for plugins that need ABI stability across versions.
+
+### Versioning
+
+Declare a plugin version with `VELK_PLUGIN_VERSION`:
+
+```cpp
+class MyPlugin : public velk::ext::Plugin<MyPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    VELK_PLUGIN_VERSION(2, 1, 0);
+
+    // ...
+};
+```
+
+The version is packed into a `uint32_t` as `[major:8][minor:8][patch:16]`. Helper functions are provided for packing and unpacking:
+
+```cpp
+uint32_t v = velk::make_version(2, 1, 3);
+velk::version_major(v);  // 2
+velk::version_minor(v);  // 1
+velk::version_patch(v);  // 3
+```
+
+The version is accessible through `PluginInfo::version` and `IPlugin::get_version()`.
 
 ### Dependencies
 
@@ -77,6 +106,26 @@ public:
 ```
 
 Dependencies are validated at load time. If any dependency is not already loaded, `load_plugin` returns `FAIL` and the plugin is not registered.
+
+### Versioned dependencies
+
+Dependencies can specify a minimum version. If the loaded dependency's version is lower, loading fails:
+
+```cpp
+class MyPlugin : public velk::ext::Plugin<MyPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
+    VELK_PLUGIN_DEPS(
+        {UiPlugin::class_uid, velk::make_version(2, 0, 0)},   // requires UiPlugin >= 2.0.0
+        AudioPlugin::class_uid                                  // any version
+    );
+
+    // ...
+};
+```
+
+A dependency without a version (bare `Uid`) accepts any version.
 
 ## Loading plugins
 
@@ -197,14 +246,15 @@ The host plugin's `shutdown` must unload sub-plugins before the library handle i
 
 ## Plugin info without instantiation
 
-`PluginInfo` is accessible as a static descriptor without creating a plugin instance. This allows inspecting a plugin's UID, name, and dependencies before loading:
+`PluginInfo` is accessible as a static descriptor without creating a plugin instance. This allows inspecting a plugin's UID, name, version, and dependencies before loading:
 
 ```cpp
 // From C++ (compile-time access)
 const auto& info = MyPlugin::plugin_info();
-auto uid = info.uid();
-auto name = info.name;
-auto deps = info.dependencies;
+auto uid     = info.uid();
+auto name    = info.name;
+auto version = info.version;
+auto deps    = info.dependencies;
 ```
 
 For shared libraries, `velk_plugin_info` returns a `const PluginInfo*`, so the host can inspect metadata before deciding whether to instantiate the plugin.
