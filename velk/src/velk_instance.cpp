@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <velk/ext/any.h>
 #include <velk/interface/types.h>
-#include <iostream>
 
 namespace velk {
 
@@ -44,10 +43,22 @@ const IObjectFactory* VelkInstance::find(Uid uid) const
     return nullptr;
 }
 
+ILog& get_logger(const VelkInstance& instance)
+{
+    /** @note VelkInstance should generally log through direct call to
+     *  detail::velk_log(get_logger(*this), ...) because VelkInstance may
+     *  still be in the process of being constructed, hence making the global
+     *  ::velk::instance() unavailable
+     */
+    return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
+}
+
 ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
 {
     auto &info = factory.get_class_info();
-    std::cout << "Register " << info.name << " (uid: " << info.uid << ")" << std::endl;
+    detail::velk_log(get_logger(*this), LogLevel::Debug, __FILE__, __LINE__,
+                  "Register %.*s",
+                  static_cast<int>(info.name.size()), info.name.data());
     Entry entry{info.uid, &factory, current_owner_};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
@@ -107,7 +118,8 @@ IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr &value, i
                 if (pi->set_any(value)) {
                     return property;
                 }
-                std::cerr << "Initial value is of incompatible type" << std::endl;
+                detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                                 "Initial value is of incompatible type");
             }
             // Any was not specified for property instance, create new one
             if (auto any = create_any(type)) {
@@ -220,6 +232,35 @@ IPlugin* VelkInstance::find_plugin(Uid pluginId) const
 size_t VelkInstance::plugin_count() const
 {
     return plugins_.size();
+}
+
+void VelkInstance::set_sink(const ILogSink::Ptr& sink)
+{
+    sink_ = sink;
+}
+
+void VelkInstance::set_level(LogLevel level)
+{
+    level_ = level;
+}
+
+LogLevel VelkInstance::get_level() const
+{
+    return level_;
+}
+
+void VelkInstance::dispatch(LogLevel level, const char* file, int line,
+                            const char* message)
+{
+    if (level < level_) return;
+    if (sink_) {
+        sink_->write(level, file, line, message);
+        return;
+    }
+    static const char* level_names[] = {"DEBUG", "INFO", "WARN", "ERROR"};
+    auto idx = static_cast<int>(level);
+    if (idx < 0 || idx > 3) idx = 3;
+    fprintf(stderr, "[%s] %s:%d: %s\n", level_names[idx], file, line, message);
 }
 
 } // namespace velk

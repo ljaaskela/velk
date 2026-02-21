@@ -27,6 +27,7 @@ add_library(velk SHARED
     src/velk_instance.cpp
     src/velk_instance.h
     src/velk.cpp
+    include/velk/interface/intf_log.h
     include/velk/interface/intf_any.h
     include/velk/interface/intf_external_any.h
     include/velk/interface/intf_object.h

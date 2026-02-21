@@ -29,7 +29,7 @@ public:
     ReturnValue initialize(IVelk& velk) override
     {
         initCount++;
-        return velk.type_registry().register_type<PluginWidget>();
+        return register_type<PluginWidget>(velk);
     }
 
     ReturnValue shutdown(IVelk& velk) override
@@ -58,7 +58,7 @@ class PluginTest : public ::testing::Test
 {
 protected:
     IVelk& velk_ = instance();
-    IPlugin::Ptr plugin_ = interface_pointer_cast<IPlugin>(ext::make_object<TestPlugin>());
+    IPlugin::Ptr plugin_ = ext::make_object<TestPlugin, IPlugin>();
     TestPlugin* tp_ = static_cast<TestPlugin*>(plugin_.get());
 
     void TearDown() override
@@ -163,7 +163,7 @@ TEST_F(PluginTest, BuiltinTypesSurvivePluginUnload)
 TEST_F(PluginTest, FailedInitializeDoesNotLoad)
 {
     auto& reg = velk_.plugin_registry();
-    auto fp = interface_pointer_cast<IPlugin>(ext::make_object<FailingPlugin>());
+    auto fp = ext::make_object<FailingPlugin, IPlugin>();
 
     EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(fp));
     EXPECT_EQ(nullptr, reg.find_plugin<FailingPlugin>());

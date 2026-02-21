@@ -25,6 +25,13 @@ IObject::Ptr make_object()
     return result;
 }
 
+/** @brief Creates a new T and returns it cast to interface I. */
+template<class T, class I>
+typename I::Ptr make_object()
+{
+    return interface_pointer_cast<I>(make_object<T>());
+}
+
 /**
  * @brief Default IObjectFactory implementation that creates instances of FinalClass.
  *
