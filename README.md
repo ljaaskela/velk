@@ -24,23 +24,19 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
   - [Query metadata](#query-metadata)
   - [Direct state access](#direct-state-access)
 
+---
+
 ## Features
 
 | Feature | Description |
 |---|---|
-| **Interfaces** | Define abstract contracts with properties, events, and functions |
-| **Type registry** | Register types, create instances by UID, query class info, directly from [type registry](#query-metadata-without-instance) or from [an object](#query-metadata-from-object).|
+| **ABI stable** | Functionality through interfaces defining abstract contracts with properties, events, and functions |
+| **Extensible** | <p>Register inline or DLL-based plugins, declarative dependencies and multi-plugin bundles through [plugin registry](docs/plugins.md).<p>Register types, create instances by UID, query class info, directly from [type registry](#query-metadata-without-instance) or from [an object](#query-metadata-from-object). |
 | **Compile-time metadata** | Declare members with `VELK_INTERFACE`, introspect at compile time or runtime |
-| **Type-erased values** | `Any<T>` wrappers over a generic `IAny` container |
-| **Typed properties** | `Property<T>` with get/set and automatic change notifications |
-| **Direct state access** | Read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
+| **Properties** | <p>`Property<T>` with get/set and automatic change notifications<p>Type-erased values through `Any<T>` wrappers over a generic `IAny` container<p>Direct statae access to Read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
 | **Events** | Observable events with multiple handlers, immediate or deferred |
-| **Functions** | Overridable virtual functions with optional typed parameters and native return types, automatically wrapped into `IAny::Ptr` |
-| **Futures** | Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution |
-| **Deferred invocation** | Queue function calls and event handlers for batch execution during `instance().update()` |
-| **Extensible** | Implement custom `IAny` types for used-defined types, external or shared data storage |
-| **No RTTI or exceptions** | Builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
-| **High performance** | Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups |
+| **Functions** | <p>Overridable virtual functions with optional typed parameters and native return types, automatically wrapped into `IAny::Ptr`<p>Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution<p>Deferred function calls and event handlers for batch execution during `instance().update()` |
+| **Performance-focused** | <p>Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
 
 ## Documentation
 
@@ -50,6 +46,7 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
 | [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
 | [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation, futures and promises |
 | [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
+| [Plugins](docs/plugins.md) | Writing plugins, DLL loading, dependencies, multi-plugin bundles |
 | [VELK_INTERFACE](docs/velk-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
 ## Project structure
