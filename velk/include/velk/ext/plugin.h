@@ -13,8 +13,12 @@ namespace velk::ext {
 /** @brief Declares a static constexpr plugin name. */
 #define VELK_PLUGIN_NAME(str) static constexpr string_view plugin_name { str };
 
-/** @brief Declares a static constexpr list of the Uids the plugin depends on. */
-#define VELK_PLUGIN_DEPS(...) static constexpr Uid plugin_deps[] = { __VA_ARGS__ };
+/** @brief Declares a static constexpr plugin version. */
+#define VELK_PLUGIN_VERSION(major, minor, patch) \
+    static constexpr uint32_t plugin_version = ::velk::make_version(major, minor, patch);
+
+/** @brief Declares a static constexpr list of plugin dependencies. */
+#define VELK_PLUGIN_DEPS(...) static constexpr PluginDependency plugin_deps[] = { __VA_ARGS__ };
 
 /**
  * @brief CRTP base for plugin implementations.
@@ -40,6 +44,11 @@ class Plugin : public Object<FinalClass, IPlugin>
     struct has_plugin_name<T, std::void_t<decltype(T::plugin_name)>> : std::true_type {};
 
     template<class T, class = void>
+    struct has_plugin_version : std::false_type {};
+    template<class T>
+    struct has_plugin_version<T, std::void_t<decltype(T::plugin_version)>> : std::true_type {};
+
+    template<class T, class = void>
     struct has_plugin_deps : std::false_type {};
     template<class T>
     struct has_plugin_deps<T, std::void_t<decltype(T::plugin_deps)>> : std::true_type {};
@@ -53,11 +62,20 @@ class Plugin : public Object<FinalClass, IPlugin>
         }
     }
 
-    static constexpr array_view<Uid> resolve_deps()
+    static constexpr uint32_t resolve_version()
+    {
+        if constexpr (has_plugin_version<FinalClass>::value) {
+            return FinalClass::plugin_version;
+        } else {
+            return 0;
+        }
+    }
+
+    static constexpr array_view<PluginDependency> resolve_deps()
     {
         if constexpr (has_plugin_deps<FinalClass>::value) {
             return { FinalClass::plugin_deps,
-                     sizeof(FinalClass::plugin_deps) / sizeof(Uid) };
+                     sizeof(FinalClass::plugin_deps) / sizeof(PluginDependency) };
         } else {
             return {};
         }
@@ -75,6 +93,7 @@ public:
         static const PluginInfo info {
             FinalClass::get_factory(),
             resolve_name(),
+            resolve_version(),
             resolve_deps()
         };
         return info;

@@ -26,6 +26,7 @@ class TestPlugin : public ext::Plugin<TestPlugin>
 public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000001");
     VELK_PLUGIN_NAME("TestPlugin");
+    VELK_PLUGIN_VERSION(2, 1, 0);
 
     ReturnValue initialize(IVelk& velk) override
     {
@@ -64,6 +65,28 @@ public:
     ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
 };
 
+// A plugin that depends on TestPlugin >= 2.1.0 (should succeed)
+class VersionOkPlugin : public ext::Plugin<VersionOkPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000004");
+    VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(2, 1, 0)});
+
+    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+};
+
+// A plugin that depends on TestPlugin >= 3.0.0 (should fail, TestPlugin is 2.1.0)
+class VersionTooNewPlugin : public ext::Plugin<VersionTooNewPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000005");
+    VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(3, 0, 0)});
+
+    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+};
+
 // UIDs for DLL test plugins (must match test_plugin_dll.cpp)
 static constexpr Uid DllTestPluginUid{"b0000000-0000-0000-0000-000000000001"};
 static constexpr Uid DllSubPluginUid{"b0000000-0000-0000-0000-000000000002"};
@@ -86,6 +109,12 @@ protected:
         }
         if (reg.find_plugin<FailingPlugin>()) {
             reg.unload_plugin<FailingPlugin>();
+        }
+        if (reg.find_plugin<VersionOkPlugin>()) {
+            reg.unload_plugin<VersionOkPlugin>();
+        }
+        if (reg.find_plugin<VersionTooNewPlugin>()) {
+            reg.unload_plugin<VersionTooNewPlugin>();
         }
         if (reg.find_plugin(DllTestPluginUid)) {
             reg.unload_plugin(DllTestPluginUid);
@@ -243,7 +272,7 @@ TEST_F(PluginTest, PluginInfoCollectsDependencies)
     auto& info = dp->get_plugin_info();
     EXPECT_EQ(DependentPlugin::class_id(), info.uid());
     ASSERT_EQ(1u, info.dependencies.size());
-    EXPECT_EQ(TestPlugin::class_id(), info.dependencies[0]);
+    EXPECT_EQ(TestPlugin::class_id(), info.dependencies[0].uid);
 }
 
 TEST_F(PluginTest, PluginInfoDefaultName)
@@ -252,6 +281,41 @@ TEST_F(PluginTest, PluginInfoDefaultName)
     auto fp = ext::make_object<FailingPlugin, IPlugin>();
     auto& info = fp->get_plugin_info();
     EXPECT_EQ(FailingPlugin::class_name(), info.name);
+}
+
+TEST_F(PluginTest, PluginVersion)
+{
+    auto& info = TestPlugin::plugin_info();
+    EXPECT_EQ(make_version(2, 1, 0), info.version);
+    EXPECT_EQ(2, version_major(info.version));
+    EXPECT_EQ(1, version_minor(info.version));
+    EXPECT_EQ(0, version_patch(info.version));
+}
+
+TEST_F(PluginTest, PluginVersionDefault)
+{
+    // FailingPlugin has no VELK_PLUGIN_VERSION, defaults to 0
+    auto& info = FailingPlugin::plugin_info();
+    EXPECT_EQ(0u, info.version);
+}
+
+TEST_F(PluginTest, VersionedDependencySatisfied)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+
+    auto vp = ext::make_object<VersionOkPlugin, IPlugin>();
+    EXPECT_EQ(ReturnValue::SUCCESS, reg.load_plugin(vp));
+}
+
+TEST_F(PluginTest, VersionedDependencyTooNew)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+
+    auto vp = ext::make_object<VersionTooNewPlugin, IPlugin>();
+    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(vp));
+    EXPECT_EQ(nullptr, reg.find_plugin<VersionTooNewPlugin>());
 }
 
 TEST_F(PluginTest, DependencyNotLoadedFails)
