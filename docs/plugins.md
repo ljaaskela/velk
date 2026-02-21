@@ -46,8 +46,9 @@ Plugins support optional static metadata via convenience macros:
 class MyPlugin : public velk::ext::Plugin<MyPlugin>
 {
 public:
+    // Optional: override automatically generated uid and name with fixed ones
     VELK_PLUGIN_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");  // stable UID
-    VELK_PLUGIN_NAME("My Plugin");                               // display name
+    VELK_PLUGIN_NAME("My Plugin");                            // display name
 
     // ...
 };
@@ -69,7 +70,7 @@ class MyPlugin : public velk::ext::Plugin<MyPlugin>
 {
 public:
     VELK_PLUGIN_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
-    VELK_PLUGIN_DEPS(CorePlugin::class_uid, AudioPlugin::class_uid);
+    VELK_PLUGIN_DEPS(UiPlugin::class_uid, AudioPlugin::class_uid);
 
     // ...
 };
@@ -111,6 +112,7 @@ public:
 
     velk::ReturnValue shutdown(velk::IVelk& velk) override
     {
+        // Velk keeps track of types registered in initialize() and automatically unregisters them.
         return velk::ReturnValue::SUCCESS;
     }
 };
@@ -172,9 +174,13 @@ public:
     velk::ReturnValue initialize(velk::IVelk& velk) override
     {
         auto rv = register_type<MyWidget>(velk);
-        return failed(rv) ?
-                    rv :
-                    velk.plugin_registry().load_plugin(velk::ext::make_object<SubPlugin, velk::IPlugin>());
+        if (failed(rv)) {
+            VELK_LOG(E, "Type registration failed [%s]", get_class_name());)
+        }
+        // Isntantiate SubPlugin
+        auto pluginInstance = velk::ext::make_object<SubPlugin, velk::IPlugin>();
+        // Load it to Velk
+        return velk.plugin_registry().load_plugin(pluginInstance);
     }
 
     velk::ReturnValue shutdown(velk::IVelk& velk) override

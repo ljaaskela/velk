@@ -5,7 +5,7 @@
 [![macOS](https://img.shields.io/github/actions/workflow/status/ljaaskela/velk/macos.yml?label=macOS)](https://github.com/ljaaskela/velk/actions/workflows/macos.yml)
 [![CodeQL](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml)
 
-Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, and compile-time metadata with runtime introspection.
+Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, compile-time metadata with runtime introspection, and a plugin system for modular extension via shared libraries.
 
 Velk is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
 
