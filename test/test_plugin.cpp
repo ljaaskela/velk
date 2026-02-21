@@ -24,7 +24,8 @@ class PluginWidget : public ext::Object<PluginWidget, IPluginWidget>
 class TestPlugin : public ext::Plugin<TestPlugin>
 {
 public:
-    VELK_CLASS_UID("a0000000-0000-0000-0000-000000000001");
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000001");
+    VELK_PLUGIN_NAME("TestPlugin");
 
     ReturnValue initialize(IVelk& velk) override
     {
@@ -38,8 +39,6 @@ public:
         return ReturnValue::SUCCESS;
     }
 
-    string_view get_name() const override { return "TestPlugin"; }
-
     int initCount = 0;
     int shutdownCount = 0;
 };
@@ -48,11 +47,26 @@ public:
 class FailingPlugin : public ext::Plugin<FailingPlugin>
 {
 public:
-    VELK_CLASS_UID("a0000000-0000-0000-0000-000000000002");
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000002");
 
     ReturnValue initialize(IVelk&) override { return ReturnValue::FAIL; }
     ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
 };
+
+// A plugin that depends on TestPlugin
+class DependentPlugin : public ext::Plugin<DependentPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000003");
+    VELK_PLUGIN_DEPS(TestPlugin::class_uid);
+
+    ReturnValue initialize(IVelk&) override { return ReturnValue::SUCCESS; }
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::SUCCESS; }
+};
+
+// UIDs for DLL test plugins (must match test_plugin_dll.cpp)
+static constexpr Uid DllTestPluginUid{"b0000000-0000-0000-0000-000000000001"};
+static constexpr Uid DllSubPluginUid{"b0000000-0000-0000-0000-000000000002"};
 
 class PluginTest : public ::testing::Test
 {
@@ -67,8 +81,17 @@ protected:
         if (reg.find_plugin<TestPlugin>()) {
             reg.unload_plugin<TestPlugin>();
         }
+        if (reg.find_plugin<DependentPlugin>()) {
+            reg.unload_plugin<DependentPlugin>();
+        }
         if (reg.find_plugin<FailingPlugin>()) {
             reg.unload_plugin<FailingPlugin>();
+        }
+        if (reg.find_plugin(DllTestPluginUid)) {
+            reg.unload_plugin(DllTestPluginUid);
+        }
+        if (reg.find_plugin(DllSubPluginUid)) {
+            reg.unload_plugin(DllSubPluginUid);
         }
     }
 };
@@ -178,3 +201,122 @@ TEST_F(PluginTest, FailedInitializeDoesNotLoad)
     EXPECT_EQ(nullptr, reg.find_plugin<FailingPlugin>());
     EXPECT_EQ(0u, reg.plugin_count());
 }
+
+TEST_F(PluginTest, LoadFromPathNonExistentFails)
+{
+    auto& reg = velk_.plugin_registry();
+    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin_from_path("nonexistent_plugin.dll"));
+    EXPECT_EQ(0u, reg.plugin_count());
+}
+
+TEST_F(PluginTest, LoadFromPathNullFails)
+{
+    auto& reg = velk_.plugin_registry();
+    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin_from_path(nullptr));
+    EXPECT_EQ(ReturnValue::INVALID_ARGUMENT, reg.load_plugin_from_path(""));
+}
+
+TEST_F(PluginTest, LoadFromPathInvalidDllFails)
+{
+    // Use the test executable itself as a "DLL" with no velk_create_plugin symbol.
+    // On Windows LoadLibrary will fail on an .exe, which is fine (tests FAIL path).
+    auto& reg = velk_.plugin_registry();
+    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin_from_path("tests.exe"));
+    EXPECT_EQ(0u, reg.plugin_count());
+}
+
+TEST_F(PluginTest, PluginInfoCollectsStaticMetadata)
+{
+    // Accessible without an instance via the static function
+    auto& info = TestPlugin::plugin_info();
+    EXPECT_EQ(TestPlugin::class_id(), info.uid());
+    EXPECT_EQ(string_view("TestPlugin"), info.name);
+    EXPECT_TRUE(info.dependencies.empty());
+
+    // Same object returned through the virtual
+    EXPECT_EQ(&info, &tp_->get_plugin_info());
+}
+
+TEST_F(PluginTest, PluginInfoCollectsDependencies)
+{
+    auto dp = ext::make_object<DependentPlugin, IPlugin>();
+    auto& info = dp->get_plugin_info();
+    EXPECT_EQ(DependentPlugin::class_id(), info.uid());
+    ASSERT_EQ(1u, info.dependencies.size());
+    EXPECT_EQ(TestPlugin::class_id(), info.dependencies[0]);
+}
+
+TEST_F(PluginTest, PluginInfoDefaultName)
+{
+    // FailingPlugin has no plugin_name, so name defaults to class_name()
+    auto fp = ext::make_object<FailingPlugin, IPlugin>();
+    auto& info = fp->get_plugin_info();
+    EXPECT_EQ(FailingPlugin::class_name(), info.name);
+}
+
+TEST_F(PluginTest, DependencyNotLoadedFails)
+{
+    auto& reg = velk_.plugin_registry();
+    auto dp = ext::make_object<DependentPlugin, IPlugin>();
+
+    EXPECT_EQ(ReturnValue::FAIL, reg.load_plugin(dp));
+    EXPECT_EQ(nullptr, reg.find_plugin<DependentPlugin>());
+}
+
+TEST_F(PluginTest, DependencyLoadedSucceeds)
+{
+    auto& reg = velk_.plugin_registry();
+
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin(plugin_));
+
+    auto dp = ext::make_object<DependentPlugin, IPlugin>();
+    EXPECT_EQ(ReturnValue::SUCCESS, reg.load_plugin(dp));
+    EXPECT_NE(nullptr, reg.find_plugin<DependentPlugin>());
+}
+
+#ifdef TEST_PLUGIN_DLL_PATH
+TEST_F(PluginTest, LoadFromPathSuccess)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
+
+    auto* plugin = reg.find_plugin(DllTestPluginUid);
+    ASSERT_NE(nullptr, plugin);
+    EXPECT_EQ(string_view("DllTestPlugin"), plugin->get_name());
+}
+
+TEST_F(PluginTest, LoadFromPathDoubleLoadReturnsNothingToDo)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    EXPECT_EQ(ReturnValue::NOTHING_TO_DO, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
+}
+
+TEST_F(PluginTest, LoadFromPathThenUnload)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin(DllTestPluginUid));
+    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(nullptr, reg.find_plugin(DllTestPluginUid));
+}
+
+TEST_F(PluginTest, LoadFromPathMultiPlugin)
+{
+    auto& reg = velk_.plugin_registry();
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
+
+    // Host plugin and sub-plugin should both be loaded
+    EXPECT_EQ(2u, reg.plugin_count());
+    EXPECT_NE(nullptr, reg.find_plugin(DllTestPluginUid));
+    EXPECT_NE(nullptr, reg.find_plugin(DllSubPluginUid));
+    EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_name());
+
+    // Unloading the host should also unload the sub-plugin (via shutdown)
+    ASSERT_EQ(ReturnValue::SUCCESS, reg.unload_plugin(DllTestPluginUid));
+    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(nullptr, reg.find_plugin(DllSubPluginUid));
+}
+#endif

@@ -34,5 +34,11 @@ add_executable(tests
 
 target_link_libraries(tests PRIVATE velk GTest::gtest_main)
 
+# Pass the test plugin DLL path as a compile definition so tests can find it.
+add_subdirectory(test_plugin_dll)
+target_compile_definitions(tests PRIVATE
+    TEST_PLUGIN_DLL_PATH="$<TARGET_FILE:test_plugin_dll>"
+)
+
 include(GoogleTest)
 gtest_discover_tests(tests)

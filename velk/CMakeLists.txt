@@ -4,7 +4,7 @@ add_library(velk SHARED
     src/function.cpp
     src/function.h
     include/velk/velk_export.h
-    include/velk/array_view.h
+include/velk/array_view.h
     include/velk/common.h
     include/velk/memory.h
     include/velk/string_view.h
@@ -15,6 +15,8 @@ add_library(velk SHARED
     src/future.h
     src/velk_instance.cpp
     src/velk_instance.h
+    src/library_handle.h
+    src/platform.h
     src/velk.cpp
     include/velk/interface/intf_log.h
     include/velk/interface/intf_any.h

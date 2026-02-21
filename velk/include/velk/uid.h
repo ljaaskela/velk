@@ -155,7 +155,4 @@ constexpr Uid make_hash(const string_view toHash)
 /** @brief Expands a UUID string literal into two uint64_t template arguments (hi, lo). */
 #define VELK_UID(str) ::velk::Uid(str).hi, ::velk::Uid(str).lo
 
-/** @brief Declares a static constexpr class UID from a UUID string literal. */
-#define VELK_CLASS_UID(str) static constexpr ::velk::Uid class_uid{str}
-
 #endif // VELK_UID_H

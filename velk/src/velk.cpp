@@ -54,14 +54,7 @@ VELK_EXPORT void detail::velk_log(ILog& log, LogLevel level,
 
 #if VELK_ENABLE_BLOCK_POOL
 
-#ifdef _WIN32
-#  ifndef WIN32_LEAN_AND_MEAN
-#    define WIN32_LEAN_AND_MEAN
-#  endif
-#  include <windows.h>
-#else
-#  include <pthread.h>
-#endif
+#include "platform.h" // IWYU pragma: keep (platform-specific defines)
 
 namespace {
 

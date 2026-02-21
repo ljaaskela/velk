@@ -17,6 +17,8 @@ class IPluginRegistry : public Interface<IPluginRegistry>
 public:
     /** @brief Loads a plugin, calling its initialize() method. */
     virtual ReturnValue load_plugin(const IPlugin::Ptr& plugin) = 0;
+    /** @brief Loads a plugin from a shared library (.dll/.so) at the given path. */
+    virtual ReturnValue load_plugin_from_path(const char* path) = 0;
     /** @brief Unloads a plugin by ID, calling shutdown() and sweeping owned types. */
     virtual ReturnValue unload_plugin(Uid pluginId) = 0;
     /**

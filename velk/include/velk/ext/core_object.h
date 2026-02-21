@@ -74,6 +74,9 @@ class DefaultFactory : public ObjectFactory<FinalClass>
     }
 };
 
+/** @brief Declares a static constexpr class UID from a UUID string literal. */
+#define VELK_CLASS_UID(str) static constexpr ::velk::Uid class_uid{str}
+
 // IObject detection: walks ParentInterface chains to check if IObject is already reachable.
 
 /** @brief Selects the RefCountedDispatch base, prepending IObject only if not already reachable. */

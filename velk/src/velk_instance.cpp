@@ -5,6 +5,7 @@
 #include "property.h"
 #include <algorithm>
 #include <velk/ext/any.h>
+#include <velk/ext/plugin.h>
 #include <velk/interface/types.h>
 
 namespace velk {
@@ -181,6 +182,77 @@ IFunction::Ptr VelkInstance::create_owned_callback(void* context,
     return func;
 }
 
+ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
+{
+    for (auto dep : info.dependencies) {
+        if (!find_plugin(dep)) {
+            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                             "Plugin '%.*s' has unmet dependency: %016llx%016llx",
+                             static_cast<int>(info.name.size()),
+                             info.name.data(),
+                             static_cast<unsigned long long>(dep.hi),
+                             static_cast<unsigned long long>(dep.lo));
+            return ReturnValue::FAIL;
+        }
+    }
+    return ReturnValue::SUCCESS;
+}
+
+ReturnValue VelkInstance::load_plugin_from_path(const char* path)
+{
+    if (!path || !*path) {
+        return ReturnValue::INVALID_ARGUMENT;
+    }
+
+    auto lib = LibraryHandle::open(path);
+    if (!lib) {
+        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                         "Failed to load library: %s", path);
+        return ReturnValue::FAIL;
+    }
+
+    auto* get_info = reinterpret_cast<detail::PluginInfoFn*>(lib.symbol("velk_plugin_info"));
+    if (!get_info) {
+        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                         "Library missing velk_plugin_info entry point: %s", path);
+        lib.close();
+        return ReturnValue::FAIL;
+    }
+
+    auto& info = *get_info();
+
+    // Check for duplicates and dependencies before instantiating.
+    Uid id = info.uid();
+    PluginEntry key{id, {}};
+    auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+    if (it != plugins_.end() && it->uid == id) {
+        lib.close();
+        return ReturnValue::NOTHING_TO_DO;
+    }
+    if (auto rv = check_dependencies(info); failed(rv)) {
+        lib.close();
+        return rv;
+    }
+
+    // Create the plugin instance via the factory (properly sets up control block).
+    auto plugin = info.factory.create_instance<IPlugin>();
+    if (!plugin) {
+        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                         "Factory failed to create plugin: %s", path);
+        lib.close();
+        return ReturnValue::FAIL;
+    }
+
+    ReturnValue rv = load_plugin(plugin);
+    if (succeeded(rv)) {
+        it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
+        it->library = std::move(lib);
+    } else {
+        lib.close();
+    }
+    return rv;
+}
+
 ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
 {
     if (!plugin) {
@@ -191,6 +263,9 @@ ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {
         return ReturnValue::NOTHING_TO_DO; // Already there
+    }
+    if (auto rv = check_dependencies(plugin->get_plugin_info()); failed(rv)) {
+        return rv;
     }
     it = plugins_.insert(it, PluginEntry{id, plugin});
 
@@ -221,7 +296,10 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
             [&](const Entry& e) { return e.owner == pluginId; }),
         types_.end());
 
+    // Move library handle out before erasing so it can be freed after the plugin pointer is gone.
+    auto handle = std::move(it->library);
     plugins_.erase(it);
+    handle.close();
     return ReturnValue::SUCCESS;
 }
 

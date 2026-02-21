@@ -4,6 +4,7 @@
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_velk.h>
+#include "library_handle.h"
 #include <mutex>
 #include <vector>
 
@@ -46,6 +47,7 @@ public:
                                          IFunction::ContextDeleter* deleter) const override;
 
     ReturnValue load_plugin(const IPlugin::Ptr& plugin) override;
+    ReturnValue load_plugin_from_path(const char* path) override;
     ReturnValue unload_plugin(Uid pluginId) override;
     IPlugin* find_plugin(Uid pluginId) const override;
     size_t plugin_count() const override;
@@ -69,11 +71,14 @@ private:
     struct PluginEntry {
         Uid uid;
         IPlugin::Ptr plugin;
+        LibraryHandle library;  ///< Non-empty when plugin was loaded from a shared library.
         bool operator<(const PluginEntry& o) const { return uid < o.uid; }
     };
 
     /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
     const IObjectFactory* find(Uid uid) const;
+    /** @brief Checks that all dependencies declared in info are loaded. Logs and returns FAIL if not. */
+    ReturnValue check_dependencies(const PluginInfo& info);
     std::vector<Entry> types_;                      ///< Sorted registry of class factories.
     std::vector<PluginEntry> plugins_;              ///< Sorted registry of loaded plugins.
     Uid current_owner_;                             ///< Owner context for type registration.
