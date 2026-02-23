@@ -34,6 +34,7 @@ include/velk/array_view.h
     include/velk/interface/intf_plugin_registry.h
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
+    include/velk/interface/member_desc.h
     include/velk/interface/types.h
     include/velk/api/any.h
     include/velk/api/callback.h
