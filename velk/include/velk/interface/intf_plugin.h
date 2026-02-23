@@ -13,19 +13,28 @@ class IVelk; // Forward declaration
  *  Layout: [major:8][minor:8][patch:16] */
 constexpr uint32_t make_version(uint8_t major, uint8_t minor, uint16_t patch = 0)
 {
-    return (static_cast<uint32_t>(major) << 24)
-         | (static_cast<uint32_t>(minor) << 16)
-         | static_cast<uint32_t>(patch);
+    return (static_cast<uint32_t>(major) << 24) | (static_cast<uint32_t>(minor) << 16) |
+           static_cast<uint32_t>(patch);
 }
 
-constexpr uint8_t  version_major(uint32_t v) { return static_cast<uint8_t>(v >> 24); }
-constexpr uint8_t  version_minor(uint32_t v) { return static_cast<uint8_t>(v >> 16); }
-constexpr uint16_t version_patch(uint32_t v) { return static_cast<uint16_t>(v); }
+constexpr uint8_t version_major(uint32_t v)
+{
+    return static_cast<uint8_t>(v >> 24);
+}
+constexpr uint8_t version_minor(uint32_t v)
+{
+    return static_cast<uint8_t>(v >> 16);
+}
+constexpr uint16_t version_patch(uint32_t v)
+{
+    return static_cast<uint16_t>(v);
+}
 
 /** @brief A dependency on another plugin, optionally with a minimum version. */
-struct PluginDependency {
-    Uid uid;                   ///< Uid of the dependency plugin
-    uint32_t min_version = 0;  ///< 0 = any version
+struct PluginDependency
+{
+    Uid uid;                  ///< Uid of the dependency plugin
+    uint32_t min_version = 0; ///< 0 = any version
 
     constexpr PluginDependency(Uid id, uint32_t ver = 0) : uid(id), min_version(ver) {}
 };
@@ -37,11 +46,12 @@ struct PluginDependency {
  * instance creation. The display name is a human-readable label that may
  * differ from the C++ class name.
  */
-struct PluginInfo {
-    const IObjectFactory& factory;              ///< Factory for creating plugin instances.
-    string_view name;                           ///< Human-readable display name.
-    uint32_t version = 0;                       ///< Plugin version (use make_version).
-    array_view<PluginDependency> dependencies;  ///< Plugins that must be loaded first.
+struct PluginInfo
+{
+    const IObjectFactory& factory;             ///< Factory for creating plugin instances.
+    string_view name;                          ///< Human-readable display name.
+    uint32_t version = 0;                      ///< Plugin version (use make_version).
+    array_view<PluginDependency> dependencies; ///< Plugins that must be loaded first.
 
     /** @brief Returns the plugin UID from the factory's ClassInfo. */
     Uid uid() const { return factory.get_class_info().uid; }

@@ -1,10 +1,12 @@
 #ifndef VELK_INSTANCE_H
 #define VELK_INSTANCE_H
 
+#include "library_handle.h"
+
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_velk.h>
-#include "library_handle.h"
+
 #include <mutex>
 #include <vector>
 
@@ -32,19 +34,18 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
-    ReturnValue register_type(const IObjectFactory &factory) override;
-    ReturnValue unregister_type(const IObjectFactory &factory) override;
+    ReturnValue register_type(const IObjectFactory& factory) override;
+    ReturnValue unregister_type(const IObjectFactory& factory) override;
     IInterface::Ptr create(Uid uid) const override;
 
     const ClassInfo* get_class_info(Uid classUid) const override;
     IAny::Ptr create_any(Uid type) const override;
-    IProperty::Ptr create_property(Uid type, const IAny::Ptr &value, int32_t flags) const override;
+    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, int32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
     void update() const override;
     IFuture::Ptr create_future() const override;
     IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
-    IFunction::Ptr create_owned_callback(void* context,
-                                         IFunction::BoundFn* fn,
+    IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
                                          IFunction::ContextDeleter* deleter) const override;
 
     ReturnValue load_plugin(const IPlugin::Ptr& plugin) override;
@@ -56,23 +57,24 @@ public:
     void set_sink(const ILogSink::Ptr& sink) override;
     void set_level(LogLevel level) override;
     LogLevel get_level() const override;
-    void dispatch(LogLevel level, const char* file, int line,
-                  const char* message) override;
+    void dispatch(LogLevel level, const char* file, int line, const char* message) override;
 
 private:
     /** @brief Registry entry mapping a class UID to its factory. */
-    struct Entry {
-        Uid uid;                        ///< Class UID.
-        const IObjectFactory *factory;  ///< Factory that creates instances of this class.
-        Uid owner;                      ///< Plugin that registered this type (Uid{} = builtin).
+    struct Entry
+    {
+        Uid uid;                       ///< Class UID.
+        const IObjectFactory* factory; ///< Factory that creates instances of this class.
+        Uid owner;                     ///< Plugin that registered this type (Uid{} = builtin).
         bool operator<(const Entry& o) const { return uid < o.uid; }
     };
 
     /** @brief Plugin registry entry. */
-    struct PluginEntry {
+    struct PluginEntry
+    {
         Uid uid;
         IPlugin::Ptr plugin;
-        LibraryHandle library;  ///< Non-empty when plugin was loaded from a shared library.
+        LibraryHandle library; ///< Non-empty when plugin was loaded from a shared library.
         bool operator<(const PluginEntry& o) const { return uid < o.uid; }
     };
 
@@ -80,13 +82,13 @@ private:
     const IObjectFactory* find(Uid uid) const;
     /** @brief Checks that all dependencies declared in info are loaded. Logs and returns Fail if not. */
     ReturnValue check_dependencies(const PluginInfo& info);
-    std::vector<Entry> types_;                      ///< Sorted registry of class factories.
-    std::vector<PluginEntry> plugins_;              ///< Sorted registry of loaded plugins.
-    Uid current_owner_;                             ///< Owner context for type registration.
-    mutable std::mutex deferred_mutex_;             ///< Guards @c deferred_queue_.
+    std::vector<Entry> types_;                         ///< Sorted registry of class factories.
+    std::vector<PluginEntry> plugins_;                 ///< Sorted registry of loaded plugins.
+    Uid current_owner_;                                ///< Owner context for type registration.
+    mutable std::mutex deferred_mutex_;                ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
-    ILogSink::Ptr sink_;                              ///< Custom log sink (empty = default stderr).
-    LogLevel level_{LogLevel::Info};                 ///< Minimum log level.
+    ILogSink::Ptr sink_;                               ///< Custom log sink (empty = default stderr).
+    LogLevel level_{LogLevel::Info};                   ///< Minimum log level.
 };
 
 } // namespace velk

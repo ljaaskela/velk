@@ -17,7 +17,7 @@ public:
      *         ReturnValue::NothingToDo if the same value was set
      *         ReturnValue::Fail otherwise
      */
-    virtual ReturnValue set_value(const IAny &from) = 0;
+    virtual ReturnValue set_value(const IAny& from) = 0;
     /**
      * @brief Returns the property's current value.
      */
@@ -39,7 +39,7 @@ public:
      * @note  This function can be called only once to initialize the property.
      *        Internal any object cannot be changed after initialization.
      */
-    virtual bool set_any(const IAny::Ptr &any) = 0;
+    virtual bool set_any(const IAny::Ptr& any) = 0;
     /**
      * @brief Returns the internal any object.
      * @note  Any changes through the direct any accessor will not lead to
@@ -52,7 +52,7 @@ public:
      * @param size Size of the source data in bytes.
      * @param type Type UID of the data.
      */
-    virtual ReturnValue set_data(const void *data, size_t size, Uid type) = 0;
+    virtual ReturnValue set_data(const void* data, size_t size, Uid type) = 0;
     /**
      * @brief Sets object flags (e.g. ObjectFlags::ReadOnly) on the property.
      * @param flags Bitwise combination of ObjectFlags constants.

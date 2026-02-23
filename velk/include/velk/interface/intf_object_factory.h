@@ -13,9 +13,9 @@ public:
     /** @brief Creates a new instance of the class this factory represents. */
     virtual IObject::Ptr create_instance() const = 0;
     /** @brief Returns the ClassInfo describing the class this factory creates. */
-    virtual const ClassInfo &get_class_info() const = 0;
+    virtual const ClassInfo& get_class_info() const = 0;
     /** @brief Type helper create_instance(). */
-    template<class T>
+    template <class T>
     typename T::Ptr create_instance() const
     {
         return interface_pointer_cast<T>(create_instance());

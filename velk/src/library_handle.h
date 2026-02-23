@@ -2,6 +2,7 @@
 #define VELK_LIBRARY_HANDLE_H
 
 #include "platform.h" // IWYU pragma: keep (platform-specific defines)
+
 #include <velk/common.h>
 
 namespace velk {
@@ -56,7 +57,9 @@ public:
     /** @brief Resolves a symbol by name from the loaded library. */
     void* symbol(const char* name) const
     {
-        if (!handle_) return nullptr;
+        if (!handle_) {
+            return nullptr;
+        }
 #ifdef _WIN32
         return reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(handle_), name));
 #else

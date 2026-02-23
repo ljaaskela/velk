@@ -258,7 +258,7 @@ if (auto writer = meta->write<IMyWidget>()) {
 }
 ```
 
-Only properties that have been accessed (instantiated) receive notifications. If no properties have been looked up yet, `write_state` writes the state but skips notification since there are no listeners. Note that `write_state` does not track which fields actually changed — on destruction it unconditionally fires `on_changed` for every instantiated property of that interface, even if the value is the same.
+Only properties that have been accessed (instantiated) receive notifications. If no properties have been looked up yet, `write_state` writes the state but skips notification since there are no listeners. Note that `write_state` does not track which fields actually changed. On destruction it unconditionally fires `on_changed` for every instantiated property of that interface, even if the value is the same.
 
 Each interface's state is independent, `write_state<IMyWidget>` only notifies `IMyWidget` properties, not properties from other interfaces on the same object:
 
@@ -274,11 +274,11 @@ if (auto writer = write_state<ISerializable>(iw)) {
 
 ### get_property_state (raw pointer)
 
-For performance-critical code paths like serialization, snapshotting (`memcpy` for trivially-copyable state), or tight loops, `get_property_state<T>` returns the raw `T::State*` with zero overhead. Writes through the raw pointer bypass change notifications entirely — this is the opt-in escape hatch when you know no listeners need notifying.
+For performance-critical code paths like serialization, snapshotting (`memcpy` for trivially-copyable state), or tight loops, `get_property_state<T>` returns the raw `T::State*` with zero overhead. Writes through the raw pointer bypass change notifications entirely. This is the opt-in escape hatch when you know no listeners need notifying.
 
 | API | Notifications | Use case |
 |---|---|---|
-| `write_state<T>` | Automatic on scope exit | General use — correctness by default |
+| `write_state<T>` | Automatic on scope exit | General use, correctness by default |
 | `get_property_state<T>` | None | Performance-critical bulk operations |
 
 ```cpp
@@ -287,7 +287,7 @@ auto* state = get_property_state<IMyWidget>(widget.get());  // IMyWidget::State*
 state->width;   // 100.f (default)
 state->height;  // 50.f
 
-// Write to state directly — property reads it back, but on_changed does NOT fire
+// Write to state directly, property reads it back, but on_changed does NOT fire
 state->width = 200.f;
 iw->width().get_value();  // 200.f
 ```

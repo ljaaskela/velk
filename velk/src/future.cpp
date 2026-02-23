@@ -1,4 +1,5 @@
 #include "future.h"
+
 #include <velk/api/callback.h>
 #include <velk/api/velk.h>
 
@@ -46,7 +47,9 @@ ReturnValue FutureImpl::set_result(const IAny* result)
 
 void FutureImpl::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)
 {
-    if (!fn) return;
+    if (!fn) {
+        return;
+    }
 
     {
         std::lock_guard lock(mutex_);
@@ -82,7 +85,9 @@ IFuture::Ptr FutureImpl::then(const IFunction::ConstPtr& fn, InvokeType type)
     auto* internal = interface_cast<IFutureInternal>(chained);
     Callback wrapper([internal, chained, fn](FnArgs args) -> IAny::Ptr {
         auto result = fn->invoke(args);
-        if (internal) internal->set_result(result.get());
+        if (internal) {
+            internal->set_result(result.get());
+        }
         return nullptr;
     });
     add_continuation(wrapper, type);

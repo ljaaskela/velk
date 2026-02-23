@@ -1,5 +1,3 @@
-#include <benchmark/benchmark.h>
-
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/event.h>
@@ -8,6 +6,8 @@
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/interface/intf_metadata.h>
+
+#include <benchmark/benchmark.h>
 
 using namespace velk;
 

@@ -33,10 +33,7 @@ public:
 
     /** @brief Invokes the function with no arguments (null-safe).
      *  @param type Immediate executes now; Deferred queues for the next update() call. */
-    IAny::Ptr invoke(InvokeType type = Immediate) const
-    {
-        return fn_ ? fn_->invoke({}, type) : nullptr;
-    }
+    IAny::Ptr invoke(InvokeType type = Immediate) const { return fn_ ? fn_->invoke({}, type) : nullptr; }
 
     /** @brief Invokes the function with the given @p args (null-safe).
      *  @param args Arguments for invocation.
@@ -57,7 +54,7 @@ private:
  * @param fn Function to invoke.
  * @param args Two or more IAny-convertible arguments.
  */
-template<class... Args, detail::require_any_args<Args...> = 0>
+template <class... Args, detail::require_any_args<Args...> = 0>
 IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
@@ -68,7 +65,7 @@ IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 
 namespace detail {
 
-template<class FnPtr, class Tuple, size_t... Is>
+template <class FnPtr, class Tuple, size_t... Is>
 IAny::Ptr invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence<Is...>)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(std::get<Is>(tup))...};
@@ -82,7 +79,7 @@ IAny::Ptr invoke_with_any_tuple(const FnPtr& fn, Tuple& tup, std::index_sequence
  *
  * Each argument is wrapped in Any<T> and passed as FnArgs.
  */
-template<class... Args, detail::require_value_args<Args...> = 0>
+template <class... Args, detail::require_value_args<Args...> = 0>
 IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);

@@ -13,11 +13,14 @@ namespace velk::ext {
  * Implicitly converts to IEvent::Ptr, creating the event via Velk
  * on the first conversion. Subsequent accesses return the cached instance.
  */
-class LazyEvent {
+class LazyEvent
+{
     mutable IEvent::Ptr event_;
+
 public:
     /** @brief Returns the event, creating it on first access. */
-    operator IEvent::Ptr() const {
+    operator IEvent::Ptr() const
+    {
         if (!event_) {
             event_ = instance().create<IEvent>(ClassId::Event);
         }

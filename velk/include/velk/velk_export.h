@@ -17,24 +17,24 @@
 #ifndef VELK_EXPORT
 #ifdef VELK_EXPORTS
 /* We are building this library */
-#  ifdef _MSC_VER
-#    define VELK_EXPORT __declspec(dllexport)
-#  else
-#    define VELK_EXPORT __attribute__((visibility("default")))
-#  endif
-#    else
-        /* We are using this library */
-#  ifdef _MSC_VER
-#    define VELK_EXPORT __declspec(dllimport)
-#  else
-#    define VELK_EXPORT __attribute__((visibility("default")))
-#  endif
-#    endif
-#  endif
+#ifdef _MSC_VER
+#define VELK_EXPORT __declspec(dllexport)
+#else
+#define VELK_EXPORT __attribute__((visibility("default")))
+#endif
+#else
+/* We are using this library */
+#ifdef _MSC_VER
+#define VELK_EXPORT __declspec(dllimport)
+#else
+#define VELK_EXPORT __attribute__((visibility("default")))
+#endif
+#endif
+#endif
 
 #ifndef VELK_NO_EXPORT
 #define VELK_NO_EXPORT
-#  endif
+#endif
 #endif
 
 #ifndef VELK_DEPRECATED
@@ -52,7 +52,7 @@
 #if 0 /* DEFINE_NO_DEPRECATED */
 #ifndef VELK_NO_DEPRECATED
 #define VELK_NO_DEPRECATED
-#  endif
+#endif
 #endif
 
 #endif /* VELK_EXPORT_H */

@@ -8,7 +8,11 @@
 namespace velk {
 
 /** @brief Specifies whether an invocation should execute immediately or be deferred to update(). */
-enum InvokeType : uint8_t { Immediate = 0, Deferred = 1 };
+enum InvokeType : uint8_t
+{
+    Immediate = 0,
+    Deferred = 1
+};
 
 /**
  * @brief Non-owning view of function arguments.
@@ -16,9 +20,10 @@ enum InvokeType : uint8_t { Immediate = 0, Deferred = 1 };
  * Passed by value (16 bytes). Constructed by callers from stack arrays of @c const @c IAny*.
  * Supports bounds-checked indexing and range-for iteration.
  */
-struct FnArgs {
-    const IAny* const* data = nullptr;  ///< Pointer to contiguous array of IAny pointers.
-    size_t count = 0;                   ///< Number of arguments.
+struct FnArgs
+{
+    const IAny* const* data = nullptr; ///< Pointer to contiguous array of IAny pointers.
+    size_t count = 0;                  ///< Number of arguments.
 
     /** @brief Returns the argument at index @p i, or nullptr if out of range. */
     const IAny* operator[](size_t i) const { return i < count ? data[i] : nullptr; }
@@ -26,10 +31,9 @@ struct FnArgs {
     bool empty() const { return count == 0; }
 
     /** @brief Returns an iterator to the first argument. */
-    const IAny *const *begin() const { return data; }
+    const IAny* const* begin() const { return data; }
     /** @brief Returns an iterator past the last argument. */
-    const IAny *const *end() const { return data + count; }
-
+    const IAny* const* end() const { return data + count; }
 };
 
 /** @brief Interface for an invocable function object. */
@@ -57,13 +61,13 @@ public:
  * @param args Arguments for invocation.
  * @param type Immediate executes now; Deferred queues for the next update() call.
  */
-inline IAny::Ptr invoke_function(const IFunction::ConstPtr &fn, FnArgs args = {}, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, FnArgs args = {}, InvokeType type = Immediate)
 {
     return fn ? fn->invoke(args, type) : nullptr;
 }
 
 /** @brief Invokes a function with a single IAny argument. */
-inline IAny::Ptr invoke_function(const IFunction::ConstPtr &fn, const IAny *arg, InvokeType type = Immediate)
+inline IAny::Ptr invoke_function(const IFunction::ConstPtr& fn, const IAny* arg, InvokeType type = Immediate)
 {
     FnArgs args{&arg, 1};
     return fn ? fn->invoke(args, type) : nullptr;

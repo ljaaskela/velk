@@ -11,14 +11,14 @@ namespace velk::ext {
 #define VELK_PLUGIN_UID(str) VELK_CLASS_UID(str)
 
 /** @brief Declares a static constexpr plugin name. */
-#define VELK_PLUGIN_NAME(str) static constexpr string_view plugin_name { str };
+#define VELK_PLUGIN_NAME(str) static constexpr string_view plugin_name{str};
 
 /** @brief Declares a static constexpr plugin version. */
 #define VELK_PLUGIN_VERSION(major, minor, patch) \
     static constexpr uint32_t plugin_version = ::velk::make_version(major, minor, patch);
 
 /** @brief Declares a static constexpr list of plugin dependencies. */
-#define VELK_PLUGIN_DEPS(...) static constexpr PluginDependency plugin_deps[] = { __VA_ARGS__ };
+#define VELK_PLUGIN_DEPS(...) static constexpr PluginDependency plugin_deps[] = {__VA_ARGS__};
 
 /**
  * @brief CRTP base for plugin implementations.
@@ -35,23 +35,29 @@ namespace velk::ext {
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  */
-template<class FinalClass>
+template <class FinalClass>
 class Plugin : public Object<FinalClass, IPlugin>
 {
-    template<class T, class = void>
-    struct has_plugin_name : std::false_type {};
-    template<class T>
-    struct has_plugin_name<T, std::void_t<decltype(T::plugin_name)>> : std::true_type {};
+    template <class T, class = void>
+    struct has_plugin_name : std::false_type
+    {};
+    template <class T>
+    struct has_plugin_name<T, std::void_t<decltype(T::plugin_name)>> : std::true_type
+    {};
 
-    template<class T, class = void>
-    struct has_plugin_version : std::false_type {};
-    template<class T>
-    struct has_plugin_version<T, std::void_t<decltype(T::plugin_version)>> : std::true_type {};
+    template <class T, class = void>
+    struct has_plugin_version : std::false_type
+    {};
+    template <class T>
+    struct has_plugin_version<T, std::void_t<decltype(T::plugin_version)>> : std::true_type
+    {};
 
-    template<class T, class = void>
-    struct has_plugin_deps : std::false_type {};
-    template<class T>
-    struct has_plugin_deps<T, std::void_t<decltype(T::plugin_deps)>> : std::true_type {};
+    template <class T, class = void>
+    struct has_plugin_deps : std::false_type
+    {};
+    template <class T>
+    struct has_plugin_deps<T, std::void_t<decltype(T::plugin_deps)>> : std::true_type
+    {};
 
     static constexpr string_view resolve_name()
     {
@@ -74,8 +80,7 @@ class Plugin : public Object<FinalClass, IPlugin>
     static constexpr array_view<PluginDependency> resolve_deps()
     {
         if constexpr (has_plugin_deps<FinalClass>::value) {
-            return { FinalClass::plugin_deps,
-                     sizeof(FinalClass::plugin_deps) / sizeof(PluginDependency) };
+            return {FinalClass::plugin_deps, sizeof(FinalClass::plugin_deps) / sizeof(PluginDependency)};
         } else {
             return {};
         }
@@ -90,12 +95,8 @@ public:
      */
     static const PluginInfo& plugin_info()
     {
-        static const PluginInfo info {
-            FinalClass::get_factory(),
-            resolve_name(),
-            resolve_version(),
-            resolve_deps()
-        };
+        static const PluginInfo info{
+            FinalClass::get_factory(), resolve_name(), resolve_version(), resolve_deps()};
         return info;
     }
 
@@ -106,18 +107,19 @@ public:
 } // namespace velk::ext
 
 #ifdef _MSC_VER
-#  define VELK_PLUGIN_EXPORT __declspec(dllexport)
+#define VELK_PLUGIN_EXPORT __declspec(dllexport)
 #else
-#  define VELK_PLUGIN_EXPORT __attribute__((visibility("default")))
+#define VELK_PLUGIN_EXPORT __attribute__((visibility("default")))
 #endif
 
 /**
  * @brief Exports the plugin entry point for a shared library.
  * @param PluginClass The concrete plugin class (must derive from ext::Plugin<T>).
  */
-#define VELK_PLUGIN(PluginClass) \
-    extern "C" VELK_PLUGIN_EXPORT const ::velk::PluginInfo* velk_plugin_info() { \
-        return &PluginClass::plugin_info(); \
+#define VELK_PLUGIN(PluginClass)                                               \
+    extern "C" VELK_PLUGIN_EXPORT const ::velk::PluginInfo* velk_plugin_info() \
+    {                                                                          \
+        return &PluginClass::plugin_info();                                    \
     }
 
 namespace velk::detail {

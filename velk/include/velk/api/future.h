@@ -22,20 +22,22 @@ namespace detail {
  * Typed callables returning void or ReturnValue produce void.
  * Other typed callables produce their return type.
  */
-template<class Callable, class = void>
-struct future_return { using type = void; };
+template <class Callable, class = void>
+struct future_return
+{
+    using type = void;
+};
 
-template<class Callable>
-struct future_return<Callable, std::enable_if_t<
-    !std::is_invocable_v<Callable, FnArgs> &&
-    has_callable_traits_v<Callable> &&
-    !std::is_void_v<typename callable_traits<Callable>::return_type> &&
-    !std::is_same_v<typename callable_traits<Callable>::return_type, ReturnValue>>>
+template <class Callable>
+struct future_return<
+    Callable, std::enable_if_t<!std::is_invocable_v<Callable, FnArgs> && has_callable_traits_v<Callable> &&
+                               !std::is_void_v<typename callable_traits<Callable>::return_type> &&
+                               !std::is_same_v<typename callable_traits<Callable>::return_type, ReturnValue>>>
 {
     using type = typename callable_traits<Callable>::return_type;
 };
 
-template<class Callable>
+template <class Callable>
 using future_return_t = typename future_return<Callable>::type;
 
 } // namespace detail
@@ -44,7 +46,7 @@ using future_return_t = typename future_return<Callable>::type;
  * @brief Typed read-side wrapper for IFuture.
  * @tparam T The expected result type. Use void for valueless futures.
  */
-template<class T>
+template <class T>
 class Future
 {
 public:
@@ -58,13 +60,15 @@ public:
     bool is_ready() const { return future_ && future_->is_ready(); }
 
     /** @brief Blocks until the result is available. */
-    void wait() const { if (future_) future_->wait(); }
+    void wait() const
+    {
+        if (future_) {
+            future_->wait();
+        }
+    }
 
     /** @brief Blocks until ready, then returns the typed result. */
-    Any<const T> get_result() const
-    {
-        return Any<const T>(future_ ? future_->get_result() : nullptr);
-    }
+    Any<const T> get_result() const { return Any<const T>(future_ ? future_->get_result() : nullptr); }
 
     /**
      * @brief Adds a continuation and returns a Future that resolves with its return value.
@@ -77,7 +81,7 @@ public:
      * @param type Immediate fires synchronously; Deferred queues for update().
      * @return A Future that resolves with the continuation's return value.
      */
-    template<class F>
+    template <class F>
     auto then(F&& callable, InvokeType type = Immediate);
 
     /** @brief Implicit conversion to IFuture::Ptr. */
@@ -90,7 +94,7 @@ private:
 };
 
 /** @brief Specialization for void futures (no result value). */
-template<>
+template <>
 class Future<void>
 {
 public:
@@ -102,10 +106,15 @@ public:
     /** @brief Returns true if the result has been set. */
     bool is_ready() const { return future_ && future_->is_ready(); }
     /** @brief Blocks until the future is resolved. */
-    void wait() const { if (future_) future_->wait(); }
+    void wait() const
+    {
+        if (future_) {
+            future_->wait();
+        }
+    }
 
     /** @copydoc Future::then */
-    template<class F>
+    template <class F>
     auto then(F&& callable, InvokeType type = Immediate);
 
     /** @brief Implicit conversion to IFuture::Ptr. */
@@ -137,7 +146,7 @@ public:
      * @param value The value to resolve with (cloned internally).
      * @return Success on first call, NothingToDo if already resolved.
      */
-    template<class T>
+    template <class T>
     ReturnValue set_value(const T& value)
     {
         auto* internal = interface_cast<IFutureInternal>(future_);
@@ -158,7 +167,7 @@ public:
      * @brief Returns a typed Future for the consumer side.
      * @tparam T The expected result type. Use void for valueless futures.
      */
-    template<class T>
+    template <class T>
     Future<T> get_future() const
     {
         return Future<T>(future_);
@@ -177,8 +186,8 @@ inline Promise make_promise()
     return Promise(instance().create_future());
 }
 
-template<class T>
-template<class F>
+template <class T>
+template <class F>
 auto Future<T>::then(F&& callable, InvokeType type)
 {
     using FR = detail::future_return_t<std::decay_t<F>>;
@@ -186,7 +195,7 @@ auto Future<T>::then(F&& callable, InvokeType type)
     return Future<FR>(future_ ? future_->then(cb, type) : nullptr);
 }
 
-template<class F>
+template <class F>
 auto Future<void>::then(F&& callable, InvokeType type)
 {
     using FR = detail::future_return_t<std::decay_t<F>>;

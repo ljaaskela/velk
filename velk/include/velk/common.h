@@ -2,19 +2,20 @@
 #define VELK_COMMON_H
 
 #include <velk/uid.h>
+
 #include <array>
 
 namespace velk {
 
 /** @brief Extracts a substring into a null-terminated std::array at compile time. */
-template<std::size_t... Idxs>
+template <std::size_t... Idxs>
 constexpr auto substring_as_array(string_view str, std::index_sequence<Idxs...>)
 {
     return std::array{str[Idxs]..., '\0'};
 }
 
 /** @brief Returns the compiler-deduced name of T as a null-terminated std::array. */
-template<typename T>
+template <typename T>
 constexpr auto type_name_array()
 {
 #if defined(__clang__)
@@ -40,7 +41,7 @@ constexpr auto type_name_array()
 }
 
 /** @brief Holds the compile-time name array for type T as a static constexpr member. */
-template<typename T>
+template <typename T>
 struct type_name_holder
 {
     static inline constexpr auto value = type_name_array<T>();
@@ -50,10 +51,10 @@ struct type_name_holder
  * @brief Returns the compile-time name of type T as a string_view.
  * @tparam T The type whose name to retrieve.
  */
-template<typename T>
+template <typename T>
 constexpr string_view get_name()
 {
-    constexpr auto &value = type_name_holder<T>::value;
+    constexpr auto& value = type_name_holder<T>::value;
     return string_view{value.data(), value.size()};
 }
 
@@ -61,7 +62,7 @@ constexpr string_view get_name()
  * @brief Returns a unique compile-time identifier for type T, derived from its name.
  * @tparam T The type to identify.
  */
-template<class... T>
+template <class... T>
 constexpr Uid type_uid()
 {
     return make_hash(get_name<T...>());
@@ -72,8 +73,8 @@ struct NoCopy
 {
     NoCopy() = default;
     ~NoCopy() = default;
-    NoCopy(const NoCopy &) = delete;
-    NoCopy &operator=(const NoCopy &) = delete;
+    NoCopy(const NoCopy&) = delete;
+    NoCopy& operator=(const NoCopy&) = delete;
 };
 
 /** @brief Mixin (inherit to add behavior) that deletes move constructor and move assignment operator. */
@@ -81,8 +82,8 @@ struct NoMove
 {
     NoMove() = default;
     ~NoMove() = default;
-    NoMove(NoMove &&) = delete;
-    NoMove &operator=(NoMove &&) = delete;
+    NoMove(NoMove&&) = delete;
+    NoMove& operator=(NoMove&&) = delete;
 };
 
 /** @brief Mixin (inherit to add behavior) that prevents both copying and moving. */

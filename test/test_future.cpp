@@ -1,5 +1,3 @@
-#include <gtest/gtest.h>
-
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/future.h>
@@ -7,6 +5,7 @@
 #include <velk/interface/intf_future.h>
 #include <velk/interface/types.h>
 
+#include <gtest/gtest.h>
 #include <thread>
 
 using namespace velk;
@@ -121,10 +120,12 @@ TEST(Future, DeferredContinuationQueuesAndFiresOnUpdate)
     auto future = promise.get_future<int>();
 
     bool called = false;
-    future.then([&](FnArgs) -> ReturnValue {
-        called = true;
-        return ReturnValue::Success;
-    }, Deferred);
+    future.then(
+        [&](FnArgs) -> ReturnValue {
+            called = true;
+            return ReturnValue::Success;
+        },
+        Deferred);
 
     promise.set_value(42);
     EXPECT_FALSE(called); // Deferred, not yet called
@@ -156,9 +157,7 @@ TEST(Future, ContinuationReceivesValueTyped)
     auto future = promise.get_future<int>();
 
     int received = 0;
-    future.then([&](int val) {
-        received = val;
-    });
+    future.then([&](int val) { received = val; });
 
     promise.set_value(42);
     EXPECT_EQ(received, 42);
@@ -201,9 +200,18 @@ TEST(Future, MultipleContinuations)
     auto future = promise.get_future<int>();
 
     int count = 0;
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
-    future.then([&](FnArgs) -> ReturnValue { count++; return ReturnValue::Success; });
+    future.then([&](FnArgs) -> ReturnValue {
+        count++;
+        return ReturnValue::Success;
+    });
+    future.then([&](FnArgs) -> ReturnValue {
+        count++;
+        return ReturnValue::Success;
+    });
+    future.then([&](FnArgs) -> ReturnValue {
+        count++;
+        return ReturnValue::Success;
+    });
 
     promise.set_value(1);
     EXPECT_EQ(count, 3);
@@ -232,7 +240,9 @@ TEST(Future, WaitFromMultipleThreads)
     std::this_thread::sleep_for(std::chrono::milliseconds(30));
     promise.set_value(77);
 
-    for (auto& t : threads) t.join();
+    for (auto& t : threads) {
+        t.join();
+    }
     EXPECT_EQ(ready_count.load(), NUM_THREADS);
 }
 
@@ -247,9 +257,7 @@ TEST(Future, ThenChaining)
     auto future2 = promise2.get_future<int>();
 
     // When future1 resolves, resolve future2 with value + 1
-    future1.then([&](int val) {
-        promise2.set_value(val + 1);
-    });
+    future1.then([&](int val) { promise2.set_value(val + 1); });
 
     promise1.set_value(10);
     EXPECT_TRUE(future2.is_ready());
@@ -262,9 +270,8 @@ TEST(Future, ThenReturnValueChaining)
     auto future = promise.get_future<int>();
 
     // .then() returns a new Future whose type matches the callable's return type
-    auto chained = future
-        .then([](int val) -> int { return val * 2; })
-        .then([](int val) -> int { return val + 1; });
+    auto chained =
+        future.then([](int val) -> int { return val * 2; }).then([](int val) -> int { return val + 1; });
 
     promise.set_value(5);
     EXPECT_TRUE(chained.is_ready());
@@ -319,9 +326,9 @@ TEST(Future, ThenTripleChain)
 {
     auto promise = make_promise();
     auto end = promise.get_future<int>()
-        .then([](int v) -> int { return v + 1; })
-        .then([](int v) -> int { return v * 10; })
-        .then([](int v) -> int { return v - 3; });
+                   .then([](int v) -> int { return v + 1; })
+                   .then([](int v) -> int { return v * 10; })
+                   .then([](int v) -> int { return v - 3; });
 
     promise.set_value(2);
     EXPECT_EQ(end.get_result().get_value(), 27); // ((2+1)*10)-3

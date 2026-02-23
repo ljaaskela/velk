@@ -22,12 +22,12 @@ public:
      * @param fn Handler to register. A handler can only be added once.
      * @param type Immediate handlers fire synchronously; Deferred handlers are queued for update().
      */
-    virtual ReturnValue add_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const = 0;
+    virtual ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const = 0;
     /**
      * @brief Removes an event handler function.
      * @param fn Handler to remove (searched in both immediate and deferred lists).
      */
-    virtual ReturnValue remove_handler(const IFunction::ConstPtr &fn) const = 0;
+    virtual ReturnValue remove_handler(const IFunction::ConstPtr& fn) const = 0;
     /**
      * @brief Returns true if the event has any handlers.
      */
@@ -39,18 +39,22 @@ public:
  * @param event Event to invoke.
  * @param args Arguments for invocation.
  */
-inline ReturnValue invoke_event(const IEvent::ConstPtr &event, FnArgs args)
+inline ReturnValue invoke_event(const IEvent::ConstPtr& event, FnArgs args)
 {
-    if (!event) return ReturnValue::InvalidArgument;
+    if (!event) {
+        return ReturnValue::InvalidArgument;
+    }
     event->invoke(args);
     return ReturnValue::Success;
 }
 
 /** @brief Invokes an event with a single IAny argument. */
-inline ReturnValue invoke_event(const IEvent::ConstPtr &event, const IAny *arg)
+inline ReturnValue invoke_event(const IEvent::ConstPtr& event, const IAny* arg)
 {
     FnArgs args{&arg, 1};
-    if (!event) return ReturnValue::InvalidArgument;
+    if (!event) {
+        return ReturnValue::InvalidArgument;
+    }
     event->invoke(args);
     return ReturnValue::Success;
 }

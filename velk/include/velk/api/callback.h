@@ -2,8 +2,8 @@
 #define VELK_API_CALLBACK_H
 
 #include <velk/api/any.h>
-#include <velk/api/velk.h>
 #include <velk/api/traits.h>
+#include <velk/api/velk.h>
 #include <velk/common.h>
 
 #include <type_traits>
@@ -14,21 +14,24 @@ namespace velk {
 namespace detail {
 
 /** @brief Typed parameter unpacking for auto-unpack Callback constructor */
-template<class Callable, class ArgsTuple, size_t... Is>
+template <class Callable, class ArgsTuple, size_t... Is>
 decltype(auto) invoke_typed_impl(Callable& callable, FnArgs args, std::index_sequence<Is...>)
 {
     return callable(Any<const decay_param_t<std::tuple_element_t<Is, ArgsTuple>>>(args[Is]).get_value()...);
 }
 
-template<class Callable, class Traits>
-struct typed_trampoline {
+template <class Callable, class Traits>
+struct typed_trampoline
+{
     using ArgsTuple = typename Traits::args_tuple;
     static constexpr size_t Arity = Traits::arity;
 
     static IAny::Ptr invoke(void* c, FnArgs args)
     {
         if constexpr (Arity > 0) {
-            if (args.count < Arity) return nullptr;
+            if (args.count < Arity) {
+                return nullptr;
+            }
         }
         auto& fn = *static_cast<Callable*>(c);
         using R = typename Traits::return_type;
@@ -43,10 +46,7 @@ struct typed_trampoline {
         }
     }
 
-    static void destroy(void* c)
-    {
-        delete static_cast<Callable*>(c);
-    }
+    static void destroy(void* c) { delete static_cast<Callable*>(c); }
 };
 
 } // namespace detail
@@ -63,29 +63,26 @@ private:
     //   is_callable_v      — not a copy/move of Callback, not convertible to raw CallbackFn*
     //   is_fnargs_callable — also invocable as (FnArgs) -> ReturnValue
     //   is_typed_callable  — not fnargs-invocable, but has a detectable operator() with typed params
-    template<class F> using Decay = std::decay_t<F>;
+    template <class F>
+    using Decay = std::decay_t<F>;
 
-    template<class F>
+    template <class F>
     static constexpr bool is_callable_v =
-        !std::is_same_v<Decay<F>, Callback> &&
-        !std::is_convertible_v<Decay<F>, CallbackFn*>;
+        !std::is_same_v<Decay<F>, Callback> && !std::is_convertible_v<Decay<F>, CallbackFn*>;
 
-    template<class F>
+    template <class F>
     static constexpr bool is_fnargs_callable_v =
         is_callable_v<F> && (std::is_invocable_r_v<ReturnValue, Decay<F>, FnArgs> ||
                              std::is_invocable_r_v<IAny::Ptr, Decay<F>, FnArgs>);
 
-    template<class F>
+    template <class F>
     static constexpr bool is_typed_callable_v =
-        is_callable_v<F> && !is_fnargs_callable_v<F> &&
-        detail::has_callable_traits_v<Decay<F>>;
+        is_callable_v<F> && !is_fnargs_callable_v<F> && detail::has_callable_traits_v<Decay<F>>;
 
 public:
     Callback() = delete;
     /** @brief Creates a Callback backed by the given callback. */
-    Callback(CallbackFn *cb)
-        : fn_(instance().create_callback(cb))
-    {}
+    Callback(CallbackFn* cb) : fn_(instance().create_callback(cb)) {}
 
     /**
      * @brief Creates a Callback from a capturing callable (lambda, functor, etc.).
@@ -93,7 +90,7 @@ public:
      * The callable is heap-allocated and owned by the underlying IFunction.
      * Only raw function pointers cross the DLL boundary.
      */
-    template<class F, detail::require<is_fnargs_callable_v<F>> = 0>
+    template <class F, detail::require<is_fnargs_callable_v<F>> = 0>
     Callback(F&& callable)
     {
         using Callable = std::decay_t<F>;
@@ -106,9 +103,7 @@ public:
                 return nullptr;
             }
         };
-        auto* deleter = +[](void* c) {
-            delete static_cast<Callable*>(c);
-        };
+        auto* deleter = +[](void* c) { delete static_cast<Callable*>(c); };
         fn_ = instance().create_owned_callback(ctx, trampoline, deleter);
     }
 
@@ -118,7 +113,7 @@ public:
      * Automatically unpacks FnArgs into typed values using Any<const T>.
      * Supports both void and ReturnValue return types.
      */
-    template<class F, detail::require<is_typed_callable_v<F>> = 0>
+    template <class F, detail::require<is_typed_callable_v<F>> = 0>
     Callback(F&& callable)
     {
         using Callable = std::decay_t<F>;

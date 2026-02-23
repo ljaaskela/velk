@@ -20,53 +20,69 @@
 namespace velk {
 
 /** @brief Discriminator for the kind of member described by a MemberDesc. */
-enum class MemberKind : uint8_t { Property, Event, Function };
+enum class MemberKind : uint8_t
+{
+    Property,
+    Event,
+    Function
+};
 
 /** @brief Discriminator for the kind of notification to broadcast. */
-enum class Notification : uint8_t { Changed, Invoked, Reset };
+enum class Notification : uint8_t
+{
+    Changed,
+    Invoked,
+    Reset
+};
 
 /** @brief Function pointer type for trampoline callbacks that route to virtual methods. */
-using FnTrampoline = IAny::Ptr(*)(void* self, FnArgs args);
+using FnTrampoline = IAny::Ptr (*)(void* self, FnArgs args);
 
 /** @brief Kind-specific data for Property members. */
-struct PropertyKind {
-    Uid typeUid;                                ///< type_uid<T>() for the property's value type.
+struct PropertyKind
+{
+    Uid typeUid; ///< type_uid<T>() for the property's value type.
     /** @brief Returns a pointer to a static IAny holding the property's default value. */
-    const IAny*(*getDefault)() = nullptr;
+    const IAny* (*getDefault)() = nullptr;
     /** @brief Creates an AnyRef pointing into the State struct at @p stateBase. */
-    IAny::Ptr(*createRef)(void* stateBase) = nullptr;
+    IAny::Ptr (*createRef)(void* stateBase) = nullptr;
     int32_t flags{ObjectFlags::None}; ///< ObjectFlags to apply to the created PropertyImpl.
 };
 
 /** @brief Describes a single argument of a typed function. */
-struct FnArgDesc {
-    string_view name;  ///< Parameter name (e.g. "x").
-    Uid typeUid;            ///< type_uid<T>() for the parameter type.
+struct FnArgDesc
+{
+    string_view name; ///< Parameter name (e.g. "x").
+    Uid typeUid;      ///< type_uid<T>() for the parameter type.
 };
 
 /** @brief Kind-specific data for Function/Event members. */
-struct FunctionKind {
-    FnTrampoline trampoline = nullptr;  ///< Static trampoline that routes invoke() to the virtual method.
-    array_view<FnArgDesc> args;         ///< Typed argument descriptors; empty for zero-arg and FN_RAW.
+struct FunctionKind
+{
+    FnTrampoline trampoline = nullptr; ///< Static trampoline that routes invoke() to the virtual method.
+    array_view<FnArgDesc> args;        ///< Typed argument descriptors; empty for zero-arg and FN_RAW.
 };
 
 /** @brief Describes a single member (property, event, or function) declared by an object class. */
-struct MemberDesc {
-    string_view name;              ///< Member name used for runtime lookup.
+struct MemberDesc
+{
+    string_view name;                   ///< Member name used for runtime lookup.
     MemberKind kind;                    ///< Discriminator (Property, Event, or Function).
     const InterfaceInfo* interfaceInfo; ///< Interface that declared this member.
     const void* ext = nullptr;          ///< Points to PropertyKind or FunctionKind based on @c kind.
 
     /// Typed ext member getter for MemberDesc.kind = MemberKind::Property
-    constexpr const PropertyKind *propertyKind() const
+    constexpr const PropertyKind* propertyKind() const
     {
         return kind == MemberKind::Property ? static_cast<const PropertyKind*>(ext) : nullptr;
     }
-    /// Typed ext member getter for MemberDesc.kind = MemberKind::Function or MemberDesc.kind = MemberKind::Event
-    constexpr const FunctionKind *functionKind() const
+    /// Typed ext member getter for MemberDesc.kind = MemberKind::Function or MemberDesc.kind =
+    /// MemberKind::Event
+    constexpr const FunctionKind* functionKind() const
     {
         return (kind == MemberKind::Function || kind == MemberKind::Event)
-            ? static_cast<const FunctionKind*>(ext) : nullptr;
+                   ? static_cast<const FunctionKind*>(ext)
+                   : nullptr;
     }
 };
 
@@ -77,7 +93,7 @@ struct MemberDesc {
  * @param pk PropertyKind with typeUid, getDefault, and createRef (may be nullptr).
  */
 constexpr MemberDesc PropertyDesc(string_view name, const InterfaceInfo* info = nullptr,
-    const PropertyKind* pk = nullptr)
+                                  const PropertyKind* pk = nullptr)
 {
     return {name, MemberKind::Property, info, pk};
 }
@@ -88,12 +104,13 @@ constexpr MemberDesc PropertyDesc(string_view name, const InterfaceInfo* info = 
  * @param desc Member descriptor whose PropertyKind::getDefault to query.
  * @return The default value, or a value-initialized @p T if unavailable.
  */
-template<class T>
-T get_default_value(const MemberDesc& desc) {
+template <class T>
+T get_default_value(const MemberDesc& desc)
+{
     T value{};
-    const auto *pk = desc.propertyKind();
+    const auto* pk = desc.propertyKind();
     if (pk && pk->getDefault) {
-        if (const auto *any = pk->getDefault()) {
+        if (const auto* any = pk->getDefault()) {
             any->get_data(&value, sizeof(T), type_uid<T>());
         }
     }
@@ -117,7 +134,7 @@ constexpr MemberDesc EventDesc(string_view name, const InterfaceInfo* info = nul
  * @param fk FunctionKind with trampoline and argument descriptors (may be nullptr).
  */
 constexpr MemberDesc FunctionDesc(string_view name, const InterfaceInfo* info = nullptr,
-    const FunctionKind* fk = nullptr)
+                                  const FunctionKind* fk = nullptr)
 {
     return {name, MemberKind::Function, info, fk};
 }
@@ -132,16 +149,16 @@ class IPropertyState : public Interface<IPropertyState>
 {
 public:
     /** @brief Returns a pointer to the State struct for the given interface UID, or nullptr. */
-    virtual void *get_property_state(Uid interfaceUid) = 0;
+    virtual void* get_property_state(Uid interfaceUid) = 0;
 
     /**
      * @brief Type-safe state access. Returns a typed pointer to T::State.
      * @tparam T The interface type whose State struct to retrieve.
      */
-    template<class T>
-    typename T::State *get_property_state()
+    template <class T>
+    typename T::State* get_property_state()
     {
-        return static_cast<typename T::State *>(get_property_state(T::UID));
+        return static_cast<typename T::State*>(get_property_state(T::UID));
     }
 };
 
@@ -150,8 +167,8 @@ public:
  * @tparam T The interface type whose State struct to retrieve.
  * @param object The object whose property state to return.
  */
-template<class T, class U>
-typename T::State *get_property_state(U *object)
+template <class T, class U>
+typename T::State* get_property_state(U* object)
 {
     auto state = interface_cast<IPropertyState>(object);
     return state ? state->template get_property_state<T>() : nullptr;
@@ -160,7 +177,7 @@ typename T::State *get_property_state(U *object)
 namespace detail {
 
 /** @brief RAII read-only accessor to an interface's State struct. Null-safe. */
-template<class T>
+template <class T>
 class StateReader
 {
 public:
@@ -171,12 +188,13 @@ public:
     const typename T::State& operator*() const { return *state_; }
     StateReader(const StateReader&) = default;
     StateReader& operator=(const StateReader&) = default;
+
 private:
     const typename T::State* state_{};
 };
 
 /** @brief RAII write accessor; fires notify on destruction. Null-safe. */
-template<class T>
+template <class T>
 class StateWriter
 {
 public:
@@ -185,12 +203,17 @@ public:
     ~StateWriter(); // defined after IMetadata
     StateWriter(const StateWriter&) = delete;
     StateWriter& operator=(const StateWriter&) = delete;
-    StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_) { o.state_ = nullptr; o.meta_ = nullptr; }
+    StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_)
+    {
+        o.state_ = nullptr;
+        o.meta_ = nullptr;
+    }
     StateWriter& operator=(StateWriter&&) = delete;
 
     explicit operator bool() const { return state_ != nullptr; }
     typename T::State* operator->() { return state_; }
     typename T::State& operator*() { return *state_; }
+
 private:
     typename T::State* state_{};
     const IInterface* meta_{};
@@ -216,39 +239,40 @@ public:
     virtual void notify(MemberKind kind, Uid interfaceUid, Notification notification) const = 0;
 
     /** @brief Returns a read-only accessor to the State struct of interface @p T. */
-    template<class T>
+    template <class T>
     detail::StateReader<T> read() const;
 
     /** @brief Returns a write accessor that fires on_changed for @p T properties on destruction. */
-    template<class T>
+    template <class T>
     detail::StateWriter<T> write();
 };
 
-template<class T>
+template <class T>
 detail::StateReader<T> IMetadata::read() const
 {
     auto* state = const_cast<IMetadata*>(this)->template get_property_state<T>();
     return detail::StateReader<T>(state);
 }
 
-template<class T>
+template <class T>
 detail::StateWriter<T> IMetadata::write()
 {
     auto* state = this->template get_property_state<T>();
     return detail::StateWriter<T>(state, state ? this : nullptr);
 }
 
-template<class T>
+template <class T>
 detail::StateWriter<T>::~StateWriter()
 {
     if (state_ && meta_) {
-        if (auto* m = interface_cast<IMetadata>(meta_))
+        if (auto* m = interface_cast<IMetadata>(meta_)) {
             m->notify(MemberKind::Property, T::UID, Notification::Changed);
+        }
     }
 }
 
 /** @brief Convenience free function: read-only access to T::State via IMetadata. */
-template<class T, class U>
+template <class T, class U>
 detail::StateReader<T> read_state(U* object)
 {
     auto* meta = interface_cast<IMetadata>(object);
@@ -256,7 +280,7 @@ detail::StateReader<T> read_state(U* object)
 }
 
 /** @brief Convenience free function: write access to T::State via IMetadata. */
-template<class T, class U>
+template <class T, class U>
 detail::StateWriter<T> write_state(U* object)
 {
     auto* meta = interface_cast<IMetadata>(object);
@@ -305,7 +329,7 @@ public:
     /**
      * @brief Set metadata container. Called internally by the library.
      */
-    virtual void set_metadata_container(IMetadata *metadata) = 0;
+    virtual void set_metadata_container(IMetadata* metadata) = 0;
 };
 
 /**
@@ -314,9 +338,7 @@ public:
  * @param name Name of the function to query.
  * @param args Function arguments.
  */
-inline IAny::Ptr invoke_function(const IInterface *o,
-                                   string_view name,
-                                   FnArgs args = {})
+inline IAny::Ptr invoke_function(const IInterface* o, string_view name, FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_function(meta->get_function(name), args) : nullptr;
@@ -328,9 +350,7 @@ inline IAny::Ptr invoke_function(const IInterface *o,
  * @param name Function name to look up.
  * @param arg Single argument to pass.
  */
-inline IAny::Ptr invoke_function(const IInterface *o,
-                                   string_view name,
-                                   const IAny *arg)
+inline IAny::Ptr invoke_function(const IInterface* o, string_view name, const IAny* arg)
 {
     FnArgs args{&arg, 1};
     return invoke_function(o, name, args);
@@ -342,9 +362,7 @@ inline IAny::Ptr invoke_function(const IInterface *o,
  * @param name Name of the event to query.
  * @param args Event arguments.
  */
-inline ReturnValue invoke_event(const IInterface *o,
-                                string_view name,
-                                FnArgs args = {})
+inline ReturnValue invoke_event(const IInterface* o, string_view name, FnArgs args = {})
 {
     auto meta = interface_cast<IMetadata>(o);
     return meta ? invoke_event(meta->get_event(name), args) : ReturnValue::InvalidArgument;
@@ -356,9 +374,7 @@ inline ReturnValue invoke_event(const IInterface *o,
  * @param name Event name to look up.
  * @param arg Single argument to pass.
  */
-inline ReturnValue invoke_event(const IInterface *o,
-                                string_view name,
-                                const IAny *arg)
+inline ReturnValue invoke_event(const IInterface* o, string_view name, const IAny* arg)
 {
     FnArgs args{&arg, 1};
     return invoke_event(o, name, args);
@@ -372,7 +388,7 @@ inline ReturnValue invoke_event(const IInterface *o,
  * @param name Name of the function to query.
  * @param args Two or more IAny-convertible arguments.
  */
-template<class... Args, detail::require_any_args<Args...> = 0>
+template <class... Args, detail::require_any_args<Args...> = 0>
 IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... args)
 {
     const IAny* ptrs[] = {static_cast<const IAny*>(args)...};
@@ -384,7 +400,7 @@ IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... 
 
 namespace detail {
 
-template<class Tuple, size_t... Is>
+template <class Tuple, size_t... Is>
 FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 {
     ((ptrs[Is] = static_cast<const IAny*>(std::get<Is>(tup))), ...);
@@ -394,7 +410,7 @@ FnArgs make_fn_args(Tuple& tup, const IAny** ptrs, std::index_sequence<Is...>)
 } // namespace detail
 
 /** @brief Invokes a named function with multiple value arguments. */
-template<class... Args, detail::require_value_args<Args...> = 0>
+template <class... Args, detail::require_value_args<Args...> = 0>
 IAny::Ptr invoke_function(const IInterface* o, string_view name, const Args&... args)
 {
     auto tup = std::make_tuple(Any<std::decay_t<Args>>(args)...);
@@ -413,10 +429,13 @@ namespace detail {
  * @param any Source IAny (may be nullptr).
  * @return The extracted value, or a value-initialized @p T if @p any is null or type mismatches.
  */
-template<class T>
-T extract_arg(const IAny* any) {
+template <class T>
+T extract_arg(const IAny* any)
+{
     T value{};
-    if (any) any->get_data(&value, sizeof(T), type_uid<T>());
+    if (any) {
+        any->get_data(&value, sizeof(T), type_uid<T>());
+    }
     return value;
 }
 
@@ -429,9 +448,9 @@ T extract_arg(const IAny* any) {
  * @param args Runtime function arguments.
  * @param fn Pointer-to-member for the virtual method to call.
  */
-template<class Intf, class R, class... Args, size_t... Is>
-IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
-    R(Intf::*fn)(Args...), std::index_sequence<Is...>)
+template <class Intf, class R, class... Args, size_t... Is>
+IAny::Ptr interface_trampoline_impl(void* self, FnArgs args, R (Intf::*fn)(Args...),
+                                    std::index_sequence<Is...>)
 {
     if constexpr (std::is_void_v<R>) {
         (static_cast<Intf*>(self)->*fn)(extract_arg<std::decay_t<Args>>(args[Is])...);
@@ -456,12 +475,13 @@ IAny::Ptr interface_trampoline_impl(void* self, FnArgs args,
  * @param fn Pointer-to-member for the virtual method to call.
  * @return The virtual method's return value, or InvalidArgument if too few args.
  */
-template<class Intf, class R, class... Args>
-IAny::Ptr interface_trampoline(void* self, FnArgs args,
-    R(Intf::*fn)(Args...))
+template <class Intf, class R, class... Args>
+IAny::Ptr interface_trampoline(void* self, FnArgs args, R (Intf::*fn)(Args...))
 {
     if constexpr (sizeof...(Args) > 0) {
-        if (args.count < sizeof...(Args)) return nullptr;
+        if (args.count < sizeof...(Args)) {
+            return nullptr;
+        }
     }
     return interface_trampoline_impl(self, args, fn, std::index_sequence_for<Args...>{});
 }
@@ -472,7 +492,7 @@ IAny::Ptr interface_trampoline(void* self, FnArgs args,
  * @tparam T The member type.
  * @note Declaration only; used with @c decltype, never called.
  */
-template<class S, class T>
+template <class S, class T>
 T member_type_helper(T S::*);
 
 /**
@@ -480,7 +500,7 @@ T member_type_helper(T S::*);
  * @tparam State The state struct type (e.g. IMyWidget::State).
  * @return Reference to the shared static default instance.
  */
-template<class State>
+template <class State>
 State& default_state()
 {
     static State s{};
@@ -503,7 +523,7 @@ State& default_state()
  * static constexpr PropertyKind pk = detail::PropBind<State, &State::width>::kind;
  * @endcode
  */
-template<class State, auto Mem, int32_t Flags = 0>
+template <class State, auto Mem, int32_t Flags = 0>
 struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.
@@ -527,11 +547,11 @@ struct PropBind
      */
     static IAny::Ptr createRef(void* base)
     {
-        return ext::create_any_ref<value_type>(
-            &(static_cast<State*>(base)->*Mem));
+        return ext::create_any_ref<value_type>(&(static_cast<State*>(base)->*Mem));
     }
 
-    static constexpr PropertyKind kind { type_uid<value_type>(), &getDefault, &createRef, Flags }; ///< Pre-built PropertyKind.
+    static constexpr PropertyKind kind{
+        type_uid<value_type>(), &getDefault, &createRef, Flags}; ///< Pre-built PropertyKind.
 };
 
 /**
@@ -555,12 +575,10 @@ struct PropBind
  * @see FnRawBind For @c FN_RAW members that receive @c FnArgs directly.
  * @see PropBind  For the analogous property binding template.
  */
-template<auto Fn>
+template <auto Fn>
 struct FnBind
 {
-    static IAny::Ptr trampoline(void* self, FnArgs args) {
-        return interface_trampoline(self, args, Fn);
-    }
+    static IAny::Ptr trampoline(void* self, FnArgs args) { return interface_trampoline(self, args, Fn); }
     static constexpr FunctionKind kind{&trampoline, {}};
 };
 
@@ -582,11 +600,12 @@ struct FnBind
  * @see FnBind  For typed @c FN members.
  * @see PropBind For the analogous property binding template.
  */
-template<auto Fn>
+template <auto Fn>
 struct FnRawBind
 {
-    template<class Intf, class R>
-    static IAny::Ptr call(void* self, FnArgs args, R(Intf::*fn)(FnArgs)) {
+    template <class Intf, class R>
+    static IAny::Ptr call(void* self, FnArgs args, R (Intf::*fn)(FnArgs))
+    {
         if constexpr (std::is_void_v<R>) {
             (static_cast<Intf*>(self)->*fn)(args);
             return nullptr;
@@ -596,9 +615,7 @@ struct FnRawBind
             return Any<R>((static_cast<Intf*>(self)->*fn)(args)).clone();
         }
     }
-    static IAny::Ptr trampoline(void* self, FnArgs args) {
-        return call(self, args, Fn);
-    }
+    static IAny::Ptr trampoline(void* self, FnArgs args) { return call(self, args, Fn); }
     static constexpr FunctionKind kind{&trampoline, {}};
 };
 
@@ -613,27 +630,89 @@ struct FnRawBind
 #define _VELK_CAT_(a, b) a##b
 
 // Argument counting (supports 1..32)
-#define _VELK_NARG(...) \
+#define _VELK_NARG(...)                       \
     _VELK_EXPAND(_VELK_NARG_IMPL(__VA_ARGS__, \
-    32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17, \
-    16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1))
-#define _VELK_NARG_IMPL( \
-    _1,_2,_3,_4,_5,_6,_7,_8,_9,_10,_11,_12,_13,_14,_15,_16, \
-    _17,_18,_19,_20,_21,_22,_23,_24,_25,_26,_27,_28,_29,_30,_31,_32,N,...) N
+                                 32,          \
+                                 31,          \
+                                 30,          \
+                                 29,          \
+                                 28,          \
+                                 27,          \
+                                 26,          \
+                                 25,          \
+                                 24,          \
+                                 23,          \
+                                 22,          \
+                                 21,          \
+                                 20,          \
+                                 19,          \
+                                 18,          \
+                                 17,          \
+                                 16,          \
+                                 15,          \
+                                 14,          \
+                                 13,          \
+                                 12,          \
+                                 11,          \
+                                 10,          \
+                                 9,           \
+                                 8,           \
+                                 7,           \
+                                 6,           \
+                                 5,           \
+                                 4,           \
+                                 3,           \
+                                 2,           \
+                                 1))
+#define _VELK_NARG_IMPL(_1,  \
+                        _2,  \
+                        _3,  \
+                        _4,  \
+                        _5,  \
+                        _6,  \
+                        _7,  \
+                        _8,  \
+                        _9,  \
+                        _10, \
+                        _11, \
+                        _12, \
+                        _13, \
+                        _14, \
+                        _15, \
+                        _16, \
+                        _17, \
+                        _18, \
+                        _19, \
+                        _20, \
+                        _21, \
+                        _22, \
+                        _23, \
+                        _24, \
+                        _25, \
+                        _26, \
+                        _27, \
+                        _28, \
+                        _29, \
+                        _30, \
+                        _31, \
+                        _32, \
+                        N,   \
+                        ...) \
+    N
 
 // Apply dispatch macro M to parenthesized args: _VELK_APPLY(M, (a,b,c)) -> M(a,b,c)
 #define _VELK_APPLY(M, args) _VELK_EXPAND(M args)
 
 // FOR_EACH unrolling (1..32)
-#define _VELK_FE_1(M, x)       _VELK_APPLY(M, x)
-#define _VELK_FE_2(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_1(M, __VA_ARGS__))
-#define _VELK_FE_3(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_2(M, __VA_ARGS__))
-#define _VELK_FE_4(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_3(M, __VA_ARGS__))
-#define _VELK_FE_5(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_4(M, __VA_ARGS__))
-#define _VELK_FE_6(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_5(M, __VA_ARGS__))
-#define _VELK_FE_7(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_6(M, __VA_ARGS__))
-#define _VELK_FE_8(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_7(M, __VA_ARGS__))
-#define _VELK_FE_9(M, x, ...)  _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_8(M, __VA_ARGS__))
+#define _VELK_FE_1(M, x) _VELK_APPLY(M, x)
+#define _VELK_FE_2(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_1(M, __VA_ARGS__))
+#define _VELK_FE_3(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_2(M, __VA_ARGS__))
+#define _VELK_FE_4(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_3(M, __VA_ARGS__))
+#define _VELK_FE_5(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_4(M, __VA_ARGS__))
+#define _VELK_FE_6(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_5(M, __VA_ARGS__))
+#define _VELK_FE_7(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_6(M, __VA_ARGS__))
+#define _VELK_FE_8(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_7(M, __VA_ARGS__))
+#define _VELK_FE_9(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_8(M, __VA_ARGS__))
 #define _VELK_FE_10(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_9(M, __VA_ARGS__))
 #define _VELK_FE_11(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_10(M, __VA_ARGS__))
 #define _VELK_FE_12(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_11(M, __VA_ARGS__))
@@ -658,38 +737,39 @@ struct FnRawBind
 #define _VELK_FE_31(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_30(M, __VA_ARGS__))
 #define _VELK_FE_32(M, x, ...) _VELK_APPLY(M, x) _VELK_EXPAND(_VELK_FE_31(M, __VA_ARGS__))
 
-#define _VELK_FOR_EACH(M, ...) \
-    _VELK_EXPAND(_VELK_CAT(_VELK_FE_, _VELK_NARG(__VA_ARGS__))(M, __VA_ARGS__))
+#define _VELK_FOR_EACH(M, ...) _VELK_EXPAND(_VELK_CAT(_VELK_FE_, _VELK_NARG(__VA_ARGS__))(M, __VA_ARGS__))
 
 // --- Param/ArgDesc expansion: (Type, Name) pairs -> typed param list / FnArgDesc array ---
 
 #define _VELK_PARAM_PAIR(Type, Name) Type Name
-#define _VELK_PARAMS_1(a)          _VELK_EXPAND(_VELK_PARAM_PAIR a)
-#define _VELK_PARAMS_2(a, b)       _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAM_PAIR b)
-#define _VELK_PARAMS_3(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_2(__VA_ARGS__))
-#define _VELK_PARAMS_4(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_3(__VA_ARGS__))
-#define _VELK_PARAMS_5(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_4(__VA_ARGS__))
-#define _VELK_PARAMS_6(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_5(__VA_ARGS__))
-#define _VELK_PARAMS_7(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_6(__VA_ARGS__))
-#define _VELK_PARAMS_8(a, ...)     _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_7(__VA_ARGS__))
-#define _VELK_PARAMS(...) \
-    _VELK_EXPAND(_VELK_CAT(_VELK_PARAMS_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
+#define _VELK_PARAMS_1(a) _VELK_EXPAND(_VELK_PARAM_PAIR a)
+#define _VELK_PARAMS_2(a, b) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAM_PAIR b)
+#define _VELK_PARAMS_3(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_2(__VA_ARGS__))
+#define _VELK_PARAMS_4(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_3(__VA_ARGS__))
+#define _VELK_PARAMS_5(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_4(__VA_ARGS__))
+#define _VELK_PARAMS_6(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_5(__VA_ARGS__))
+#define _VELK_PARAMS_7(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_6(__VA_ARGS__))
+#define _VELK_PARAMS_8(a, ...) _VELK_PARAMS_1(a), _VELK_EXPAND(_VELK_PARAMS_7(__VA_ARGS__))
+#define _VELK_PARAMS(...) _VELK_EXPAND(_VELK_CAT(_VELK_PARAMS_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-#define _VELK_ARGDESC_PAIR(Type, Name) ::velk::FnArgDesc{#Name, ::velk::type_uid<Type>()}
-#define _VELK_ARGDESCS_1(a)        _VELK_EXPAND(_VELK_ARGDESC_PAIR a)
-#define _VELK_ARGDESCS_2(a, b)     _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESC_PAIR b)
-#define _VELK_ARGDESCS_3(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_2(__VA_ARGS__))
-#define _VELK_ARGDESCS_4(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_3(__VA_ARGS__))
-#define _VELK_ARGDESCS_5(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_4(__VA_ARGS__))
-#define _VELK_ARGDESCS_6(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_5(__VA_ARGS__))
-#define _VELK_ARGDESCS_7(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_6(__VA_ARGS__))
-#define _VELK_ARGDESCS_8(a, ...)   _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_7(__VA_ARGS__))
-#define _VELK_ARGDESCS(...) \
-    _VELK_EXPAND(_VELK_CAT(_VELK_ARGDESCS_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
+#define _VELK_ARGDESC_PAIR(Type, Name)  \
+    ::velk::FnArgDesc                   \
+    {                                   \
+        #Name, ::velk::type_uid<Type>() \
+    }
+#define _VELK_ARGDESCS_1(a) _VELK_EXPAND(_VELK_ARGDESC_PAIR a)
+#define _VELK_ARGDESCS_2(a, b) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESC_PAIR b)
+#define _VELK_ARGDESCS_3(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_2(__VA_ARGS__))
+#define _VELK_ARGDESCS_4(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_3(__VA_ARGS__))
+#define _VELK_ARGDESCS_5(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_4(__VA_ARGS__))
+#define _VELK_ARGDESCS_6(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_5(__VA_ARGS__))
+#define _VELK_ARGDESCS_7(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_6(__VA_ARGS__))
+#define _VELK_ARGDESCS_8(a, ...) _VELK_ARGDESCS_1(a), _VELK_EXPAND(_VELK_ARGDESCS_7(__VA_ARGS__))
+#define _VELK_ARGDESCS(...) _VELK_EXPAND(_VELK_CAT(_VELK_ARGDESCS_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
 // --- State pass: generates State struct fields for PROP members ---
 
-#define _VELK_STATE_PROP(Type, Name, Default)  Type Name = Default;
+#define _VELK_STATE_PROP(Type, Name, Default) Type Name = Default;
 #define _VELK_STATE_RPROP(Type, Name, Default) Type Name = Default;
 #define _VELK_STATE_EVT(Name)
 #define _VELK_STATE_FN(...)
@@ -698,36 +778,35 @@ struct FnRawBind
 
 // --- Defaults pass: generates kind-specific static data for each member ---
 
-#define _VELK_DEFAULTS_PROP(Type, Name, Default) \
+#define _VELK_DEFAULTS_PROP(Type, Name, Default)                  \
     static constexpr ::velk::PropertyKind _velk_propkind_##Name = \
         ::velk::detail::PropBind<State, &State::Name>::kind;
-#define _VELK_DEFAULTS_RPROP(Type, Name, Default) \
+#define _VELK_DEFAULTS_RPROP(Type, Name, Default)                 \
     static constexpr ::velk::PropertyKind _velk_propkind_##Name = \
         ::velk::detail::PropBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
 #define _VELK_DEFAULTS_EVT(...)
 
-#define _VELK_DEFAULTS_FN_0(Name) \
+#define _VELK_DEFAULTS_FN_0(Name)                               \
     static constexpr ::velk::FunctionKind _velk_fnkind_##Name = \
         ::velk::detail::FnBind<&_velk_intf_type::fn_##Name>::kind;
-#define _VELK_DEFAULTS_FN_N(Name, ...) \
-    static constexpr ::velk::FnArgDesc _velk_fnargs_##Name[] = { _VELK_ARGDESCS(__VA_ARGS__) }; \
-    static constexpr ::velk::FunctionKind _velk_fnkind_##Name { \
-        &::velk::detail::FnBind<&_velk_intf_type::fn_##Name>::trampoline, \
-        {_velk_fnargs_##Name, _VELK_NARG(__VA_ARGS__)} };
+#define _VELK_DEFAULTS_FN_N(Name, ...)                                                        \
+    static constexpr ::velk::FnArgDesc _velk_fnargs_##Name[] = {_VELK_ARGDESCS(__VA_ARGS__)}; \
+    static constexpr ::velk::FunctionKind _velk_fnkind_##Name{                                \
+        &::velk::detail::FnBind<&_velk_intf_type::fn_##Name>::trampoline,                     \
+        {_velk_fnargs_##Name, _VELK_NARG(__VA_ARGS__)}};
 
-#define _VELK_DFN_2(RetType, Name)       _VELK_DEFAULTS_FN_0(Name)
-#define _VELK_DFN_3(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_4(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_5(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_6(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_7(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_8(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DFN_9(RetType, Name, ...)  _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_2(RetType, Name) _VELK_DEFAULTS_FN_0(Name)
+#define _VELK_DFN_3(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_4(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_5(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_6(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_7(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_8(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
+#define _VELK_DFN_9(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
 #define _VELK_DFN_10(RetType, Name, ...) _VELK_DEFAULTS_FN_N(Name, __VA_ARGS__)
-#define _VELK_DEFAULTS_FN(...) \
-    _VELK_EXPAND(_VELK_CAT(_VELK_DFN_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
+#define _VELK_DEFAULTS_FN(...) _VELK_EXPAND(_VELK_CAT(_VELK_DFN_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-#define _VELK_DEFAULTS_FN_RAW(Name) \
+#define _VELK_DEFAULTS_FN_RAW(Name)                             \
     static constexpr ::velk::FunctionKind _velk_fnkind_##Name = \
         ::velk::detail::FnRawBind<&_velk_intf_type::fn_##Name>::kind;
 
@@ -735,17 +814,12 @@ struct FnRawBind
 
 // --- Metadata dispatch: tag -> MemberDesc initializer ---
 
-#define _VELK_META_PROP(Type, Name, ...) \
-    ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
-#define _VELK_META_RPROP(Type, Name, ...) \
-    ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
-#define _VELK_META_EVT(Name) \
-    ::velk::EventDesc(#Name, &INFO),
-#define _VELK_META_FN(RetType, Name, ...) \
-    ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
-#define _VELK_META_FN_RAW(Name) \
-    ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
-#define _VELK_META(Tag, ...)        _VELK_EXPAND(_VELK_CAT(_VELK_META_, Tag)(__VA_ARGS__))
+#define _VELK_META_PROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
+#define _VELK_META_RPROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
+#define _VELK_META_EVT(Name) ::velk::EventDesc(#Name, &INFO),
+#define _VELK_META_FN(RetType, Name, ...) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
+#define _VELK_META_FN_RAW(Name) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
+#define _VELK_META(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_META_, Tag)(__VA_ARGS__))
 
 // --- Trampoline dispatch: tag -> virtual method + static trampoline for FN, no-op for PROP/EVT ---
 
@@ -753,25 +827,21 @@ struct FnRawBind
 #define _VELK_TRAMPOLINE_RPROP(...)
 #define _VELK_TRAMPOLINE_EVT(Name)
 
-#define _VELK_TRAMPOLINE_FN_0(RetType, Name) \
-    virtual RetType fn_##Name() = 0;
-#define _VELK_TRAMPOLINE_FN_N(RetType, Name, ...) \
-    virtual RetType fn_##Name(_VELK_PARAMS(__VA_ARGS__)) = 0;
+#define _VELK_TRAMPOLINE_FN_0(RetType, Name) virtual RetType fn_##Name() = 0;
+#define _VELK_TRAMPOLINE_FN_N(RetType, Name, ...) virtual RetType fn_##Name(_VELK_PARAMS(__VA_ARGS__)) = 0;
 
-#define _VELK_TFN_2(RetType, Name)       _VELK_TRAMPOLINE_FN_0(RetType, Name)
-#define _VELK_TFN_3(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_4(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_5(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_6(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_7(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_8(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TFN_9(RetType, Name, ...)  _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_2(RetType, Name) _VELK_TRAMPOLINE_FN_0(RetType, Name)
+#define _VELK_TFN_3(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_4(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_5(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_6(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_7(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_8(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
+#define _VELK_TFN_9(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
 #define _VELK_TFN_10(RetType, Name, ...) _VELK_TRAMPOLINE_FN_N(RetType, Name, __VA_ARGS__)
-#define _VELK_TRAMPOLINE_FN(...) \
-    _VELK_EXPAND(_VELK_CAT(_VELK_TFN_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
+#define _VELK_TRAMPOLINE_FN(...) _VELK_EXPAND(_VELK_CAT(_VELK_TFN_, _VELK_NARG(__VA_ARGS__))(__VA_ARGS__))
 
-#define _VELK_TRAMPOLINE_FN_RAW(Name) \
-    virtual ::velk::IAny::Ptr fn_##Name(::velk::FnArgs) = 0;
+#define _VELK_TRAMPOLINE_FN_RAW(Name) virtual ::velk::IAny::Ptr fn_##Name(::velk::FnArgs) = 0;
 
 #define _VELK_TRAMPOLINE(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_TRAMPOLINE_, Tag)(__VA_ARGS__))
 
@@ -785,37 +855,44 @@ struct FnRawBind
  *
  * @see VELK_INTERFACE For the full macro that also generates accessors and virtuals.
  */
-#define VELK_METADATA(...) \
-    struct State { _VELK_FOR_EACH(_VELK_STATE, __VA_ARGS__) }; \
-    _VELK_FOR_EACH(_VELK_DEFAULTS, __VA_ARGS__) \
-    static constexpr std::array metadata = { _VELK_FOR_EACH(_VELK_META, __VA_ARGS__) };
+#define VELK_METADATA(...)                       \
+    struct State                                 \
+    {                                            \
+        _VELK_FOR_EACH(_VELK_STATE, __VA_ARGS__) \
+    };                                           \
+    _VELK_FOR_EACH(_VELK_DEFAULTS, __VA_ARGS__)  \
+    static constexpr std::array metadata = {_VELK_FOR_EACH(_VELK_META, __VA_ARGS__)};
 
 // --- Accessor dispatch: tag -> typed non-virtual accessor method ---
 
-#define _VELK_ACC_PROP(Type, Name, ...) \
-    ::velk::Property<Type> Name() const { \
-        return ::velk::Property<Type>(::velk::get_property( \
-            this->template get_interface<::velk::IMetadata>(), #Name)); \
+#define _VELK_ACC_PROP(Type, Name, ...)                                                      \
+    ::velk::Property<Type> Name() const                                                      \
+    {                                                                                        \
+        return ::velk::Property<Type>(                                                       \
+            ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_RPROP(Type, Name, ...) \
-    ::velk::ConstProperty<Type> Name() const { \
-        return ::velk::ConstProperty<Type>(::velk::get_property( \
-            this->template get_interface<::velk::IMetadata>(), #Name)); \
+#define _VELK_ACC_RPROP(Type, Name, ...)                                                     \
+    ::velk::ConstProperty<Type> Name() const                                                 \
+    {                                                                                        \
+        return ::velk::ConstProperty<Type>(                                                  \
+            ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_EVT(Name) \
-    ::velk::Event Name() const { \
-        return ::velk::Event(::velk::get_event( \
-            this->template get_interface<::velk::IMetadata>(), #Name)); \
+#define _VELK_ACC_EVT(Name)                                                                                \
+    ::velk::Event Name() const                                                                             \
+    {                                                                                                      \
+        return ::velk::Event(::velk::get_event(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_FN(RetType, Name, ...) \
-    ::velk::Function Name() const { \
-        return ::velk::Function(::velk::get_function( \
-            this->template get_interface<::velk::IMetadata>(), #Name)); \
+#define _VELK_ACC_FN(RetType, Name, ...)                                                     \
+    ::velk::Function Name() const                                                            \
+    {                                                                                        \
+        return ::velk::Function(                                                             \
+            ::velk::get_function(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
-#define _VELK_ACC_FN_RAW(Name) \
-    ::velk::Function Name() const { \
-        return ::velk::Function(::velk::get_function( \
-            this->template get_interface<::velk::IMetadata>(), #Name)); \
+#define _VELK_ACC_FN_RAW(Name)                                                               \
+    ::velk::Function Name() const                                                            \
+    {                                                                                        \
+        return ::velk::Function(                                                             \
+            ::velk::get_function(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
 #define _VELK_ACC(Tag, ...) _VELK_EXPAND(_VELK_CAT(_VELK_ACC_, Tag)(__VA_ARGS__))
 
@@ -925,9 +1002,9 @@ struct FnRawBind
  * @see Object       For the CRTP base that collects metadata from interfaces.
  * @see IMetadata     For the runtime metadata query interface.
  */
-#define VELK_INTERFACE(...) \
+#define VELK_INTERFACE(...)                       \
     _VELK_FOR_EACH(_VELK_TRAMPOLINE, __VA_ARGS__) \
-    VELK_METADATA(__VA_ARGS__) \
+    VELK_METADATA(__VA_ARGS__)                    \
     _VELK_FOR_EACH(_VELK_ACC, __VA_ARGS__)
 
 #endif // VELK_INTF_METADATA_H

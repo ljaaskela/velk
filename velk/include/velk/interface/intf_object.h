@@ -26,10 +26,12 @@ public:
  * @param obj The raw object pointer.
  * @return A shared_ptr<T> if the cast succeeds, empty shared_ptr otherwise.
  */
-template<class T>
-typename T::Ptr interface_pointer_cast(IObject *obj)
+template <class T>
+typename T::Ptr interface_pointer_cast(IObject* obj)
 {
-    if (!obj) return {};
+    if (!obj) {
+        return {};
+    }
     return interface_pointer_cast<T>(obj->get_self());
 }
 

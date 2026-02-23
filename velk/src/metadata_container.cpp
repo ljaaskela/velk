@@ -1,4 +1,5 @@
 #include "metadata_container.h"
+
 #include "function.h"
 #include "property.h"
 
@@ -10,7 +11,8 @@
 namespace velk {
 
 MetadataContainer::MetadataContainer(array_view<MemberDesc> members, IInterface* owner)
-    : members_(members), owner_(owner)
+    : members_(members),
+      owner_(owner)
 {}
 
 array_view<MemberDesc> MetadataContainer::get_static_metadata() const
@@ -25,7 +27,7 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     switch (desc.kind) {
     case MemberKind::Property: {
         created = ext::make_object<PropertyImpl>();
-        if (auto *pi = created->get_interface<IPropertyInternal>()) {
+        if (auto* pi = created->get_interface<IPropertyInternal>()) {
             if (auto* pk = desc.propertyKind()) {
                 // Try state-backed ref first
                 if (pk->createRef && owner_) {
@@ -62,20 +64,20 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     return created;
 }
 
-void MetadataContainer::bind(const MemberDesc &m, const IInterface::Ptr &fn) const
+void MetadataContainer::bind(const MemberDesc& m, const IInterface::Ptr& fn) const
 {
     // Wire virtual dispatch: if the interface declared a fn_Name()
     // virtual (via VELK_INTERFACE), bind the FunctionImpl so that
     // invoke() routes through the static trampoline to the virtual
     // method on the owning object's interface subobject.
 
-    auto *fk = m.functionKind(); // Only valid for functions
+    auto* fk = m.functionKind(); // Only valid for functions
     if (fk && fk->trampoline && owner_) {
-        if (auto *fi = interface_cast<IFunctionInternal>(fn)) {
+        if (auto* fi = interface_cast<IFunctionInternal>(fn)) {
             // Resolve the interface pointer that declared this function.
             // This is the 'self' the trampoline will static_cast back to
             // the concrete interface type (e.g. IMyWidget*).
-            void *intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
+            void* intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
             if (intf_ptr) {
                 fi->bind(intf_ptr, fk->trampoline);
             }
@@ -85,10 +87,10 @@ void MetadataContainer::bind(const MemberDesc &m, const IInterface::Ptr &fn) con
 
 IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind kind) const
 {
-    auto matches = [&](const MemberDesc &m) { return m.kind == kind && m.name == name; };
+    auto matches = [&](const MemberDesc& m) { return m.kind == kind && m.name == name; };
 
     // Check cache first
-    for (auto &[idx, ptr] : instances_) {
+    for (auto& [idx, ptr] : instances_) {
         if (matches(members_[idx])) {
             return ptr;
         }
@@ -96,7 +98,7 @@ IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind k
     IInterface::Ptr created;
     // Find in static metadata and create if found
     for (size_t i = 0; i < members_.size(); ++i) {
-        auto &m = members_[i];
+        auto& m = members_[i];
         if (matches(m)) {
             // Create
             created = create(m);
@@ -126,16 +128,18 @@ IFunction::Ptr MetadataContainer::get_function(string_view name) const
 
 void MetadataContainer::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
 {
-    for (auto &[idx, ptr] : instances_) {
-        auto &m = members_[idx];
-        if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid)
+    for (auto& [idx, ptr] : instances_) {
+        auto& m = members_[idx];
+        if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid) {
             continue;
+        }
 
         switch (notification) {
         case Notification::Changed:
             if (kind == MemberKind::Property) {
-                if (auto *prop = interface_cast<IProperty>(ptr))
+                if (auto* prop = interface_cast<IProperty>(ptr)) {
                     invoke_event(prop->on_changed(), prop->get_value().get());
+                }
             }
             break;
         default:

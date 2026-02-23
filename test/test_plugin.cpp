@@ -1,9 +1,9 @@
-#include <gtest/gtest.h>
-
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
 #include <velk/interface/types.h>
+
+#include <gtest/gtest.h>
 
 using namespace velk;
 
@@ -17,8 +17,7 @@ public:
 };
 
 class PluginWidget : public ext::Object<PluginWidget, IPluginWidget>
-{
-};
+{};
 
 // A test plugin that registers PluginWidget
 class TestPlugin : public ext::Plugin<TestPlugin>
@@ -195,7 +194,6 @@ TEST_F(PluginTest, DoubleLoadReturnsNothingToDo)
     EXPECT_EQ(ReturnValue::NothingToDo, reg.load_plugin(plugin_));
     EXPECT_EQ(1, tp_->initCount);
 }
-
 
 TEST_F(PluginTest, InvalidReturnsError)
 {

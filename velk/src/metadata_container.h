@@ -3,6 +3,7 @@
 
 #include <velk/ext/refcounted_dispatch.h>
 #include <velk/interface/intf_metadata.h>
+
 #include <memory>
 #include <vector>
 
@@ -29,7 +30,7 @@ public:
     explicit MetadataContainer(array_view<MemberDesc> members, IInterface* owner = nullptr);
 
 public: // IPropertyState (inherited via IMetadata; state lives in the Object, not here)
-    void *get_property_state(Uid) override { return nullptr; }
+    void* get_property_state(Uid) override { return nullptr; }
 
 public: // IMetadata
     array_view<MemberDesc> get_static_metadata() const override;
@@ -39,16 +40,17 @@ public: // IMetadata
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override;
 
 private:
-    array_view<MemberDesc> members_;    ///< Static metadata descriptors from VELK_INTERFACE.
-    IInterface* owner_{};               ///< Owning object for trampoline binding and state access.
+    array_view<MemberDesc> members_; ///< Static metadata descriptors from VELK_INTERFACE.
+    IInterface* owner_{};            ///< Owning object for trampoline binding and state access.
 
     /// Lazily populated cache mapping metadata index to runtime instance.
     mutable std::vector<std::pair<size_t, IInterface::Ptr>> instances_;
 
     /** @brief Storage for dynamically added members (future extension). */
-    struct DynamicMembers {
+    struct DynamicMembers
+    {
         std::vector<MemberDesc> descriptors;    ///< Dynamic member descriptors.
-        std::vector<IInterface::Ptr> instances;  ///< Runtime instances for dynamic members.
+        std::vector<IInterface::Ptr> instances; ///< Runtime instances for dynamic members.
     };
     mutable std::unique_ptr<DynamicMembers> dynamic_;
 
@@ -57,7 +59,7 @@ private:
     /** @brief Creates a runtime instance (PropertyImpl or FunctionImpl) from a member descriptor. */
     IInterface::Ptr create(MemberDesc desc) const;
     /** @brief Binds a function instance to the owner's virtual trampoline. */
-    void bind(const MemberDesc &m, const IInterface::Ptr &fn) const;
+    void bind(const MemberDesc& m, const IInterface::Ptr& fn) const;
 };
 
 } // namespace velk

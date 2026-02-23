@@ -53,7 +53,7 @@ public:
      * evt.add_handler([](int x, float y) { std::cout << x + y << std::endl; });
      * @endcode
      */
-    template<class F, detail::require<!std::is_convertible_v<F, const IFunction::ConstPtr&>> = 0>
+    template <class F, detail::require<!std::is_convertible_v<F, const IFunction::ConstPtr&>> = 0>
     ReturnValue add_handler(F&& callable, InvokeType type = Immediate) const
     {
         Callback cb(std::forward<F>(callable));
@@ -67,15 +67,14 @@ public:
     }
 
     /** @brief Returns true if the event has any handlers (null-safe). */
-    bool has_handlers() const
-    {
-        return event_ ? event_->has_handlers() : false;
-    }
+    bool has_handlers() const { return event_ ? event_->has_handlers() : false; }
 
     /** @brief Invokes the event with no arguments (null-safe). */
     ReturnValue invoke(InvokeType type = Immediate) const
     {
-        if (!event_) return ReturnValue::InvalidArgument;
+        if (!event_) {
+            return ReturnValue::InvalidArgument;
+        }
         event_->invoke({}, type);
         return ReturnValue::Success;
     }
@@ -83,7 +82,9 @@ public:
     /** @brief Invokes the event with the given @p args (null-safe). */
     ReturnValue invoke(FnArgs args, InvokeType type = Immediate) const
     {
-        if (!event_) return ReturnValue::InvalidArgument;
+        if (!event_) {
+            return ReturnValue::InvalidArgument;
+        }
         event_->invoke(args, type);
         return ReturnValue::Success;
     }

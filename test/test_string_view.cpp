@@ -1,5 +1,6 @@
-#include <gtest/gtest.h>
 #include <velk/string_view.h>
+
+#include <gtest/gtest.h>
 
 using velk::string_view;
 
@@ -34,7 +35,9 @@ TEST(StringView, BeginEnd)
     string_view sv("abc");
     EXPECT_EQ(sv.end() - sv.begin(), 3);
     std::string result;
-    for (char c : sv) result += c;
+    for (char c : sv) {
+        result += c;
+    }
     EXPECT_EQ(result, "abc");
 }
 

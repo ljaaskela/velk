@@ -40,7 +40,8 @@ public: // IFutureInternal
     ReturnValue set_result(const IAny* result) override;
 
 private:
-    struct Continuation {
+    struct Continuation
+    {
         IFunction::ConstPtr fn;
         InvokeType type;
     };

@@ -4,6 +4,7 @@
 #include <velk/array_view.h>
 #include <velk/common.h>
 #include <velk/interface/intf_interface.h>
+
 #include <type_traits>
 
 namespace velk::ext {
@@ -21,7 +22,7 @@ namespace velk::ext {
  *
  * @tparam Interfaces The interfaces this class implements (each must derive from IInterface).
  */
-template<class... Interfaces>
+template <class... Interfaces>
 class InterfaceDispatch : public Interfaces...
 {
 private:
@@ -34,11 +35,14 @@ private:
      * @brief Returns the number of interfaces in T's parent chain (excluding IInterface).
      * @tparam T The interface to measure.
      */
-    template<class T>
+    template <class T>
     static constexpr size_t chain_length()
     {
-        if constexpr (std::is_same_v<T, IInterface>) return 0;
-        else return 1 + chain_length<typename T::ParentInterface>();
+        if constexpr (std::is_same_v<T, IInterface>) {
+            return 0;
+        } else {
+            return 1 + chain_length<typename T::ParentInterface>();
+        }
     }
 
     /** @brief Upper bound on total interface count (sum of all chain lengths before dedup). */
@@ -53,7 +57,7 @@ private:
      * @tparam Root   A direct base of Self (one of Interfaces...).
      * @tparam Target Root or one of Root's ancestor interfaces.
      */
-    template<class Root, class Target>
+    template <class Root, class Target>
     static IInterface* cast_to(Self* self)
     {
         return static_cast<Target*>(static_cast<Root*>(self));
@@ -77,7 +81,9 @@ private:
         constexpr bool contains(Uid uid) const
         {
             for (size_t i = 0; i < count; ++i) {
-                if (entries[i].uid == uid) return true;
+                if (entries[i].uid == uid) {
+                    return true;
+                }
             }
             return false;
         }
@@ -102,7 +108,7 @@ private:
      * @tparam Root The direct base of Self that owns this parent chain.
      * @tparam T    The current interface in the chain (Root, then Root::ParentInterface, etc.).
      */
-    template<class Root, class T>
+    template <class Root, class T>
     static constexpr void collect_chain(InterfaceListData& list)
     {
         if constexpr (!std::is_same_v<T, IInterface>) {
@@ -130,7 +136,7 @@ public:
      * For all other UIDs, scans the flat interface table and invokes the
      * matching cast function, or returns nullptr if not found.
      */
-    IInterface *get_interface(Uid uid) override
+    IInterface* get_interface(Uid uid) override
     {
         if (uid == IInterface::UID) {
             return static_cast<IInterface*>(static_cast<void*>(this));
@@ -143,25 +149,24 @@ public:
         return nullptr;
     }
     /** @copydoc get_interface(Uid) */
-    const IInterface *get_interface(Uid uid) const override
+    const IInterface* get_interface(Uid uid) const override
     {
-        return const_cast<InterfaceDispatch *>(this)->get_interface(uid);
+        return const_cast<InterfaceDispatch*>(this)->get_interface(uid);
     }
 
     /** @brief Compile-time list of all interfaces implemented by this class (including parents). */
-    static constexpr array_view<InterfaceInfo> class_interfaces{
-        class_interface_data_.entries, class_interface_data_.count
-    };
+    static constexpr array_view<InterfaceInfo> class_interfaces{class_interface_data_.entries,
+                                                                class_interface_data_.count};
 
     /**
      * @brief Type-safe convenience wrapper for get_interface.
      * @tparam T The target interface type. Must have a static UID member.
      * @return T* if this object implements T, nullptr otherwise.
      */
-    template<class T>
-    T *get_interface()
+    template <class T>
+    T* get_interface()
     {
-        return static_cast<T *>(get_interface(T::UID));
+        return static_cast<T*>(get_interface(T::UID));
     }
 
     /**

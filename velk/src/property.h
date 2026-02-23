@@ -2,8 +2,8 @@
 #define PROPERTY_H
 
 #include <velk/common.h>
-#include <velk/ext/event.h>
 #include <velk/ext/core_object.h>
+#include <velk/ext/event.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
@@ -25,20 +25,21 @@ public:
     PropertyImpl() = default;
 
 protected: // IProperty
-    ReturnValue set_value(const IAny &from) override;
+    ReturnValue set_value(const IAny& from) override;
     const IAny::ConstPtr get_value() const override;
     IEvent::Ptr on_changed() const override { return onChanged_; }
 
 protected: // IPropertyInternal
-    bool set_any(const IAny::Ptr &value) override;
+    bool set_any(const IAny::Ptr& value) override;
     IAny::ConstPtr get_any() const override;
-    ReturnValue set_data(const void *data, size_t size, Uid type) override;
+    ReturnValue set_data(const void* data, size_t size, Uid type) override;
     void set_flags(int32_t flags) override;
 
 private:
     IAny::Ptr data_;
     ext::LazyEvent onChanged_;
-    bool external_{};  ///< True if data_ implements IExternalAny (on_data_changed fires on_changed automatically).
+    bool external_{}; ///< True if data_ implements IExternalAny (on_data_changed fires on_changed
+                      ///< automatically).
 };
 
 } // namespace velk

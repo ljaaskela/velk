@@ -1,16 +1,19 @@
 #include "velk_instance.h"
+
 #include "function.h"
 #include "future.h"
 #include "metadata_container.h"
 #include "property.h"
-#include <algorithm>
+
 #include <velk/ext/any.h>
 #include <velk/ext/plugin.h>
 #include <velk/interface/types.h>
 
+#include <algorithm>
+
 namespace velk {
 
-void RegisterTypes(ITypeRegistry &reg)
+void RegisterTypes(ITypeRegistry& reg)
 {
     reg.register_type<PropertyImpl>();
     reg.register_type<FunctionImpl>();
@@ -45,8 +48,7 @@ VelkInstance::~VelkInstance()
         // Sweep types owned by this plugin.
         Uid owner = entry.uid;
         types_.erase(
-            std::remove_if(types_.begin(), types_.end(),
-                [&](const Entry& e) { return e.owner == owner; }),
+            std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == owner; }),
             types_.end());
 
         // Move library handle out before erasing so it outlives the plugin pointer.
@@ -76,12 +78,16 @@ ILog& get_logger(const VelkInstance& instance)
     return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
 }
 
-ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
+ReturnValue VelkInstance::register_type(const IObjectFactory& factory)
 {
-    auto &info = factory.get_class_info();
-    detail::velk_log(get_logger(*this), LogLevel::Debug, __FILE__, __LINE__,
-                  "Register %.*s",
-                  static_cast<int>(info.name.size()), info.name.data());
+    auto& info = factory.get_class_info();
+    detail::velk_log(get_logger(*this),
+                     LogLevel::Debug,
+                     __FILE__,
+                     __LINE__,
+                     "Register %.*s",
+                     static_cast<int>(info.name.size()),
+                     info.name.data());
     Entry entry{info.uid, &factory, current_owner_};
     auto it = std::lower_bound(types_.begin(), types_.end(), entry);
     if (it != types_.end() && it->uid == info.uid) {
@@ -93,7 +99,7 @@ ReturnValue VelkInstance::register_type(const IObjectFactory &factory)
     return ReturnValue::Success;
 }
 
-ReturnValue VelkInstance::unregister_type(const IObjectFactory &factory)
+ReturnValue VelkInstance::unregister_type(const IObjectFactory& factory)
 {
     Entry key{factory.get_class_info().uid, nullptr};
     auto it = std::lower_bound(types_.begin(), types_.end(), key);
@@ -105,11 +111,11 @@ ReturnValue VelkInstance::unregister_type(const IObjectFactory &factory)
 
 IInterface::Ptr VelkInstance::create(Uid uid) const
 {
-    if (auto *factory = find(uid)) {
+    if (auto* factory = find(uid)) {
         if (auto object = factory->create_instance()) {
-            if (auto *meta = interface_cast<IMetadataContainer>(object)) {
+            if (auto* meta = interface_cast<IMetadataContainer>(object)) {
                 // Object can contain metadata
-                auto &info = factory->get_class_info();
+                auto& info = factory->get_class_info();
                 // Object takes ownership of the MetadataContainer
                 meta->set_metadata_container(new MetadataContainer(info.members, object.get()));
             }
@@ -121,7 +127,7 @@ IInterface::Ptr VelkInstance::create(Uid uid) const
 
 const ClassInfo* VelkInstance::get_class_info(Uid classUid) const
 {
-    if (auto *factory = find(classUid)) {
+    if (auto* factory = find(classUid)) {
         return &factory->get_class_info();
     }
     return nullptr;
@@ -132,7 +138,7 @@ IAny::Ptr VelkInstance::create_any(Uid type) const
     return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr &value, int32_t flags) const
+IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, int32_t flags) const
 {
     auto property = interface_pointer_cast<IProperty>(create(ClassId::Property));
     if (auto pi = interface_cast<IPropertyInternal>(property)) {
@@ -141,7 +147,10 @@ IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr &value, i
             if (pi->set_any(value)) {
                 return property;
             }
-            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+            detail::velk_log(get_logger(*this),
+                             LogLevel::Error,
+                             __FILE__,
+                             __LINE__,
                              "Initial value is of incompatible type");
         }
         // Any was not specified for property instance, create new one
@@ -169,7 +178,7 @@ void VelkInstance::update() const
         std::lock_guard lock(deferred_mutex_);
         tasks.swap(deferred_queue_);
     }
-    for (auto &task : tasks) {
+    for (auto& task : tasks) {
         if (task.fn) {
             task.fn->invoke(task.args ? task.args->view() : FnArgs{});
         }
@@ -192,8 +201,8 @@ IFunction::Ptr VelkInstance::create_callback(IFunction::CallableFn* fn) const
     return func;
 }
 
-IFunction::Ptr VelkInstance::create_owned_callback(void* context,
-    IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) const
+IFunction::Ptr VelkInstance::create_owned_callback(void* context, IFunction::BoundFn* fn,
+                                                   IFunction::ContextDeleter* deleter) const
 {
     auto func = interface_pointer_cast<IFunction>(create(ClassId::Function));
     if (fn && deleter) {
@@ -209,7 +218,10 @@ ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
     for (auto& dep : info.dependencies) {
         auto* plugin = find_plugin(dep.uid);
         if (!plugin) {
-            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+            detail::velk_log(get_logger(*this),
+                             LogLevel::Error,
+                             __FILE__,
+                             __LINE__,
                              "Plugin '%.*s' has unmet dependency: %016llx%016llx",
                              static_cast<int>(info.name.size()),
                              info.name.data(),
@@ -218,7 +230,10 @@ ReturnValue VelkInstance::check_dependencies(const PluginInfo& info)
             return ReturnValue::Fail;
         }
         if (dep.min_version && plugin->get_version() < dep.min_version) {
-            detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+            detail::velk_log(get_logger(*this),
+                             LogLevel::Error,
+                             __FILE__,
+                             __LINE__,
                              "Plugin '%.*s' requires version %u.%u.%u, got %u.%u.%u",
                              static_cast<int>(info.name.size()),
                              info.name.data(),
@@ -242,15 +257,19 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
 
     auto lib = LibraryHandle::open(path);
     if (!lib) {
-        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
-                         "Failed to load library: %s", path);
+        detail::velk_log(
+            get_logger(*this), LogLevel::Error, __FILE__, __LINE__, "Failed to load library: %s", path);
         return ReturnValue::Fail;
     }
 
     auto* get_info = reinterpret_cast<detail::PluginInfoFn*>(lib.symbol("velk_plugin_info"));
     if (!get_info) {
-        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
-                         "Library missing velk_plugin_info entry point: %s", path);
+        detail::velk_log(get_logger(*this),
+                         LogLevel::Error,
+                         __FILE__,
+                         __LINE__,
+                         "Library missing velk_plugin_info entry point: %s",
+                         path);
         lib.close();
         return ReturnValue::Fail;
     }
@@ -273,8 +292,12 @@ ReturnValue VelkInstance::load_plugin_from_path(const char* path)
     // Create the plugin instance via the factory (properly sets up control block).
     auto plugin = info.factory.create_instance<IPlugin>();
     if (!plugin) {
-        detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
-                         "Factory failed to create plugin: %s", path);
+        detail::velk_log(get_logger(*this),
+                         LogLevel::Error,
+                         __FILE__,
+                         __LINE__,
+                         "Factory failed to create plugin: %s",
+                         path);
         lib.close();
         return ReturnValue::Fail;
     }
@@ -326,10 +349,15 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
 
     // Reject if any other loaded plugin depends on this one.
     for (auto& pe : plugins_) {
-        if (pe.uid == pluginId) continue;
+        if (pe.uid == pluginId) {
+            continue;
+        }
         for (auto& dep : pe.plugin->get_dependencies()) {
             if (dep.uid == pluginId) {
-                detail::velk_log(get_logger(*this), LogLevel::Error, __FILE__, __LINE__,
+                detail::velk_log(get_logger(*this),
+                                 LogLevel::Error,
+                                 __FILE__,
+                                 __LINE__,
                                  "Cannot unload plugin '%.*s': plugin '%.*s' depends on it",
                                  static_cast<int>(it->plugin->get_name().size()),
                                  it->plugin->get_name().data(),
@@ -344,8 +372,7 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
 
     // Sweep types owned by this plugin
     types_.erase(
-        std::remove_if(types_.begin(), types_.end(),
-            [&](const Entry& e) { return e.owner == pluginId; }),
+        std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == pluginId; }),
         types_.end());
 
     // Move library handle out before erasing so it can be freed after the plugin pointer is gone.
@@ -385,10 +412,11 @@ LogLevel VelkInstance::get_level() const
     return level_;
 }
 
-void VelkInstance::dispatch(LogLevel level, const char* file, int line,
-                            const char* message)
+void VelkInstance::dispatch(LogLevel level, const char* file, int line, const char* message)
 {
-    if (level < level_) return;
+    if (level < level_) {
+        return;
+    }
     if (sink_) {
         // User-defined sink
         sink_->write(level, file, line, message);
@@ -397,7 +425,9 @@ void VelkInstance::dispatch(LogLevel level, const char* file, int line,
     // No sink defined, currently writes to stderr regardless of level.
     static const char* level_names[] = {"DEBUG", "INFO", "WARN", "ERROR"};
     auto idx = static_cast<int>(level);
-    if (idx < 0 || idx > 3) idx = 3;
+    if (idx < 0 || idx > 3) {
+        idx = 3;
+    }
     fprintf(stderr, "[%s] %s:%d: %s\n", level_names[idx], file, line, message);
 }
 

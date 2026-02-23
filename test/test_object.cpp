@@ -1,5 +1,3 @@
-#include <gtest/gtest.h>
-
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
@@ -10,6 +8,8 @@
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
+
+#include <gtest/gtest.h>
 
 using namespace velk;
 
@@ -60,15 +60,9 @@ public:
     int lastAddResult = 0;
     int processCallCount = 0;
 
-    void fn_reset() override
-    {
-        resetCallCount++;
-    }
+    void fn_reset() override { resetCallCount++; }
 
-    void fn_serialize() override
-    {
-        serializeCallCount++;
-    }
+    void fn_serialize() override { serializeCallCount++; }
 
     int fn_add(int x, int y) override
     {
@@ -88,10 +82,7 @@ public:
 class ObjectTest : public ::testing::Test
 {
 protected:
-    static void SetUpTestSuite()
-    {
-        instance().type_registry().register_type<TestWidget>();
-    }
+    static void SetUpTestSuite() { instance().type_registry().register_type<TestWidget>(); }
 };
 
 // --- Tests ---
@@ -274,10 +265,10 @@ TEST_F(ObjectTest, StaticDefaultValues)
     auto* info = instance().type_registry().get_class_info(TestWidget::class_id());
     ASSERT_NE(info, nullptr);
 
-    EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f);  // width
-    EXPECT_FLOAT_EQ(get_default_value<float>(info->members[1]), 50.f);   // height
-    EXPECT_EQ(get_default_value<int>(info->members[2]), 42);             // id (RPROP)
-    EXPECT_EQ(get_default_value<int>(info->members[5]), 1);              // version
+    EXPECT_FLOAT_EQ(get_default_value<float>(info->members[0]), 100.f); // width
+    EXPECT_FLOAT_EQ(get_default_value<float>(info->members[1]), 50.f);  // height
+    EXPECT_EQ(get_default_value<int>(info->members[2]), 42);            // id (RPROP)
+    EXPECT_EQ(get_default_value<int>(info->members[5]), 1);             // version
 }
 
 TEST_F(ObjectTest, PropertyStateReadWrite)
@@ -289,7 +280,7 @@ TEST_F(ObjectTest, PropertyStateReadWrite)
     ASSERT_NE(ps, nullptr);
 
     auto* state = ps->get_property_state<ITestWidget>();
-    auto *state2 = get_property_state<ITestWidget>(ps);
+    auto* state2 = get_property_state<ITestWidget>(ps);
     ASSERT_NE(state, nullptr);
     ASSERT_EQ(state, state2);
 
@@ -356,7 +347,10 @@ TEST_F(ObjectTest, TypedFunctionArgMetadata)
     // Find the "add" member
     const MemberDesc* addDesc = nullptr;
     for (auto& m : info->members) {
-        if (m.name == "add") { addDesc = &m; break; }
+        if (m.name == "add") {
+            addDesc = &m;
+            break;
+        }
     }
     ASSERT_NE(addDesc, nullptr);
     EXPECT_EQ(addDesc->kind, MemberKind::Function);
@@ -377,7 +371,10 @@ TEST_F(ObjectTest, ZeroArgFunctionHasNoArgMetadata)
 
     const MemberDesc* resetDesc = nullptr;
     for (auto& m : info->members) {
-        if (m.name == "reset") { resetDesc = &m; break; }
+        if (m.name == "reset") {
+            resetDesc = &m;
+            break;
+        }
     }
     ASSERT_NE(resetDesc, nullptr);
 
@@ -431,7 +428,10 @@ TEST_F(ObjectTest, FnRawHasNoArgMetadata)
 
     const MemberDesc* processDesc = nullptr;
     for (auto& m : info->members) {
-        if (m.name == "process") { processDesc = &m; break; }
+        if (m.name == "process") {
+            processDesc = &m;
+            break;
+        }
     }
     ASSERT_NE(processDesc, nullptr);
 
@@ -596,7 +596,7 @@ TEST_F(ObjectTest, ReadStateReturnsCurrentValues)
 
     auto reader = read_state<ITestWidget>(iw);
     EXPECT_FLOAT_EQ(reader->width, 200.f);
-    EXPECT_FLOAT_EQ(reader->height, 50.f);  // default
+    EXPECT_FLOAT_EQ(reader->height, 50.f); // default
 }
 
 TEST_F(ObjectTest, ReadStateViaIMetadata)

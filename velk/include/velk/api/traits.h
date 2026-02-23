@@ -1,9 +1,10 @@
 #ifndef VELK_API_TRAITS_H
 #define VELK_API_TRAITS_H
 
+#include <velk/interface/intf_object.h>
+
 #include <tuple>
 #include <type_traits>
-#include <velk/interface/intf_object.h>
 
 namespace velk {
 
@@ -21,12 +22,16 @@ namespace detail {
 // IObject introspection
 
 /** @brief Returns true if T is IObject or has IObject as an ancestor via ParentInterface. */
-template<class T>
+template <class T>
 constexpr bool has_iobject_in_chain()
 {
-    if constexpr (std::is_same_v<T, IObject>) return true;
-    else if constexpr (std::is_same_v<T, IInterface>) return false;
-    else return has_iobject_in_chain<typename T::ParentInterface>();
+    if constexpr (std::is_same_v<T, IObject>) {
+        return true;
+    } else if constexpr (std::is_same_v<T, IInterface>) {
+        return false;
+    } else {
+        return has_iobject_in_chain<typename T::ParentInterface>();
+    }
 }
 
 // Callable introspection
@@ -40,10 +45,11 @@ constexpr bool has_iobject_in_chain()
  * @tparam R    Return type of the callable.
  * @tparam Args Parameter types of the callable.
  */
-template<class R, class... Args>
-struct callable_traits_base {
-    using return_type = R;                      ///< The callable's return type.
-    using args_tuple = std::tuple<Args...>;     ///< Parameter types as a std::tuple.
+template <class R, class... Args>
+struct callable_traits_base
+{
+    using return_type = R;                           ///< The callable's return type.
+    using args_tuple = std::tuple<Args...>;          ///< Parameter types as a std::tuple.
     static constexpr size_t arity = sizeof...(Args); ///< Number of parameters.
 };
 
@@ -72,22 +78,26 @@ struct callable_traits_base {
  * // Traits::arity == 2
  * @endcode
  */
-template<class F, class = void>
+template <class F, class = void>
 struct callable_traits; // SFINAE-friendly primary (undefined)
 
 /// @cond INTERNAL
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...)> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) const noexcept> : callable_traits_base<R, Args...> {};
-template<class R, class C, class... Args>
-struct callable_traits<R(C::*)(Args...) noexcept> : callable_traits_base<R, Args...> {};
+template <class R, class C, class... Args>
+struct callable_traits<R (C::*)(Args...) const> : callable_traits_base<R, Args...>
+{};
+template <class R, class C, class... Args>
+struct callable_traits<R (C::*)(Args...)> : callable_traits_base<R, Args...>
+{};
+template <class R, class C, class... Args>
+struct callable_traits<R (C::*)(Args...) const noexcept> : callable_traits_base<R, Args...>
+{};
+template <class R, class C, class... Args>
+struct callable_traits<R (C::*)(Args...) noexcept> : callable_traits_base<R, Args...>
+{};
 
-template<class F>
-struct callable_traits<F, std::void_t<decltype(&F::operator())>>
-    : callable_traits<decltype(&F::operator())> {};
+template <class F>
+struct callable_traits<F, std::void_t<decltype(&F::operator())>> : callable_traits<decltype(&F::operator())>
+{};
 /// @endcond
 
 /**
@@ -98,11 +108,11 @@ struct callable_traits<F, std::void_t<decltype(&F::operator())>>
  *
  * @tparam F The type to test.
  */
-template<class F, class = void>
+template <class F, class = void>
 inline constexpr bool has_callable_traits_v = false;
 
 /// @cond INTERNAL
-template<class F>
+template <class F>
 inline constexpr bool has_callable_traits_v<F, std::void_t<typename callable_traits<F>::return_type>> = true;
 /// @endcond
 
@@ -118,7 +128,7 @@ inline constexpr bool has_callable_traits_v<F, std::void_t<typename callable_tra
  *
  * @tparam T The (possibly const/ref-qualified) parameter type.
  */
-template<class T>
+template <class T>
 using decay_param_t = std::remove_const_t<std::decay_t<T>>;
 
 // IAny convertibility checks
@@ -132,7 +142,7 @@ using decay_param_t = std::remove_const_t<std::decay_t<T>>;
  *
  * @tparam Args Variadic argument types to check.
  */
-template<class... Args>
+template <class... Args>
 inline constexpr bool all_any_convertible_v =
     (sizeof...(Args) >= 2) && (std::is_convertible_v<const Args&, const IAny*> && ...);
 
@@ -145,7 +155,7 @@ inline constexpr bool all_any_convertible_v =
  *
  * @tparam Args Variadic argument types to check.
  */
-template<class... Args>
+template <class... Args>
 inline constexpr bool none_any_convertible_v =
     (sizeof...(Args) >= 2) && (!std::is_convertible_v<const Args&, const IAny*> && ...);
 
@@ -163,7 +173,7 @@ inline constexpr bool none_any_convertible_v =
  *
  * @tparam B Boolean condition.
  */
-template<bool B>
+template <bool B>
 using require = std::enable_if_t<B, int>;
 
 /**
@@ -171,7 +181,7 @@ using require = std::enable_if_t<B, int>;
  * @tparam Args Variadic argument types; gate opens when @c all_any_convertible_v is @c true.
  * @see all_any_convertible_v
  */
-template<class... Args>
+template <class... Args>
 using require_any_args = std::enable_if_t<all_any_convertible_v<Args...>, int>;
 
 /**
@@ -179,7 +189,7 @@ using require_any_args = std::enable_if_t<all_any_convertible_v<Args...>, int>;
  * @tparam Args Variadic argument types; gate opens when @c none_any_convertible_v is @c true.
  * @see none_any_convertible_v
  */
-template<class... Args>
+template <class... Args>
 using require_value_args = std::enable_if_t<none_any_convertible_v<Args...>, int>;
 
 } // namespace detail

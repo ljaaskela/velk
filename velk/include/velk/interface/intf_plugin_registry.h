@@ -33,11 +33,17 @@ public:
     virtual size_t plugin_count() const = 0;
 
     /** @brief Unloads a plugin by its class type. */
-    template<class T>
-    ReturnValue unload_plugin() { return unload_plugin(T::class_id()); }
+    template <class T>
+    ReturnValue unload_plugin()
+    {
+        return unload_plugin(T::class_id());
+    }
     /** @brief Finds a loaded plugin by its class type, or nullptr if not loaded. */
-    template<class T>
-    IPlugin* find_plugin() const { return find_plugin(T::class_id()); }
+    template <class T>
+    IPlugin* find_plugin() const
+    {
+        return find_plugin(T::class_id());
+    }
 };
 
 } // namespace velk

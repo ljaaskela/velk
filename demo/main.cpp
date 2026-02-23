@@ -1,9 +1,8 @@
-#include <velk/api/velk.h>
-
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
 #include <velk/api/property.h>
+#include <velk/api/velk.h>
 #include <velk/ext/any.h>
 #include <velk/ext/event.h>
 #include <velk/ext/object.h>
@@ -11,6 +10,7 @@
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_velk.h>
 #include <velk/interface/types.h>
+
 #include <iostream>
 
 using std::cout;
@@ -22,10 +22,10 @@ using namespace velk;
 struct Data
 {
     Data() = default;
-    Data(float v, const string &n) : value(v), name(n) {}
+    Data(float v, const string& n) : value(v), name(n) {}
     float value;
     string name;
-    constexpr bool operator!=(const Data &other) const noexcept
+    constexpr bool operator!=(const Data& other) const noexcept
     {
         return value != other.value && name != other.name;
     }
@@ -39,8 +39,8 @@ Data globalData_;
 class MyDataAny final : public ext::AnyCore<MyDataAny, Data, IExternalAny>
 {
 public:
-    Data &get_value() const override { return globalData_; }
-    ReturnValue set_value(const Data &value) override
+    Data& get_value() const override { return globalData_; }
+    ReturnValue set_value(const Data& value) override
     {
         if (value != globalData_) {
             globalData_.value = value.value;
@@ -51,10 +51,7 @@ public:
         return ReturnValue::NothingToDo;
     }
 
-    IEvent::Ptr on_data_changed() const override
-    {
-        return globalData_.onChanged;
-    }
+    IEvent::Ptr on_data_changed() const override { return globalData_.onChanged; }
 
 private:
 };
@@ -84,10 +81,7 @@ public:
 // MyWidget concrete class implementation, implements IMyWidget and ISerializable
 class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
 {
-    void fn_reset() override
-    {
-        cout << "  MyWidget::fn_reset called!" << endl;
-    }
+    void fn_reset() override { cout << "  MyWidget::fn_reset called!" << endl; }
 
     void fn_add(int x, float y) override
     {
@@ -124,12 +118,11 @@ void demo_custom_any()
 {
     cout << endl << "=== demo_custom_any ===" << endl;
 
-    Any<Data> data;                 // One view to globalData
+    Any<Data> data;                                                   // One view to globalData
     auto myprop = Property<Data>(instance().create_property<Data>()); // Property to global data
     myprop.set_value({10.f, "Hello"});
 
-    cout << "Property<Data> value is " << myprop.get_value().value << ":"
-              << myprop.get_value().name << endl;
+    cout << "Property<Data> value is " << myprop.get_value().value << ":" << myprop.get_value().name << endl;
 
     cout << "=== demo_custom_any done ===" << endl;
 }
@@ -185,7 +178,7 @@ void demo_static_metadata()
         cout << "  Class: " << info->name << " (" << info->members.size() << " members)" << endl;
         for (auto& m : info->members) {
             const char* kind = m.kind == MemberKind::Property ? "Property"
-                             : m.kind == MemberKind::Event    ? "Event"
+                               : m.kind == MemberKind::Event  ? "Event"
                                                               : "Function";
             cout << "    " << kind << " \"" << m.name << "\"";
             if (m.interfaceInfo) {
@@ -211,8 +204,7 @@ void demo_static_metadata()
         cout << "    width default = " << get_default_value<float>(info->members[0]) << endl;
         cout << "    height default = " << get_default_value<float>(info->members[1]) << endl;
         // ISerializable::name (no custom default, should be "")
-        cout << "    name default = \"" << get_default_value<string>(info->members[4]) << "\""
-             << endl;
+        cout << "    name default = \"" << get_default_value<string>(info->members[4]) << "\"" << endl;
     }
 
     cout << "=== demo_static_metadata done ===" << endl;
@@ -226,7 +218,7 @@ void demo_runtime_metadata(IObject::Ptr& widget)
     // --- Runtime metadata via IMetadata ---
     cout << "MyWidget instance metadata:" << endl;
     if (auto* meta = interface_cast<IMetadata>(widget)) {
-        for (auto &m : meta->get_static_metadata()) {
+        for (auto& m : meta->get_static_metadata()) {
             cout << "    member: " << m.name << endl;
         }
         if (auto p = meta->get_property("width")) {
@@ -304,7 +296,7 @@ void demo_uid()
     static_assert(a == b, "Uid string parsing mismatch");
     static_assert(is_valid_uid_format("cc262192-d151-941f-d542-d4c622b50b09"));
     static_assert(!is_valid_uid_format("not-a-uid"));
-    static_assert(!is_valid_uid_format("cc262192-d151-941f-d542-d4c622b50b0")); // too short
+    static_assert(!is_valid_uid_format("cc262192-d151-941f-d542-d4c622b50b0"));  // too short
     static_assert(!is_valid_uid_format("cc262192Xd151-941f-d542-d4c622b50b09")); // wrong dash
     static_assert(!is_valid_uid_format("gg262192-d151-941f-d542-d4c622b50b09")); // bad hex
     // constexpr Uid bad("not-a-uid"); // would fail to compile
@@ -332,7 +324,8 @@ void demo_serializable(IObject::Ptr& widget)
     if (auto* is = interface_cast<ISerializable>(widget)) {
         auto n = is->name();
         n.set_value(string("MyWidget1"));
-        cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value() << endl;
+        cout << "  name().set_value(\"MyWidget1\") -> name().get_value() = " << is->name().get_value()
+             << endl;
         cout << "  serialize() ok: " << (is->serialize() ? "yes" : "no") << endl;
         cout << "  Invoking serialize() (FN_RAW)..." << endl;
         invoke_function(is, "serialize");
@@ -349,7 +342,8 @@ void demo_any_ref()
     // --- AnyRef: external struct storage ---
     cout << "AnyRef<T> with struct storage:" << endl;
     {
-        struct WidgetState {
+        struct WidgetState
+        {
             float width = 100.f;
             float height = 50.f;
         } state;
@@ -381,7 +375,8 @@ void demo_any_ref()
         state.width = 777.f;
         float clonedValue{};
         cloned->get_data(&clonedValue, sizeof(float), type_uid<float>());
-        cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)" << endl;
+        cout << "  clone() after state.width = 777 -> cloned value = " << clonedValue << " (independent)"
+             << endl;
 
         cout << "  sizeof(AnyRef<float>) " << sizeof(ext::AnyRef<float>) << endl;
     }
@@ -403,7 +398,7 @@ void demo_direct_state()
         auto* iw = interface_cast<IMyWidget>(widget2);
         auto* ps = interface_cast<IPropertyState>(widget2);
         if (iw && ps) {
-            auto *state = ps->get_property_state<IMyWidget>();
+            auto* state = ps->get_property_state<IMyWidget>();
             cout << "  IMyWidget::State* = " << (state ? "ok" : "null") << endl;
             if (state) {
                 // Verify defaults in state struct
@@ -416,7 +411,8 @@ void demo_direct_state()
 
                 // Write to state directly, verify property reads it
                 state->height = 75.f;
-                cout << "  After state->height = 75: height().get_value() = " << iw->height().get_value() << endl;
+                cout << "  After state->height = 75: height().get_value() = " << iw->height().get_value()
+                     << endl;
             }
 
             // ISerializable state
@@ -453,7 +449,7 @@ void demo_function_context(IObject::Ptr& widget)
             auto b = Any<const int>(ctx.arg(1));
             if (a && b) {
                 cout << "  add(" << a.get_value() << ", " << b.get_value()
-                          << ") = " << (a.get_value() + b.get_value()) << endl;
+                     << ") = " << (a.get_value() + b.get_value()) << endl;
             }
             return ReturnValue::Success;
         });
@@ -521,7 +517,7 @@ void demo_sizes()
 
 int main()
 {
-    auto &r = instance();
+    auto& r = instance();
 
     r.type_registry().register_type<MyDataAny>();
     r.type_registry().register_type<MyWidget>();

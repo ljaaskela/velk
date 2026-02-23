@@ -12,13 +12,14 @@ namespace velk {
  * Usage in callbacks:
  * @code
  * ReturnValue fn_reset(FnArgs args) override {
- *     if (auto ctx = FunctionContext(args, 1)) { // Expecting 1 argument 
+ *     if (auto ctx = FunctionContext(args, 1)) { // Expecting 1 argument
  *         auto a = Any<const float>(ctx[0]);
  *     }
  * }
  * @endcode
  */
-class FunctionContext {
+class FunctionContext
+{
     FnArgs args_;
 
 public:
@@ -41,7 +42,7 @@ public:
      * @brief Returns the argument at index @p i, or nullptr if out of range.
      * @param i Argument index.
      */
-    const IAny *arg(size_t i) const { return i < args_.count ? args_[i] : nullptr; }
+    const IAny* arg(size_t i) const { return i < args_.count ? args_[i] : nullptr; }
 
     /** @brief Returns the number of arguments. */
     size_t size() const { return args_.count; }
@@ -55,7 +56,7 @@ public:
      * @param i Argument index.
      * @return A read-only Any wrapping the argument, or an empty Any if out of range.
      */
-    template<class T>
+    template <class T>
     Any<const std::remove_const_t<T>> arg(size_t i) const
     {
         using AnyType = Any<const std::remove_const_t<T>>;

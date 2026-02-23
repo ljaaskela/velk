@@ -37,7 +37,7 @@ public:
     const IProperty::ConstPtr get_property_interface() const { return prop_; }
 
     /** @brief Subscribes @p fn to be called when the property value changes. */
-    void add_on_changed(const IFunction::ConstPtr &fn)
+    void add_on_changed(const IFunction::ConstPtr& fn)
     {
         if (prop_) {
             prop_->on_changed()->add_handler(fn);
@@ -45,7 +45,7 @@ public:
     }
 
     /** @brief Unsubscribes @p fn from property change notifications. */
-    void remove_on_changed(const IFunction::ConstPtr &fn)
+    void remove_on_changed(const IFunction::ConstPtr& fn)
     {
         if (prop_) {
             prop_->on_changed()->remove_handler(fn);
@@ -53,7 +53,7 @@ public:
     }
 
 protected:
-    IPropertyInternal *get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
+    IPropertyInternal* get_internal() const { return interface_cast<IPropertyInternal>(prop_); }
     IProperty::Ptr prop_;
 };
 
@@ -65,7 +65,7 @@ protected:
  * Returned by RPROP accessors. Provides read and observe operations but no set_value.
  * @tparam T The value type stored by the property.
  */
-template<class T>
+template <class T>
 class ConstProperty : public detail::PropertyStorage
 {
 public:
@@ -76,7 +76,8 @@ public:
     explicit ConstProperty(IProperty::Ptr existing) : PropertyStorage(std::move(existing)) {}
 
     /** @brief Returns the current value of the property. */
-    T get_value() const {
+    T get_value() const
+    {
         Type value{};
         if (auto internal = get_internal()) {
             if (auto any = internal->get_any()) {
@@ -93,7 +94,7 @@ public:
  * Returned by PROP accessors. Inherits read/observe from ConstProperty<T> and adds set_value.
  * @tparam T The value type stored by the property.
  */
-template<class T>
+template <class T>
 class Property : public ConstProperty<T>
 {
     using Base = ConstProperty<T>;
@@ -104,7 +105,7 @@ public:
     explicit Property(IProperty::Ptr existing) : Base(std::move(existing)) {}
 
     /** @brief Sets the property to @p value. */
-    ReturnValue set_value(const Type &value)
+    ReturnValue set_value(const Type& value)
     {
         if (auto internal = this->get_internal()) {
             return internal->set_data(&value, sizeof(Type), Base::TYPE_UID);
@@ -116,8 +117,8 @@ public:
 /**
  * @brief A helper template for creating a new read-only poperty instance
  */
-template<class T, class = std::enable_if_t<std::is_const_v<T>>>
-ConstProperty<std::remove_const_t<T>> create_property(const T &value = {})
+template <class T, class = std::enable_if_t<std::is_const_v<T>>>
+ConstProperty<std::remove_const_t<T>> create_property(const T& value = {})
 {
     using Type = std::remove_const_t<T>;
     Any<Type> v(value);
@@ -127,8 +128,8 @@ ConstProperty<std::remove_const_t<T>> create_property(const T &value = {})
 /**
  * @brief A helper template for creating a new poperty instance
  */
-template<class T, class = std::enable_if_t<!std::is_const_v<T>>>
-Property<T> create_property(const T &value = {})
+template <class T, class = std::enable_if_t<!std::is_const_v<T>>>
+Property<T> create_property(const T& value = {})
 {
     Any<T> v(value);
     return Property<T>(instance().create_property<T>(v.clone()));

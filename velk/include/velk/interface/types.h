@@ -4,6 +4,7 @@
 #include <velk/array_view.h>
 #include <velk/common.h>
 #include <velk/interface/intf_interface.h>
+
 #include <type_traits>
 
 namespace velk {
@@ -29,7 +30,7 @@ inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
 inline constexpr Uid Event = Function;
 /** @brief Default future object implementation. */
 inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
-}
+} // namespace ClassId
 
 /**
  * @brief Casts a shared IInterface pointer to a derived interface type.
@@ -53,8 +54,8 @@ typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
  * @param obj The source pointer.
  * @return A shared_ptr<const T> if the interface is supported, nullptr otherwise.
  */
-template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-typename T::ConstPtr interface_pointer_cast(const shared_ptr<U> &obj)
+template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
+typename T::ConstPtr interface_pointer_cast(const shared_ptr<U>& obj)
 {
     if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
         return typename T::ConstPtr(p, obj.block());
@@ -69,21 +70,21 @@ typename T::ConstPtr interface_pointer_cast(const shared_ptr<U> &obj)
  * @return A pointer to T if the interface is supported, nullptr otherwise.
  */
 template <class T>
-T *interface_cast(IInterface *obj)
+T* interface_cast(IInterface* obj)
 {
     return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
-const T *interface_cast(const IInterface *obj)
+const T* interface_cast(const IInterface* obj)
 {
     return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @copydoc interface_cast(IInterface*) */
 template <class T>
-T *interface_cast(const IInterface::Ptr &obj)
+T* interface_cast(const IInterface::Ptr& obj)
 {
     return obj ? obj->template get_interface<T>() : nullptr;
 }
@@ -92,19 +93,20 @@ T *interface_cast(const IInterface::Ptr &obj)
  * @copydoc interface_cast(IInterface*)
  * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
  */
-template<class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
-const T *interface_cast(const shared_ptr<U> &obj)
+template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
+const T* interface_cast(const shared_ptr<U>& obj)
 {
     return obj ? obj->template get_interface<T>() : nullptr;
 }
 
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
-enum ReturnValue : int16_t {
-    Success = 0,           ///< Operation succeeded.
-    NothingToDo = 1,       ///< Operation succeeded but had no effect (e.g. value unchanged).
-    Fail = -1,             ///< Operation failed.
-    InvalidArgument = -2,  ///< One or more arguments were invalid.
-    ReadOnly = -3,         ///< Write rejected: target is read-only.
+enum ReturnValue : int16_t
+{
+    Success = 0,          ///< Operation succeeded.
+    NothingToDo = 1,      ///< Operation succeeded but had no effect (e.g. value unchanged).
+    Fail = -1,            ///< Operation failed.
+    InvalidArgument = -2, ///< One or more arguments were invalid.
+    ReadOnly = -3,        ///< Write rejected: target is read-only.
 };
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */

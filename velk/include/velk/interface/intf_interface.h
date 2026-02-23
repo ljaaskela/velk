@@ -7,7 +7,8 @@
 namespace velk {
 
 /** @brief Static descriptor for an interface type, providing its UID and name. */
-struct InterfaceInfo {
+struct InterfaceInfo
+{
     Uid uid;
     string_view name;
 };
@@ -36,22 +37,22 @@ public:
     /** @brief Returns a pointer to the requested interface, or nullptr if not supported. */
     virtual IInterface* get_interface(Uid uid) = 0;
     /** @copydoc get_interface(Uid) */
-    virtual const IInterface *get_interface(Uid uid) const = 0;
+    virtual const IInterface* get_interface(Uid uid) const = 0;
 
     /**
      * @brief Type-safe interface query.
      * @tparam T The interface type to query for. Must have a static UID member.
      */
-    template<class T>
-    T *get_interface() noexcept
+    template <class T>
+    T* get_interface() noexcept
     {
         return static_cast<T*>(get_interface(T::UID));
     }
     /** @copydoc get_interface() */
-    template<class T>
-    const T *get_interface() const noexcept
+    template <class T>
+    const T* get_interface() const noexcept
     {
-        return static_cast<const T *>(get_interface(T::UID));
+        return static_cast<const T*>(get_interface(T::UID));
     }
 
     /** @brief Increments the reference count. */
@@ -90,7 +91,7 @@ protected:
  * @tparam UidHi High 64 bits of a user-specified UID (0 = auto-generate from type name).
  * @tparam UidLo Low 64 bits of a user-specified UID (0 = auto-generate from type name).
  */
-template<typename T, typename Base = IInterface, uint64_t UidHi = 0, uint64_t UidLo = 0>
+template <typename T, typename Base = IInterface, uint64_t UidHi = 0, uint64_t UidLo = 0>
 class Interface : public Base
 {
     static constexpr Uid compute_uid()
@@ -106,7 +107,7 @@ public:
     /** @brief Compile-time unique identifier for this interface type. */
     static constexpr Uid UID = compute_uid();
     /** @brief Static descriptor containing the UID and human-readable name. */
-    static constexpr InterfaceInfo INFO { compute_uid(), get_name<T>() };
+    static constexpr InterfaceInfo INFO{compute_uid(), get_name<T>()};
     /** @brief Shared pointer to a mutable T. */
     using Ptr = shared_ptr<T>;
     /** @brief Shared pointer to a const T. */

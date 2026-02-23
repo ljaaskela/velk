@@ -1,9 +1,10 @@
 #ifndef VELK_UID_H
 #define VELK_UID_H
 
+#include <velk/string_view.h>
+
 #include <cstdint>
 #include <ostream>
-#include <velk/string_view.h>
 
 namespace velk {
 
@@ -16,12 +17,18 @@ constexpr bool is_hex_digit(char c)
 /** @brief Returns true if @p str is a valid UUID string (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx). */
 constexpr bool is_valid_uid_format(string_view str)
 {
-    if (str.size() != 36) return false;
+    if (str.size() != 36) {
+        return false;
+    }
     for (size_t i = 0; i < 36; ++i) {
         if (i == 8 || i == 13 || i == 18 || i == 23) {
-            if (str[i] != '-') return false;
+            if (str[i] != '-') {
+                return false;
+            }
         } else {
-            if (!is_hex_digit(str[i])) return false;
+            if (!is_hex_digit(str[i])) {
+                return false;
+            }
         }
     }
     return true;
@@ -29,11 +36,11 @@ constexpr bool is_valid_uid_format(string_view str)
 
 /** @brief Called at runtime for malformed UID strings. Not constexpr, so bad UIDs in
  *  constexpr context produce a compile error. */
-inline void uid_format_error() {
-}
+inline void uid_format_error() {}
 
 /** @brief 128-bit unique identifier used for type and interface identification. */
-struct Uid {
+struct Uid
+{
     uint64_t hi = 0;
     uint64_t lo = 0;
 
@@ -41,7 +48,7 @@ struct Uid {
     constexpr Uid(uint64_t h, uint64_t l) : hi(h), lo(l) {}
 
     /** @brief Constructs a Uid from a string literal. Validates length at compile time. */
-    template<size_t N>
+    template <size_t N>
     constexpr Uid(const char (&str)[N]) : Uid(string_view(str, N - 1))
     {
         static_assert(N == 37, "Uid string must be 36 characters (xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)");
@@ -58,10 +65,13 @@ struct Uid {
             return;
         }
         for (auto c : str) {
-            if (c == '-') continue;
-            uint64_t nibble = (c >= '0' && c <= '9') ? uint64_t(c - '0') :
-                              (c >= 'a' && c <= 'f') ? uint64_t(c - 'a' + 10) :
-                              (c >= 'A' && c <= 'F') ? uint64_t(c - 'A' + 10) : 0;
+            if (c == '-') {
+                continue;
+            }
+            uint64_t nibble = (c >= '0' && c <= '9')   ? uint64_t(c - '0')
+                              : (c >= 'a' && c <= 'f') ? uint64_t(c - 'a' + 10)
+                              : (c >= 'A' && c <= 'F') ? uint64_t(c - 'A' + 10)
+                                                       : 0;
             hi = (hi << 4) | (lo >> 60);
             lo = (lo << 4) | nibble;
         }
@@ -75,14 +85,19 @@ struct Uid {
     {
         constexpr char hex[] = "0123456789abcdef";
         auto put = [&](uint64_t v, int nibbles) {
-            for (int i = (nibbles - 1) * 4; i >= 0; i -= 4)
+            for (int i = (nibbles - 1) * 4; i >= 0; i -= 4) {
                 os.put(hex[(v >> i) & 0xF]);
+            }
         };
         // GUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
-        put(u.hi >> 32, 8); os.put('-');
-        put(u.hi >> 16, 4); os.put('-');
-        put(u.hi,       4); os.put('-');
-        put(u.lo >> 48, 4); os.put('-');
+        put(u.hi >> 32, 8);
+        os.put('-');
+        put(u.hi >> 16, 4);
+        os.put('-');
+        put(u.hi, 4);
+        os.put('-');
+        put(u.lo >> 48, 4);
+        os.put('-');
         put(u.lo, 12);
         return os;
     }

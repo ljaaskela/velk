@@ -25,7 +25,8 @@ public:
     virtual array_view<Uid> get_compatible_types() const = 0;
     /**
      * @brief Returns the size of data contained within the any
-     * @param type The type whose data size to query. Must be one of the values returned by get_compatible_types.
+     * @param type The type whose data size to query. Must be one of the values returned by
+     * get_compatible_types.
      */
     virtual size_t get_data_size(Uid type) const = 0;
     /**
@@ -35,7 +36,7 @@ public:
      * @param type Type which should be stored. Must be one of the values returned by get_compatible_types.
      * @return Success if data was successfully stored, Fail otherwise.
      */
-    virtual ReturnValue get_data(void *to, size_t toSize, Uid type) const = 0;
+    virtual ReturnValue get_data(void* to, size_t toSize, Uid type) const = 0;
     /**
      * @brief Stores a given data to this IAny.
      * @param from The buffer to read data from.
@@ -45,13 +46,13 @@ public:
      *         NothingToDo if the operation was successful but did not result to the contained value changing.
      *         Fail otherwise.
      */
-    virtual ReturnValue set_data(void const *from, size_t fromSize, Uid type) = 0;
+    virtual ReturnValue set_data(void const* from, size_t fromSize, Uid type) = 0;
     /**
      * @brief Copies the content of this IAny from another IAny.
      * @param other The IAny to copy from. Must be compatible with this IAny.
      * @return Success if copy operation completed successfully, Fail otherwise.
      */
-    virtual ReturnValue copy_from(const IAny &other) = 0;
+    virtual ReturnValue copy_from(const IAny& other) = 0;
     /**
      * @brief Creates a new IAny of the same type and copies the contained value.
      * @return A new IAny with the same data, or null if cloning fails.
@@ -64,9 +65,9 @@ public:
  * @param any The IAny whose compatibility to check.
  * @param type The type to check against.
  */
-inline bool is_compatible(const IAny &any, Uid type)
+inline bool is_compatible(const IAny& any, Uid type)
 {
-    for (auto &&uid : any.get_compatible_types()) {
+    for (auto&& uid : any.get_compatible_types()) {
         if (uid == type) {
             return true;
         }
@@ -75,20 +76,20 @@ inline bool is_compatible(const IAny &any, Uid type)
 }
 
 /** @copydoc is_compatible(const IAny&, Uid) */
-inline bool is_compatible(const IAny::ConstPtr &any, Uid type)
+inline bool is_compatible(const IAny::ConstPtr& any, Uid type)
 {
     return any && is_compatible(*(any.get()), type);
 }
 
 /** @brief Returns true if the any is compatible with type T. */
-template<class T>
-inline bool is_compatible(const IAny::ConstPtr &any)
+template <class T>
+inline bool is_compatible(const IAny::ConstPtr& any)
 {
     return is_compatible(any, type_uid<T>());
 }
 
 /** @copydoc is_compatible(const IAny&, Uid) */
-inline bool is_compatible(const IAny::RefPtr &any, Uid type)
+inline bool is_compatible(const IAny::RefPtr& any, Uid type)
 {
     return any && is_compatible(*(any.get()), type);
 }
@@ -96,10 +97,10 @@ inline bool is_compatible(const IAny::RefPtr &any, Uid type)
 /**
  * @brief Returns the first type UID that both any objects are compatible with, or 0 if none.
  */
-inline Uid get_compatible_type(const IAny::ConstPtr &any, const IAny::ConstPtr &with)
+inline Uid get_compatible_type(const IAny::ConstPtr& any, const IAny::ConstPtr& with)
 {
     if (any && with) {
-        for (auto &&uid : any->get_compatible_types()) {
+        for (auto&& uid : any->get_compatible_types()) {
             if (is_compatible(with, uid)) {
                 return uid;
             }
@@ -109,7 +110,7 @@ inline Uid get_compatible_type(const IAny::ConstPtr &any, const IAny::ConstPtr &
 }
 
 /** @brief Returns true if two any objects share at least one compatible type. */
-inline bool is_compatible(const IAny::ConstPtr &any, const IAny::ConstPtr &with)
+inline bool is_compatible(const IAny::ConstPtr& any, const IAny::ConstPtr& with)
 {
     return get_compatible_type(any, with) != Uid{};
 }

@@ -1,21 +1,20 @@
 #include "velk_instance.h"
 
 #include <velk/velk_export.h>
+
 #include <cstdarg>
 #include <cstdio>
 
 namespace velk {
 
-VELK_EXPORT IVelk &instance()
+VELK_EXPORT IVelk& instance()
 {
     // Global IVelk& instance
     static VelkInstance r;
     return *(r.get_interface<IVelk>());
 }
 
-VELK_EXPORT void detail::velk_log(ILog& log, LogLevel level,
-                                   const char* file, int line,
-                                   const char* fmt, ...)
+VELK_EXPORT void detail::velk_log(ILog& log, LogLevel level, const char* file, int line, const char* fmt, ...)
 {
     char buf[1024];
     va_list args;
@@ -107,10 +106,7 @@ DWORD g_fls_index = FLS_OUT_OF_INDEXES;
 
 struct fls_init
 {
-    fls_init()
-    {
-        g_fls_index = FlsAlloc(fls_callback);
-    }
+    fls_init() { g_fls_index = FlsAlloc(fls_callback); }
     ~fls_init()
     {
         if (g_fls_index != FLS_OUT_OF_INDEXES) {
@@ -175,7 +171,9 @@ thread_local block_pool* t_cache = nullptr;
 void pthread_key_callback(void* data)
 {
     t_cache = nullptr;
-    if (!data) return;
+    if (!data) {
+        return;
+    }
     auto* pool = static_cast<block_pool*>(data);
     drain_pool(pool);
     delete pool;
@@ -193,8 +191,9 @@ struct key_init
 {
     key_init()
     {
-        if (pthread_key_create(&g_pool_key, pthread_key_callback) == 0)
+        if (pthread_key_create(&g_pool_key, pthread_key_callback) == 0) {
             g_key_valid = true;
+        }
     }
     ~key_init()
     {
@@ -217,7 +216,9 @@ block_pool* get_pool_ptr()
         t_cache = nullptr;
         return nullptr;
     }
-    if (t_cache) return t_cache;
+    if (t_cache) {
+        return t_cache;
+    }
     auto* pool = static_cast<block_pool*>(pthread_getspecific(g_pool_key));
     if (!pool) {
         pool = new block_pool;

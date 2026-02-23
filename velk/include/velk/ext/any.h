@@ -20,7 +20,7 @@ namespace velk::ext {
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
-template<class FinalClass, class... Interfaces>
+template <class FinalClass, class... Interfaces>
 class AnyBase : public ObjectCore<FinalClass, IAny, Interfaces...>
 {
 public:
@@ -37,7 +37,7 @@ public:
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Types The data types this any is compatible with.
  */
-template<class FinalClass, class... Types>
+template <class FinalClass, class... Types>
 class AnyMulti : public AnyBase<FinalClass>
 {
 public:
@@ -57,15 +57,15 @@ public:
 /**
  * @brief A helper template for implementing an Any which supports a single type
  */
-template<class FinalClass, class T, class... Interfaces>
+template <class FinalClass, class T, class... Interfaces>
 class AnyCore : public AnyBase<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
     /** @brief Sets the stored value. Returns Success if changed, NothingToDo if identical. */
-    virtual ReturnValue set_value(const T &value) = 0;
+    virtual ReturnValue set_value(const T& value) = 0;
     /** @brief Returns a const reference to the stored value. */
-    virtual const T &get_value() const = 0;
+    virtual const T& get_value() const = 0;
 
     /** @brief Returns the UID for type T. */
     static constexpr Uid class_id() { return TYPE_UID; }
@@ -76,26 +76,23 @@ public:
         static constexpr Uid uid = TYPE_UID;
         return {&uid, 1};
     }
-    size_t get_data_size(Uid type) const override
-    {
-        return type == TYPE_UID ? sizeof(T) : 0;
-    }
-    ReturnValue get_data(void *to, size_t toSize, Uid type) const override
+    size_t get_data_size(Uid type) const override { return type == TYPE_UID ? sizeof(T) : 0; }
+    ReturnValue get_data(void* to, size_t toSize, Uid type) const override
     {
         if (is_valid_args(to, toSize, type)) {
-            *reinterpret_cast<T *>(to) = get_value();
+            *reinterpret_cast<T*>(to) = get_value();
             return ReturnValue::Success;
         }
         return ReturnValue::Fail;
     }
-    ReturnValue set_data(void const *from, size_t fromSize, Uid type) override
+    ReturnValue set_data(void const* from, size_t fromSize, Uid type) override
     {
         if (is_valid_args(from, fromSize, type)) {
-            return set_value(*reinterpret_cast<const T *>(from));
+            return set_value(*reinterpret_cast<const T*>(from));
         }
         return ReturnValue::Fail;
     }
-    ReturnValue copy_from(const IAny &other) override
+    ReturnValue copy_from(const IAny& other) override
     {
         if (is_compatible(other, TYPE_UID)) {
             T value;
@@ -107,7 +104,7 @@ public:
     }
 
 private:
-    static constexpr bool is_valid_args(void const *to, size_t toSize, Uid type)
+    static constexpr bool is_valid_args(void const* to, size_t toSize, Uid type)
     {
         return to && type == TYPE_UID && sizeof(T) == toSize;
     }
@@ -119,13 +116,13 @@ private:
  * Overrides data operations to access storage directly, avoiding virtual get_value()/set_value() dispatch.
  * For trivially copyable types, uses memcpy/memcmp instead of typed operations.
  */
-template<class T>
+template <class T>
 class AnyValue final : public AnyCore<AnyValue<T>, T>
 {
     using Base = AnyCore<AnyValue<T>, T>;
 
 public:
-    ReturnValue set_value(const T &value) override
+    ReturnValue set_value(const T& value) override
     {
         if constexpr (std::is_trivially_copyable_v<T>) {
             if (std::memcmp(&data_, &value, sizeof(T)) != 0) {
@@ -143,12 +140,9 @@ public:
 
     const T& get_value() const override { return data_; }
 
-    size_t get_data_size(Uid type) const override
-    {
-        return type == Base::TYPE_UID ? sizeof(T) : 0;
-    }
+    size_t get_data_size(Uid type) const override { return type == Base::TYPE_UID ? sizeof(T) : 0; }
 
-    ReturnValue get_data(void *to, size_t toSize, Uid type) const override
+    ReturnValue get_data(void* to, size_t toSize, Uid type) const override
     {
         if (!valid_args(to, toSize, type)) {
             return ReturnValue::Fail;
@@ -156,19 +150,18 @@ public:
         if constexpr (std::is_trivially_copyable_v<T>) {
             std::memcpy(to, &data_, sizeof(T));
         } else {
-            *reinterpret_cast<T *>(to) = data_;
+            *reinterpret_cast<T*>(to) = data_;
         }
         return ReturnValue::Success;
     }
 
-    ReturnValue set_data(const void *from, size_t fromSize, Uid type) override
+    ReturnValue set_data(const void* from, size_t fromSize, Uid type) override
     {
-        return valid_args(from, fromSize, type)
-            ? set_value(*reinterpret_cast<const T *>(from))
-            : ReturnValue::Fail;
+        return valid_args(from, fromSize, type) ? set_value(*reinterpret_cast<const T*>(from))
+                                                : ReturnValue::Fail;
     }
 
-    ReturnValue copy_from(const IAny &other) override
+    ReturnValue copy_from(const IAny& other) override
     {
         if (!is_compatible(other, Base::TYPE_UID)) {
             return ReturnValue::Fail;
@@ -176,16 +169,17 @@ public:
         if constexpr (std::is_trivially_copyable_v<T>) {
             char buf[sizeof(T)];
             return succeeded(other.get_data(buf, sizeof(T), Base::TYPE_UID))
-                ? set_value(*reinterpret_cast<const T *>(buf)) : ReturnValue::Fail;
+                       ? set_value(*reinterpret_cast<const T*>(buf))
+                       : ReturnValue::Fail;
         } else {
             T value{};
-            return succeeded(other.get_data(&value, sizeof(T), Base::TYPE_UID))
-                ? set_value(value) : ReturnValue::Fail;
+            return succeeded(other.get_data(&value, sizeof(T), Base::TYPE_UID)) ? set_value(value)
+                                                                                : ReturnValue::Fail;
         }
     }
 
 private:
-    static constexpr bool valid_args(const void *p, size_t size, Uid type)
+    static constexpr bool valid_args(const void* p, size_t size, Uid type)
     {
         return p && type == Base::TYPE_UID && size == sizeof(T);
     }
@@ -198,7 +192,7 @@ private:
  * Does not own the data. Useful for ECS-style patterns where all property values live
  * in a contiguous struct that can be memcpy'd. Cloning produces an owned AnyValue<T> copy.
  */
-template<class T>
+template <class T>
 class AnyRef final : public AnyCore<AnyRef<T>, T>
 {
     using Base = AnyCore<AnyRef<T>, T>;
@@ -209,7 +203,7 @@ public:
     /** @brief Retargets this any to a different memory location. */
     void set_target(T* ptr) { ptr_ = ptr; }
 
-    ReturnValue set_value(const T &value) override
+    ReturnValue set_value(const T& value) override
     {
         if constexpr (std::is_trivially_copyable_v<T>) {
             if (std::memcmp(ptr_, &value, sizeof(T)) != 0) {
@@ -239,8 +233,9 @@ private:
 };
 
 /** @brief Creates an AnyRef<T> wrapped in a shared_ptr, pointing to the given address. */
-template<class T>
-IAny::Ptr create_any_ref(T* ptr) {
+template <class T>
+IAny::Ptr create_any_ref(T* ptr)
+{
     auto* obj = new AnyRef<T>(ptr);
     return IAny::Ptr(static_cast<IAny*>(obj));
 }

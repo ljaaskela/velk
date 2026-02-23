@@ -1,10 +1,11 @@
 #include "property.h"
+
 #include <velk/interface/intf_external_any.h>
 #include <velk/interface/types.h>
 
 namespace velk {
 
-ReturnValue PropertyImpl::set_value(const IAny &from)
+ReturnValue PropertyImpl::set_value(const IAny& from)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;
@@ -22,7 +23,7 @@ const IAny::ConstPtr PropertyImpl::get_value() const
 {
     return data_;
 }
-bool PropertyImpl::set_any(const IAny::Ptr &value)
+bool PropertyImpl::set_any(const IAny::Ptr& value)
 {
     if (data_ && value) {
         return false;
@@ -46,7 +47,7 @@ void PropertyImpl::set_flags(int32_t flags)
     get_object_data().flags = flags;
 }
 
-ReturnValue PropertyImpl::set_data(const void *data, size_t size, Uid type)
+ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type)
 {
     if (get_object_data().flags & ObjectFlags::ReadOnly) {
         return ReturnValue::ReadOnly;

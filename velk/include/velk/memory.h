@@ -1,12 +1,13 @@
 #ifndef VELK_MEMORY_H
 #define VELK_MEMORY_H
 
+#include <velk/velk_export.h>
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
 #include <utility>
-#include <velk/velk_export.h>
 
 namespace velk {
 
@@ -29,13 +30,11 @@ namespace velk {
 struct control_block
 {
     std::atomic<int32_t> strong{0};
-    std::atomic<int32_t> weak{1};           ///< 1 = "strong group exists"
-    void* ptr{nullptr};                     ///< IObject* (IInterface) or destroy target (non-IInterface)
+    std::atomic<int32_t> weak{1}; ///< 1 = "strong group exists"
+    void* ptr{nullptr};           ///< IObject* (IInterface) or destroy target (non-IInterface)
 
     /** @brief Increments the strong count (relaxed). */
-    void add_ref() {
-        strong.fetch_add(1, std::memory_order_relaxed);
-    }
+    void add_ref() { strong.fetch_add(1, std::memory_order_relaxed); }
 
     /**
      * @brief Decrements the strong count (acq_rel).
@@ -61,8 +60,8 @@ struct control_block
     {
         int32_t old = strong.load(std::memory_order_relaxed);
         while (old > 0) {
-            if (strong.compare_exchange_weak(old, old + 1,
-                    std::memory_order_acquire, std::memory_order_relaxed)) {
+            if (strong.compare_exchange_weak(
+                    old, old + 1, std::memory_order_acquire, std::memory_order_relaxed)) {
                 return true;
             }
         }
@@ -70,18 +69,13 @@ struct control_block
     }
 
     /** @brief Increments the weak count (relaxed). */
-    void add_weak() {
-        weak.fetch_add(1, std::memory_order_relaxed);
-    }
+    void add_weak() { weak.fetch_add(1, std::memory_order_relaxed); }
 
     /**
      * @brief Decrements the weak count (acq_rel).
      * @return true if this was the last weak ref (caller must deallocate the block).
      */
-    bool release_weak()
-    {
-        return weak.fetch_sub(1, std::memory_order_acq_rel) == 1;
-    }
+    bool release_weak() { return weak.fetch_sub(1, std::memory_order_acq_rel) == 1; }
 };
 
 /**
@@ -92,7 +86,7 @@ struct control_block
  */
 struct external_control_block : control_block
 {
-    void (*destroy)(void*){nullptr};        ///< Type-erased destructor for the owned object
+    void (*destroy)(void*){nullptr}; ///< Type-erased destructor for the owned object
 };
 
 namespace detail {
@@ -188,14 +182,17 @@ inline void shared_release_external(control_block* block)
 } // namespace detail
 
 /** @brief Tag type for adopting an existing reference without incrementing. */
-struct adopt_ref_t {};
+struct adopt_ref_t
+{};
 /** @brief Tag value for adopt_ref_t. */
 inline constexpr adopt_ref_t adopt_ref{};
 
 class IInterface;
 
-template<class T> class shared_ptr;
-template<class T> class weak_ptr;
+template <class T>
+class shared_ptr;
+template <class T>
+class weak_ptr;
 
 /**
  * @brief Common base for shared_ptr and weak_ptr.
@@ -206,17 +203,19 @@ template<class T> class weak_ptr;
  *
  * @tparam T The pointed-to type.
  */
-template<class T>
+template <class T>
 class ptr_base
 {
-    template<class U> friend class ptr_base;
-    template<class U> friend class shared_ptr;
-    template<class U> friend class weak_ptr;
+    template <class U>
+    friend class ptr_base;
+    template <class U>
+    friend class shared_ptr;
+    template <class U>
+    friend class weak_ptr;
 
 protected:
     /// True if T derives from IInterface (selects intrusive vs external mode).
-    static constexpr bool is_interface =
-        std::is_convertible_v<std::remove_const_t<T>*, IInterface*>;
+    static constexpr bool is_interface = std::is_convertible_v<std::remove_const_t<T>*, IInterface*>;
     using mutable_t = std::remove_const_t<T>;
 
     constexpr ptr_base() = default;
@@ -242,8 +241,8 @@ protected:
         }
     }
 
-    T* ptr_{};              ///< Raw pointer to the managed object
-    control_block* block_{};///< Associated control block (may be null for IInterface raw-ptr construction)
+    T* ptr_{};               ///< Raw pointer to the managed object
+    control_block* block_{}; ///< Associated control block (may be null for IInterface raw-ptr construction)
 };
 
 /**
@@ -262,24 +261,30 @@ protected:
  *
  * @tparam T The pointed-to type.
  */
-template<class T>
+template <class T>
 class shared_ptr : public ptr_base<T>
 {
     using base = ptr_base<T>;
+    using base::block_;
     using base::is_interface;
     using base::ptr_;
-    using base::block_;
 
-    template<class U> friend class shared_ptr;
-    template<class U> friend class weak_ptr;
+    template <class U>
+    friend class shared_ptr;
+    template <class U>
+    friend class weak_ptr;
 
     /** @brief Increments strong + weak refs for a non-null ptr_. */
     void acquire()
     {
-        if (!ptr_) return;
+        if (!ptr_) {
+            return;
+        }
         if constexpr (is_interface) {
             this->mutable_ptr()->ref();
-            if (block_) block_->add_weak();
+            if (block_) {
+                block_->add_weak();
+            }
         } else if (block_) {
             block_->add_ref();
             block_->add_weak();
@@ -289,7 +294,9 @@ class shared_ptr : public ptr_base<T>
     /** @brief Decrements strong + weak refs and nulls out the pointer. */
     void release()
     {
-        if (!ptr_) return;
+        if (!ptr_) {
+            return;
+        }
         if constexpr (is_interface) {
             this->mutable_ptr()->unref();
             detail::weak_release_intrusive(block_);
@@ -315,11 +322,12 @@ public:
      */
     explicit shared_ptr(T* p)
     {
-        if (!p) return;
+        if (!p) {
+            return;
+        }
         ptr_ = p;
         if constexpr (!is_interface) {
-            auto* ecb = static_cast<external_control_block*>(
-                detail::alloc_control_block(true));
+            auto* ecb = static_cast<external_control_block*>(detail::alloc_control_block(true));
             ecb->ptr = p;
             ecb->destroy = [](void* obj) { delete static_cast<T*>(obj); };
             block_ = ecb;
@@ -341,7 +349,9 @@ public:
      */
     shared_ptr(T* p, control_block* b, adopt_ref_t) : base(p, b)
     {
-        if (block_) block_->add_weak();
+        if (block_) {
+            block_->add_weak();
+        }
     }
 
     ~shared_ptr() { release(); }
@@ -367,11 +377,14 @@ public:
     }
 
     /** @brief Converting copy constructor: shared_ptr<U> to shared_ptr<T>. */
-    template<class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
-    shared_ptr(const shared_ptr<U>& o) : base(o.ptr_, o.block_) { acquire(); }
+    template <class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+    shared_ptr(const shared_ptr<U>& o) : base(o.ptr_, o.block_)
+    {
+        acquire();
+    }
 
     /** @brief Converting move constructor: shared_ptr<U> to shared_ptr<T>. */
-    template<class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
+    template <class U, class = std::enable_if_t<std::is_convertible_v<U*, T*>>>
     shared_ptr(shared_ptr<U>&& o) noexcept : base(o.ptr_, o.block_)
     {
         o.ptr_ = nullptr;
@@ -417,10 +430,16 @@ public:
     bool operator==(std::nullptr_t) const { return ptr_ == nullptr; }
     bool operator!=(std::nullptr_t) const { return ptr_ != nullptr; }
 
-    template<class U>
-    bool operator==(const shared_ptr<U>& o) const { return ptr_ == o.get(); }
-    template<class U>
-    bool operator!=(const shared_ptr<U>& o) const { return ptr_ != o.get(); }
+    template <class U>
+    bool operator==(const shared_ptr<U>& o) const
+    {
+        return ptr_ == o.get();
+    }
+    template <class U>
+    bool operator!=(const shared_ptr<U>& o) const
+    {
+        return ptr_ != o.get();
+    }
 };
 
 /**
@@ -431,16 +450,18 @@ public:
  *
  * @tparam T The pointed-to type.
  */
-template<class T>
+template <class T>
 class weak_ptr : public ptr_base<T>
 {
     using base = ptr_base<T>;
+    using base::block_;
     using base::is_interface;
     using base::ptr_;
-    using base::block_;
 
-    template<class U> friend class weak_ptr;
-    template<class U> friend class shared_ptr;
+    template <class U>
+    friend class weak_ptr;
+    template <class U>
+    friend class shared_ptr;
 
     /** @brief Releases the weak ref and nulls out the pointer. */
     void release()
@@ -458,7 +479,9 @@ public:
     /** @brief Constructs a weak_ptr observing the same object as @p sp. */
     weak_ptr(const shared_ptr<T>& sp) : base(sp.ptr_, sp.block_)
     {
-        if (block_) block_->add_weak();
+        if (block_) {
+            block_->add_weak();
+        }
     }
 
     ~weak_ptr() { release(); }
@@ -523,10 +546,7 @@ public:
      *
      * Checks whether the strong count has dropped to zero.
      */
-    bool expired() const
-    {
-        return !block_ || block_->strong.load(std::memory_order_acquire) == 0;
-    }
+    bool expired() const { return !block_ || block_->strong.load(std::memory_order_acquire) == 0; }
 };
 
 /**
@@ -536,7 +556,7 @@ public:
  * @param args Arguments forwarded to T's constructor.
  * @return A shared_ptr owning the new object.
  */
-template<class T, class... Args>
+template <class T, class... Args>
 shared_ptr<T> make_shared(Args&&... args)
 {
     return shared_ptr<T>(new T(std::forward<Args>(args)...));

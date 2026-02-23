@@ -1,13 +1,14 @@
 #ifndef VELK_API_ANY_H
 #define VELK_API_ANY_H
 
-#include <velk/api/velk.h>
 #include <velk/api/traits.h>
-#include <cassert>
+#include <velk/api/velk.h>
 #include <velk/common.h>
-#include <type_traits>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_velk.h>
+
+#include <cassert>
+#include <type_traits>
 
 namespace velk {
 
@@ -19,23 +20,20 @@ class AnyStorage
 protected:
     AnyStorage() = default;
 
-    void set_any(const IAny &any, const Uid &req) noexcept
+    void set_any(const IAny& any, const Uid& req) noexcept
     {
         if (is_compatible(any, req)) {
             set_any_direct(any);
         }
     }
-    void set_any(const IAny::ConstPtr &any, const Uid &req) noexcept
+    void set_any(const IAny::ConstPtr& any, const Uid& req) noexcept
     {
         if (is_compatible(any, req)) {
             set_any_direct(any);
         }
     }
-    void set_any_direct(const IAny &any) noexcept
-    {
-        any_ = refcnt_ptr<IAny>(const_cast<IAny *>(&any));
-    }
-    void set_any_direct(const IAny::ConstPtr &any) noexcept { set_any_direct(*(any.get())); }
+    void set_any_direct(const IAny& any) noexcept { any_ = refcnt_ptr<IAny>(const_cast<IAny*>(&any)); }
+    void set_any_direct(const IAny::ConstPtr& any) noexcept { set_any_direct(*(any.get())); }
 
     refcnt_ptr<IAny> any_;
 };
@@ -50,7 +48,7 @@ protected:
  *
  * @tparam T The value type.
  */
-template<class T>
+template <class T>
 class Any final : detail::AnyStorage
 {
     static constexpr bool IsReadWrite = !std::is_const_v<T>;
@@ -61,33 +59,33 @@ public:
     static constexpr Uid TYPE_UID = type_uid<std::remove_const_t<T>>();
 
     /** @brief Wraps an existing mutable IAny pointer (read-write). */
-    template<bool RW = IsReadWrite, detail::require<RW> = 0>
-    constexpr Any(const IAny::Ptr &any) noexcept
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    constexpr Any(const IAny::Ptr& any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
-    template<bool RO = IsReadOnly, detail::require<RO> = 0>
-    constexpr Any(const IAny::ConstPtr &any) noexcept
+    template <bool RO = IsReadOnly, detail::require<RO> = 0>
+    constexpr Any(const IAny::ConstPtr& any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps a const IAny reference (read-only). */
-    template<bool RO = IsReadOnly, detail::require<RO> = 0>
-    constexpr Any(const IAny &any) noexcept
+    template <bool RO = IsReadOnly, detail::require<RO> = 0>
+    constexpr Any(const IAny& any) noexcept
     {
         set_any(any, TYPE_UID);
     }
     /** @brief Wraps an existing const IAny pointer (read-only). */
-    template<bool RO = IsReadOnly, detail::require<RO> = 0>
-    constexpr Any(const IAny *any) noexcept
+    template <bool RO = IsReadOnly, detail::require<RO> = 0>
+    constexpr Any(const IAny* any) noexcept
     {
         if (any) {
             set_any(*any, TYPE_UID);
         }
     }
     /** @brief Move-constructs from an IAny rvalue. */
-    constexpr Any(IAny &&any) noexcept
+    constexpr Any(IAny&& any) noexcept
     {
         if (is_compatible(any, TYPE_UID)) {
             any_ = std::move(any);
@@ -96,7 +94,7 @@ public:
     /** @brief Default-constructs an IAny of type T via Velk. */
     Any() noexcept { set_any_direct(instance().create_any(TYPE_UID)); }
     /** @brief Constructs an IAny of type T and initializes it with @p value. */
-    Any(const T &value) noexcept
+    Any(const T& value) noexcept
     {
         if (!is_compatible(any_, TYPE_UID)) {
             auto any = instance().create_any(TYPE_UID);
@@ -106,24 +104,33 @@ public:
     }
 
     /** @brief Implicit conversion to a const IAny pointer. */
-    operator const IAny *() const noexcept { return any_.get(); }
+    operator const IAny*() const noexcept { return any_.get(); }
     /** @brief Implicit conversion to a mutable IAny pointer (read-write only). */
-    template<bool RW = IsReadWrite, detail::require<RW> = 0>
-    operator IAny *() noexcept { return any_.get(); }
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    operator IAny*() noexcept
+    {
+        return any_.get();
+    }
     /** @brief Returns a const reference to the underlying IAny. */
-    operator const IAny &() const noexcept { return *(any_.get()); }
+    operator const IAny&() const noexcept { return *(any_.get()); }
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
 
     /** @brief Returns the underlying const IAny pointer. */
-    const IAny *get_any_interface() const noexcept { return any_.get(); }
+    const IAny* get_any_interface() const noexcept { return any_.get(); }
     /** @brief Returns the underlying mutable IAny pointer (read-write only). */
-    template<bool RW = IsReadWrite, detail::require<RW> = 0>
-    IAny *get_any_interface() noexcept { return any_.get(); }
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    IAny* get_any_interface() noexcept
+    {
+        return any_.get();
+    }
 
     /** @brief Copies the value from @p other into the managed IAny (read-write only). */
-    template<bool RW = IsReadWrite, detail::require<RW> = 0>
-    bool copy_from(const IAny &other) { return any_ && any_->copy_from(other); }
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    bool copy_from(const IAny& other)
+    {
+        return any_ && any_->copy_from(other);
+    }
 
     /** @brief Returns the type id of the any value. */
     constexpr Uid get_type_uid() const noexcept { return TYPE_UID; }
@@ -141,8 +148,8 @@ public:
         return value;
     }
     /** @brief Overwrites the stored value with @p value (read-write only). */
-    template<bool RW = IsReadWrite, detail::require<RW> = 0>
-    void set_value(const T &value) noexcept
+    template <bool RW = IsReadWrite, detail::require<RW> = 0>
+    void set_value(const T& value) noexcept
     {
         if (any_) {
             any_->set_data(&value, sizeof(T), TYPE_UID);
@@ -150,9 +157,9 @@ public:
     }
 
     /** @brief Creates a read-write typed view over an existing IAny pointer. */
-    static Any<T> ref(const IAny::Ptr &ref) { return Any<T>(ref); }
+    static Any<T> ref(const IAny::Ptr& ref) { return Any<T>(ref); }
     /** @brief Creates a read-only typed view over an existing const IAny pointer. */
-    static const Any<const T> const_ref(const IAny::ConstPtr &ref) { return Any<const T>(ref); }
+    static const Any<const T> const_ref(const IAny::ConstPtr& ref) { return Any<const T>(ref); }
 };
 
 } // namespace velk

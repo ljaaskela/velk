@@ -7,11 +7,12 @@
 namespace velk {
 
 /** @brief Severity levels for log messages (ordered lowest to highest). */
-enum class LogLevel : int32_t {
-    Debug   = 0, ///< Verbose diagnostic output.
-    Info    = 1, ///< General informational messages.
+enum class LogLevel : int32_t
+{
+    Debug = 0,   ///< Verbose diagnostic output.
+    Info = 1,    ///< General informational messages.
     Warning = 2, ///< Potential issues that may require attention.
-    Error   = 3, ///< Failures that affect correctness.
+    Error = 3,   ///< Failures that affect correctness.
 };
 
 /**
@@ -24,8 +25,7 @@ class ILogSink : public Interface<ILogSink>
 {
 public:
     /** @brief Called by the log system to deliver a formatted message. */
-    virtual void write(LogLevel level, const char* file, int line,
-                       const char* message) = 0;
+    virtual void write(LogLevel level, const char* file, int line, const char* message) = 0;
 };
 
 /**
@@ -51,8 +51,7 @@ public:
      *
      * Callers should generally use the VELK_LOG macro instead of calling this directly.
      */
-    virtual void dispatch(LogLevel level, const char* file, int line,
-                          const char* message) = 0;
+    virtual void dispatch(LogLevel level, const char* file, int line, const char* message) = 0;
 };
 
 namespace detail {
@@ -61,10 +60,8 @@ namespace detail {
  * @brief Formats and dispatches a log message through @p log.
  * @note Usually not called directly; use VELK_LOG from api/velk.h instead.
  */
-VELK_EXPORT void velk_log(ILog& log, LogLevel level,
-                           const char* file, int line,
-                           const char* fmt, ...);
-}
+VELK_EXPORT void velk_log(ILog& log, LogLevel level, const char* file, int line, const char* fmt, ...);
+} // namespace detail
 
 } // namespace velk
 

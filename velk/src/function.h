@@ -21,7 +21,7 @@ class IFunctionInternal : public Interface<IFunctionInternal, IEvent>
 {
 public:
     /** @brief Sets the callback that will be called when IFunction::invoke is called. */
-    virtual void set_invoke_callback(IFunction::CallableFn *fn) = 0;
+    virtual void set_invoke_callback(IFunction::CallableFn* fn) = 0;
 
     /**
      * @brief Binds a context pointer and trampoline function for virtual dispatch.
@@ -40,7 +40,8 @@ public:
      * @param fn Static trampoline that casts context and invokes it.
      * @param deleter Static function that deletes context.
      */
-    virtual void set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) = 0;
+    virtual void set_owned_callback(void* context, IFunction::BoundFn* fn,
+                                    IFunction::ContextDeleter* deleter) = 0;
 };
 
 /**
@@ -67,13 +68,14 @@ public: // IFunction
     IAny::Ptr invoke(FnArgs args, InvokeType type = Immediate) const override;
 
 public: // IFunctionInternal
-    void set_invoke_callback(IFunction::CallableFn *fn) override;
-    void bind(void *context, IFunction::BoundFn *fn) override;
-    void set_owned_callback(void* context, IFunction::BoundFn* fn, IFunction::ContextDeleter* deleter) override;
+    void set_invoke_callback(IFunction::CallableFn* fn) override;
+    void bind(void* context, IFunction::BoundFn* fn) override;
+    void set_owned_callback(void* context, IFunction::BoundFn* fn,
+                            IFunction::ContextDeleter* deleter) override;
 
 public: // IEvent
-    ReturnValue add_handler(const IFunction::ConstPtr &fn, InvokeType type = Immediate) const override;
-    ReturnValue remove_handler(const IFunction::ConstPtr &fn) const override;
+    ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const override;
+    ReturnValue remove_handler(const IFunction::ConstPtr& fn) const override;
     bool has_handlers() const override;
 
 private:
@@ -84,13 +86,15 @@ private:
 
     void release_owned_context();
 
-    void* target_context_{};              ///< Context for target_fn_: interface ptr (bind) or CallableFn* (set_invoke_callback).
-    IFunction::BoundFn* target_fn_{};  ///< Primary invoke target. Uses callback_trampoline when set via set_invoke_callback.
-    void* owned_context_{};               ///< Heap-allocated callable context (owned).
-    IFunction::ContextDeleter* context_deleter_{};  ///< Deleter for owned_context_.
+    void* target_context_{}; ///< Context for target_fn_: interface ptr (bind) or CallableFn*
+                             ///< (set_invoke_callback).
+    IFunction::BoundFn*
+        target_fn_{}; ///< Primary invoke target. Uses callback_trampoline when set via set_invoke_callback.
+    void* owned_context_{};                        ///< Heap-allocated callable context (owned).
+    IFunction::ContextDeleter* context_deleter_{}; ///< Deleter for owned_context_.
     /// Partitioned handler list: [0, deferred_begin_) = immediate, [deferred_begin_, size()) = deferred.
     mutable std::vector<IFunction::ConstPtr> handlers_;
-    mutable uint32_t deferred_begin_{};  ///< Index separating immediate handlers from deferred handlers.
+    mutable uint32_t deferred_begin_{}; ///< Index separating immediate handlers from deferred handlers.
 };
 
 } // namespace velk

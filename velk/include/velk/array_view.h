@@ -6,8 +6,9 @@
 namespace velk {
 
 /** @brief A simple constexpr span-like view over contiguous const data. */
-template<class T>
-struct array_view {
+template <class T>
+struct array_view
+{
     constexpr array_view() = default;
     /** @brief Constructs a view over @p size elements starting at @p data. */
     constexpr array_view(const T* data, size_t size) : data_(data), size_(size) {}
@@ -21,10 +22,10 @@ struct array_view {
     /** @brief Returns a past-the-end pointer. */
     constexpr const T* end() const { return data_ + size_; }
     /** @brief Returns the element at index @p i (unchecked). */
-    constexpr const T &operator[](size_t i) const { return data_[i]; }
+    constexpr const T& operator[](size_t i) const { return data_[i]; }
 
 private:
-    const T *data_{};
+    const T* data_{};
     size_t size_{};
 };
 

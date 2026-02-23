@@ -1,14 +1,14 @@
-#include <gtest/gtest.h>
-
 #include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 
+#include <gtest/gtest.h>
 #include <string>
 #include <vector>
 
 using namespace velk;
 
-struct LogEntry {
+struct LogEntry
+{
     LogLevel level;
     std::string file;
     int line;
@@ -18,8 +18,7 @@ struct LogEntry {
 class TestSink : public ext::ObjectCore<TestSink, ILogSink>
 {
 public:
-    void write(LogLevel level, const char* file, int line,
-               const char* message) override
+    void write(LogLevel level, const char* file, int line, const char* message) override
     {
         entries.push_back({level, file, line, message});
     }
@@ -102,10 +101,10 @@ TEST_F(LogTest, AllLevelShortForms)
     VELK_LOG(W, "w");
     VELK_LOG(E, "e");
     ASSERT_EQ(4u, ts_->entries.size());
-    EXPECT_EQ(LogLevel::Debug,   ts_->entries[0].level);
-    EXPECT_EQ(LogLevel::Info,    ts_->entries[1].level);
+    EXPECT_EQ(LogLevel::Debug, ts_->entries[0].level);
+    EXPECT_EQ(LogLevel::Info, ts_->entries[1].level);
     EXPECT_EQ(LogLevel::Warning, ts_->entries[2].level);
-    EXPECT_EQ(LogLevel::Error,   ts_->entries[3].level);
+    EXPECT_EQ(LogLevel::Error, ts_->entries[3].level);
 }
 
 TEST_F(LogTest, NullSinkRestoresDefault)

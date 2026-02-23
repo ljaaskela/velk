@@ -1,8 +1,8 @@
 #ifndef VELK_EXT_CORE_OBJECT_H
 #define VELK_EXT_CORE_OBJECT_H
 
-#include <velk/common.h>
 #include <velk/api/traits.h>
+#include <velk/common.h>
 #include <velk/ext/interface_dispatch.h>
 #include <velk/ext/refcounted_dispatch.h>
 #include <velk/interface/intf_any.h>
@@ -13,7 +13,7 @@
 namespace velk::ext {
 
 /** @brief Creates a new T, sets self-pointer, and wraps it in a shared_ptr. */
-template<class T>
+template <class T>
 IObject::Ptr make_object()
 {
     auto* obj = new T;
@@ -26,7 +26,7 @@ IObject::Ptr make_object()
 }
 
 /** @brief Creates a new T and returns it cast to interface I. */
-template<class T, class I>
+template <class T, class I>
 typename I::Ptr make_object()
 {
     return interface_pointer_cast<I>(make_object<T>());
@@ -39,7 +39,7 @@ typename I::Ptr make_object()
  *
  * @tparam FinalClass The concrete class to instantiate.
  */
-template<class FinalClass>
+template <class FinalClass>
 class ObjectFactory : public InterfaceDispatch<IObjectFactory>
 {
 public:
@@ -47,10 +47,7 @@ public:
     ~ObjectFactory() override = default;
 
 public:
-    IObject::Ptr create_instance() const override
-    {
-        return make_object<FinalClass>();
-    }
+    IObject::Ptr create_instance() const override { return make_object<FinalClass>(); }
 };
 
 /**
@@ -60,31 +57,38 @@ public:
  *
  * @tparam FinalClass The concrete class whose class_id()/class_name() are used.
  */
-template<class FinalClass>
+template <class FinalClass>
 class DefaultFactory : public ObjectFactory<FinalClass>
 {
-    const ClassInfo &get_class_info() const override
+    const ClassInfo& get_class_info() const override
     {
         static constexpr ClassInfo info{
-            FinalClass::class_id(),
-            FinalClass::class_name(),
-            FinalClass::class_interfaces
-        };
+            FinalClass::class_id(), FinalClass::class_name(), FinalClass::class_interfaces};
         return info;
     }
 };
 
 /** @brief Declares a static constexpr class UID from a UUID string literal. */
-#define VELK_CLASS_UID(str) static constexpr ::velk::Uid class_uid{str}
+#define VELK_CLASS_UID(str)                \
+    static constexpr ::velk::Uid class_uid \
+    {                                      \
+        str                                \
+    }
 
 // IObject detection: walks ParentInterface chains to check if IObject is already reachable.
 
 /** @brief Selects the RefCountedDispatch base, prepending IObject only if not already reachable. */
-template<bool HasIObject, class... Interfaces>
-struct ObjectCoreBase { using type = RefCountedDispatch<IObject, Interfaces...>; };
+template <bool HasIObject, class... Interfaces>
+struct ObjectCoreBase
+{
+    using type = RefCountedDispatch<IObject, Interfaces...>;
+};
 
-template<class... Interfaces>
-struct ObjectCoreBase<true, Interfaces...> { using type = RefCountedDispatch<Interfaces...>; };
+template <class... Interfaces>
+struct ObjectCoreBase<true, Interfaces...>
+{
+    using type = RefCountedDispatch<Interfaces...>;
+};
 
 /**
  * @brief CRTP base for concrete Velk objects (without metadata).
@@ -96,14 +100,16 @@ struct ObjectCoreBase<true, Interfaces...> { using type = RefCountedDispatch<Int
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
-template<class FinalClass, class... Interfaces>
-class ObjectCore : public ObjectCoreBase<
-    (detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
+template <class FinalClass, class... Interfaces>
+class ObjectCore
+    : public ObjectCoreBase<(detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
 {
-    template<class T, class = void>
-    struct has_class_uid : std::false_type {};
-    template<class T>
-    struct has_class_uid<T, std::void_t<decltype(T::class_uid)>> : std::true_type {};
+    template <class T, class = void>
+    struct has_class_uid : std::false_type
+    {};
+    template <class T>
+    struct has_class_uid<T, std::void_t<decltype(T::class_uid)>> : std::true_type
+    {};
 
 public:
     ObjectCore() = default;
@@ -112,7 +118,8 @@ public:
 public:
     /** @brief Returns the compile-time class name of FinalClass. */
     static constexpr string_view class_name() noexcept { return ::velk::get_name<FinalClass>(); }
-    /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid. */
+    /** @brief Returns the compile-time UID of FinalClass, or a user-specified UID if provided via class_uid.
+     */
     static constexpr Uid class_id() noexcept
     {
         if constexpr (has_class_uid<FinalClass>::value) {
@@ -123,26 +130,21 @@ public:
     }
 
 public: // IObject
-    Uid get_class_uid() const override
-    {
-        return class_id();
-    }
+    Uid get_class_uid() const override { return class_id(); }
 
-    string_view get_class_name() const override
-    {
-        return class_name();
-    }
+    string_view get_class_name() const override { return class_name(); }
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
     IObject::Ptr get_self() const override
     {
         auto* block = this->get_block();
         // No self set, or object already destroyed (strong count reached zero) -> return {}
-        return block && block->ptr && block->strong.load(std::memory_order_acquire) ?
-            IObject::Ptr(static_cast<IObject*>(block->ptr), block) : nullptr;
+        return block && block->ptr && block->strong.load(std::memory_order_acquire)
+                   ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
+                   : nullptr;
     }
 
-    template<class T>
+    template <class T>
     typename T::Ptr get_self() const
     {
         return interface_pointer_cast<T>(get_self());
@@ -150,7 +152,7 @@ public: // IObject
 
 public:
     /** @brief Returns the singleton factory for creating instances of FinalClass. */
-    static const IObjectFactory &get_factory()
+    static const IObjectFactory& get_factory()
     {
         static DefaultFactory<FinalClass> factory_;
         return factory_;
