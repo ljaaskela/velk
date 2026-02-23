@@ -208,10 +208,16 @@ struct key_init
 static key_init g_key;
 
 // Same pattern as the FLS version above.
+// Unlike Windows where FlsFree invokes the callback for all threads (clearing
+// t_cache), pthread_key_delete does not. Check g_key_valid first so that a
+// surviving thread's stale t_cache is invalidated after ~key_init runs.
 block_pool* get_pool_ptr()
 {
+    if (!g_key_valid) {
+        t_cache = nullptr;
+        return nullptr;
+    }
     if (t_cache) return t_cache;
-    if (!g_key_valid) return nullptr;
     auto* pool = static_cast<block_pool*>(pthread_getspecific(g_pool_key));
     if (!pool) {
         pool = new block_pool;

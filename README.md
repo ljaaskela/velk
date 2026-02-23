@@ -61,6 +61,7 @@ velk/
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
     performance.md        Performance and memory usage
+    plugins.md            Plugin system: writing, loading, dependencies, bundles
     velk-interface.md     VELK_INTERFACE macro reference
   velk/
     include/              Public API (consumers depend only on these headers)
