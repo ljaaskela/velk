@@ -56,8 +56,9 @@ struct DeferredTask
 /** @brief Information passed to each update cycle. */
 struct UpdateInfo
 {
-    Duration timeSinceInit;       ///< Time elapsed since the instance was initialized.
-    Duration timeSinceLastUpdate; ///< Time elapsed since the previous update() call.
+    Duration timeSinceInit;        ///< Time elapsed since the instance was created.
+    Duration timeSinceFirstUpdate; ///< Time elapsed since the first update() call.
+    Duration timeSinceLastUpdate;  ///< Time elapsed since the previous update() call.
 };
 
 /**

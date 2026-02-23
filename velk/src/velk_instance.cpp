@@ -39,7 +39,7 @@ void RegisterTypes(ITypeRegistry& reg)
     reg.register_type<ext::AnyValue<std::string>>();
 }
 
-VelkInstance::VelkInstance()
+VelkInstance::VelkInstance() : init_time_us_(now_us())
 {
     RegisterTypes(*this);
 }
@@ -57,10 +57,9 @@ VelkInstance::~VelkInstance()
         // Sweep types owned by this plugin unless it opted to retain them.
         if (!entry.config.retainTypesOnUnload) {
             Uid owner = entry.uid;
-            types_.erase(
-                std::remove_if(types_.begin(), types_.end(),
-                               [&](const Entry& e) { return e.owner == owner; }),
-                types_.end());
+            types_.erase(std::remove_if(
+                             types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == owner; }),
+                         types_.end());
         }
 
         // Move library handle out before erasing so it outlives the plugin pointer.
@@ -213,7 +212,8 @@ void VelkInstance::update(Duration time) const
         }
 
         UpdateInfo info;
-        info.timeSinceInit = {current_us - first_update_us_};
+        info.timeSinceInit = {current_us - init_time_us_};
+        info.timeSinceFirstUpdate = {current_us - first_update_us_};
         info.timeSinceLastUpdate = {last_update_us_ ? current_us - last_update_us_ : 0};
         last_update_us_ = current_us;
 
@@ -425,8 +425,7 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
     // Sweep types owned by this plugin unless it opted to retain them.
     if (!it->config.retainTypesOnUnload) {
         types_.erase(
-            std::remove_if(types_.begin(), types_.end(),
-                           [&](const Entry& e) { return e.owner == pluginId; }),
+            std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == pluginId; }),
             types_.end());
     }
 

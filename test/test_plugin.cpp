@@ -449,16 +449,16 @@ TEST_F(PluginTest, UpdateProvidesTimeInfo)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
 
     // Supply explicit time values (microseconds)
-    velk_.update({1'000'000}); // t = 1s
-    EXPECT_EQ(0, raw->lastInfo.timeSinceInit.us);       // First update is the baseline
-    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us); // First update has no previous
+    velk_.update({1'000'000});                           // t = 1s
+    EXPECT_EQ(0, raw->lastInfo.timeSinceFirstUpdate.us); // First update is the baseline
+    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us);  // First update has no previous
 
     velk_.update({1'500'000}); // t = 1.5s
-    EXPECT_EQ(500'000, raw->lastInfo.timeSinceInit.us);
+    EXPECT_EQ(500'000, raw->lastInfo.timeSinceFirstUpdate.us);
     EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
 
     velk_.update({2'000'000}); // t = 2s
-    EXPECT_EQ(1'000'000, raw->lastInfo.timeSinceInit.us);
+    EXPECT_EQ(1'000'000, raw->lastInfo.timeSinceFirstUpdate.us);
     EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
 }
 
@@ -470,14 +470,16 @@ TEST_F(PluginTest, UpdateAutoTime)
 
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
 
-    // First call sets the baseline
+    // First call sets the baseline for timeSinceFirstUpdate
     velk_.update();
-    EXPECT_EQ(0, raw->lastInfo.timeSinceInit.us);
+    EXPECT_GT(raw->lastInfo.timeSinceInit.us, 0);        // Always > 0 (since construction)
+    EXPECT_EQ(0, raw->lastInfo.timeSinceFirstUpdate.us); // First update is the baseline
     EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us);
 
-    // Second call should have non-negative timeSinceInit and timeSinceLastUpdate
+    // Second call
     velk_.update();
-    EXPECT_GE(raw->lastInfo.timeSinceInit.us, 0);
+    EXPECT_GT(raw->lastInfo.timeSinceInit.us, 0);
+    EXPECT_GE(raw->lastInfo.timeSinceFirstUpdate.us, 0);
     EXPECT_GE(raw->lastInfo.timeSinceLastUpdate.us, 0);
 }
 

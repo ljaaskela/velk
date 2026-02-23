@@ -176,8 +176,9 @@ public:
 
     void update(const velk::UpdateInfo& info) override
     {
-        // info.timeSinceInit       - time since the first update() call
-        // info.timeSinceLastUpdate - time since the previous update() call
+        // info.timeSinceInit        - time since the instance was created
+        // info.timeSinceFirstUpdate - time since the first update() call
+        // info.timeSinceLastUpdate  - time since the previous update() call
     }
 };
 ```
