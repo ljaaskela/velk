@@ -99,6 +99,12 @@ const T* interface_cast(const shared_ptr<U>& obj)
     return obj ? obj->template get_interface<T>() : nullptr;
 }
 
+/** @brief A duration in microseconds. */
+struct Duration
+{
+    int64_t us = 0; ///< Microseconds.
+};
+
 /** @brief Standard return codes for Velk operations. Non-negative values indicate success. */
 enum ReturnValue : int16_t
 {

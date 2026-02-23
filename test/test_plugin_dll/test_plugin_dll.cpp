@@ -22,7 +22,7 @@ public:
     VELK_PLUGIN_UID("b0000000-0000-0000-0000-000000000002");
     VELK_PLUGIN_NAME("DllSubPlugin");
 
-    ReturnValue initialize(IVelk& velk) override { return register_type<DllWidget>(velk); }
+    ReturnValue initialize(IVelk& velk, PluginConfig&) override { return register_type<DllWidget>(velk); }
 
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
@@ -34,7 +34,7 @@ public:
     VELK_PLUGIN_UID("b0000000-0000-0000-0000-000000000001"); // optional
     VELK_PLUGIN_NAME("DllTestPlugin");                       // optional
 
-    ReturnValue initialize(IVelk& velk) override
+    ReturnValue initialize(IVelk& velk, PluginConfig&) override
     {
         // Register DllWidget type
         auto rv = register_type<DllWidget>(velk);

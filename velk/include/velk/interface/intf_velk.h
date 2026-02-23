@@ -53,6 +53,13 @@ struct DeferredTask
     shared_ptr<DeferredArgs> args;
 };
 
+/** @brief Information passed to each update cycle. */
+struct UpdateInfo
+{
+    Duration timeSinceInit;       ///< Time elapsed since the instance was initialized.
+    Duration timeSinceLastUpdate; ///< Time elapsed since the previous update() call.
+};
+
 /**
  * @brief Central interface for creating and managing Velk object types.
  *
@@ -88,8 +95,11 @@ public:
      * @param tasks The tasks to invoke.
      */
     virtual void queue_deferred_tasks(array_view<DeferredTask> tasks) const = 0;
-    /** @brief Executes all queued deferred tasks. */
-    virtual void update() const = 0;
+    /**
+     * @brief Executes all queued deferred tasks and notifies opted-in plugins.
+     * @param time Current time in microseconds. If zero, the system clock is used.
+     */
+    virtual void update(Duration time = {}) const = 0;
 
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid) const = 0;

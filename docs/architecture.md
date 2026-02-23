@@ -60,11 +60,11 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_any.h` | `IAny` type-erased value container |
 | `intf_external_any.h` | `IExternalAny` for externally-managed data |
 | `intf_type_registry.h` | `ITypeRegistry` for type registration and class info lookup |
-| `intf_plugin.h` | `PluginInfo`, `PluginDependency`, `IPlugin` interface, version helpers (`make_version`, `version_major/minor/patch`) |
+| `intf_plugin.h` | `PluginInfo`, `PluginDependency`, `PluginConfig`, `IPlugin` interface, version helpers (`make_version`, `version_major/minor/patch`) |
 | `intf_plugin_registry.h` | `IPluginRegistry` for loading/unloading plugins by instance or from shared libraries |
-| `intf_velk.h` | `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
+| `intf_velk.h` | `UpdateInfo`, `IVelk` for object creation, factory methods, and deferred tasks; delegates type registration to `ITypeRegistry` via `type_registry()` and plugin management to `IPluginRegistry` via `plugin_registry()` |
 | `intf_object_factory.h` | `IObjectFactory` for instance creation |
-| `types.h` | `ClassInfo`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
+| `types.h` | `ClassInfo`, `Duration`, `ReturnValue`, `interface_cast`, `interface_pointer_cast` |
 
 ## ext/
 
@@ -171,7 +171,7 @@ classDiagram
     }
     class IPlugin {
         <<interface>>
-        initialize/shutdown
+        initialize/shutdown/update
     }
     class IPluginRegistry {
         <<interface>>
@@ -363,6 +363,9 @@ Types that do not cross the DLL boundary can safely use STL types:
 | `ext::LazyEvent` | Helper that lazily creates an `IEvent` on first access via implicit conversion |
 | `ext::Plugin<T>` | CRTP base for plugin implementations; collects static metadata (name, version, dependencies) via SFINAE |
 | `PluginInfo` | Static plugin descriptor: factory, name, version, dependencies; accessible without an instance via `Plugin<T>::plugin_info()` |
+| `PluginConfig` | Per-plugin configuration set during `initialize`: `retainTypesOnUnload`, `enableUpdate` |
 | `PluginDependency` | Plugin dependency entry: UID and optional minimum version |
+| `Duration` | Type-safe microsecond duration (`{int64_t us}`) used in `UpdateInfo` and `IVelk::update()` |
+| `UpdateInfo` | Time information passed to plugin `update()`: `timeSinceInit` and `timeSinceLastUpdate` (both `Duration`) |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |
