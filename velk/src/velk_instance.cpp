@@ -39,7 +39,7 @@ void RegisterTypes(ITypeRegistry& reg)
     reg.register_type<ext::AnyValue<std::string>>();
 }
 
-VelkInstance::VelkInstance() : init_time_us_(now_us())
+VelkInstance::VelkInstance() : update_timestamps_{{now_us()}, {}, {}}
 {
     RegisterTypes(*this);
 }
@@ -199,23 +199,24 @@ void VelkInstance::update(Duration time) const
     if (!update_plugins_.empty()) {
         bool is_explicit = time.us != 0;
         int64_t current_us = is_explicit ? time.us : now_us();
+        auto& t = update_timestamps_;
 
         // Reset tracking when switching between explicit and auto time domains.
         if (is_explicit != last_update_was_explicit_) {
-            first_update_us_ = 0;
-            last_update_us_ = 0;
+            t.timeSinceFirstUpdate = {};
+            t.timeSinceLastUpdate = {};
         }
         last_update_was_explicit_ = is_explicit;
 
-        if (!first_update_us_) {
-            first_update_us_ = current_us;
+        if (!t.timeSinceFirstUpdate.us) {
+            t.timeSinceFirstUpdate.us = current_us;
         }
 
         UpdateInfo info;
-        info.timeSinceInit = {current_us - init_time_us_};
-        info.timeSinceFirstUpdate = {current_us - first_update_us_};
-        info.timeSinceLastUpdate = {last_update_us_ ? current_us - last_update_us_ : 0};
-        last_update_us_ = current_us;
+        info.timeSinceInit = {current_us - t.timeSinceInit.us};
+        info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
+        info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
+        t.timeSinceLastUpdate.us = current_us;
 
         for (auto* plugin : update_plugins_) {
             plugin->update(info);

@@ -91,9 +91,7 @@ private:
     ILogSink::Ptr sink_;                               ///< Custom log sink (empty = default stderr).
     LogLevel level_{LogLevel::Info};                   ///< Minimum log level.
     std::vector<IPlugin*> update_plugins_;             ///< Plugins that opted into update notifications.
-    int64_t init_time_us_;                             ///< System time at construction (microseconds).
-    mutable int64_t first_update_us_{};                ///< Time of the first update() call.
-    mutable int64_t last_update_us_{};                 ///< Time of the previous update() call.
+    mutable UpdateInfo update_timestamps_;              ///< Absolute timestamps for init, first update, last update.
     mutable bool last_update_was_explicit_{};          ///< Whether previous update used explicit time.
 };
 
