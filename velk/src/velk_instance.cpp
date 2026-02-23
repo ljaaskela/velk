@@ -10,8 +10,15 @@
 #include <velk/interface/types.h>
 
 #include <algorithm>
+#include <chrono>
 
 namespace velk {
+
+static int64_t now_us()
+{
+    using namespace std::chrono;
+    return duration_cast<microseconds>(steady_clock::now().time_since_epoch()).count();
+}
 
 void RegisterTypes(ITypeRegistry& reg)
 {
@@ -45,11 +52,14 @@ VelkInstance::~VelkInstance()
         auto& entry = plugins_.back();
         entry.plugin->shutdown(*this);
 
-        // Sweep types owned by this plugin.
-        Uid owner = entry.uid;
-        types_.erase(
-            std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == owner; }),
-            types_.end());
+        // Sweep types owned by this plugin unless it opted to retain them.
+        if (!entry.config.retainTypesOnUnload) {
+            Uid owner = entry.uid;
+            types_.erase(
+                std::remove_if(types_.begin(), types_.end(),
+                               [&](const Entry& e) { return e.owner == owner; }),
+                types_.end());
+        }
 
         // Move library handle out before erasing so it outlives the plugin pointer.
         auto handle = std::move(entry.library);
@@ -169,7 +179,7 @@ void VelkInstance::queue_deferred_tasks(array_view<DeferredTask> tasks) const
     deferred_queue_.insert(deferred_queue_.end(), tasks.begin(), tasks.end());
 }
 
-void VelkInstance::update() const
+void VelkInstance::update(Duration time) const
 {
     // Swap the queue under lock, then invoke outside the lock.
     // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
@@ -181,6 +191,33 @@ void VelkInstance::update() const
     for (auto& task : tasks) {
         if (task.fn) {
             task.fn->invoke(task.args ? task.args->view() : FnArgs{});
+        }
+    }
+
+    // Resolve current time: use caller-supplied value or fall back to system clock.
+    bool is_explicit = time.us != 0;
+    int64_t current_us = is_explicit ? time.us : now_us();
+
+    // Reset tracking when switching between explicit and auto time domains.
+    if (is_explicit != last_update_was_explicit_) {
+        first_update_us_ = 0;
+        last_update_us_ = 0;
+    }
+    last_update_was_explicit_ = is_explicit;
+
+    if (!first_update_us_) {
+        first_update_us_ = current_us;
+    }
+
+    UpdateInfo info;
+    info.timeSinceInit = {current_us - first_update_us_};
+    info.timeSinceLastUpdate = {last_update_us_ ? current_us - last_update_us_ : 0};
+    last_update_us_ = current_us;
+
+    // Notify plugins that opted into update notifications.
+    for (auto& entry : plugins_) {
+        if (entry.config.enableUpdate) {
+            entry.plugin->update(info);
         }
     }
 }
@@ -328,9 +365,12 @@ ReturnValue VelkInstance::load_plugin(const IPlugin::Ptr& plugin)
     }
     it = plugins_.insert(it, PluginEntry{id, plugin});
 
+    PluginConfig config;
     current_owner_ = id;
-    ReturnValue rv = plugin->initialize(*this);
+    ReturnValue rv = plugin->initialize(*this, config);
     current_owner_ = Uid{};
+
+    it->config = config;
 
     if (failed(rv)) {
         plugins_.erase(it);
@@ -370,10 +410,13 @@ ReturnValue VelkInstance::unload_plugin(Uid pluginId)
 
     it->plugin->shutdown(*this);
 
-    // Sweep types owned by this plugin
-    types_.erase(
-        std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == pluginId; }),
-        types_.end());
+    // Sweep types owned by this plugin unless it opted to retain them.
+    if (!it->config.retainTypesOnUnload) {
+        types_.erase(
+            std::remove_if(types_.begin(), types_.end(),
+                           [&](const Entry& e) { return e.owner == pluginId; }),
+            types_.end());
+    }
 
     // Move library handle out before erasing so it can be freed after the plugin pointer is gone.
     auto handle = std::move(it->library);

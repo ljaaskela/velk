@@ -27,7 +27,7 @@ public:
     VELK_PLUGIN_NAME("TestPlugin");
     VELK_PLUGIN_VERSION(2, 1, 0);
 
-    ReturnValue initialize(IVelk& velk) override
+    ReturnValue initialize(IVelk& velk, PluginConfig&) override
     {
         initCount++;
         return register_type<PluginWidget>(velk);
@@ -49,7 +49,7 @@ class FailingPlugin : public ext::Plugin<FailingPlugin>
 public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000002");
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::Fail; }
+    ReturnValue initialize(IVelk&, PluginConfig&) override { return ReturnValue::Fail; }
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
@@ -60,7 +60,7 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000003");
     VELK_PLUGIN_DEPS(TestPlugin::class_uid);
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue initialize(IVelk&, PluginConfig&) override { return ReturnValue::Success; }
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
@@ -71,7 +71,7 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000004");
     VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(2, 1, 0)});
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue initialize(IVelk&, PluginConfig&) override { return ReturnValue::Success; }
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 };
 
@@ -82,8 +82,47 @@ public:
     VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000005");
     VELK_PLUGIN_DEPS({TestPlugin::class_uid, make_version(3, 0, 0)});
 
-    ReturnValue initialize(IVelk&) override { return ReturnValue::Success; }
+    ReturnValue initialize(IVelk&, PluginConfig&) override { return ReturnValue::Success; }
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
+};
+
+// A plugin that opts to retain its types after unload
+class RetainingPlugin : public ext::Plugin<RetainingPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000006");
+
+    ReturnValue initialize(IVelk& velk, PluginConfig& config) override
+    {
+        config.retainTypesOnUnload = true;
+        return register_type<PluginWidget>(velk);
+    }
+
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
+};
+
+// A plugin that opts into update notifications
+class UpdatingPlugin : public ext::Plugin<UpdatingPlugin>
+{
+public:
+    VELK_PLUGIN_UID("a0000000-0000-0000-0000-000000000007");
+
+    ReturnValue initialize(IVelk&, PluginConfig& config) override
+    {
+        config.enableUpdate = true;
+        return ReturnValue::Success;
+    }
+
+    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
+
+    void update(const UpdateInfo& info) override
+    {
+        updateCount++;
+        lastInfo = info;
+    }
+
+    int updateCount = 0;
+    UpdateInfo lastInfo{};
 };
 
 // UIDs for DLL test plugins (must match test_plugin_dll.cpp)
@@ -115,6 +154,12 @@ protected:
         }
         if (reg.find_plugin<DependentPlugin>()) {
             reg.unload_plugin<DependentPlugin>();
+        }
+        if (reg.find_plugin<UpdatingPlugin>()) {
+            reg.unload_plugin<UpdatingPlugin>();
+        }
+        if (reg.find_plugin<RetainingPlugin>()) {
+            reg.unload_plugin<RetainingPlugin>();
         }
         if (reg.find_plugin<FailingPlugin>()) {
             reg.unload_plugin<FailingPlugin>();
@@ -352,6 +397,88 @@ TEST_F(PluginTest, UnloadRejectsWhenDependentsLoaded)
     // Unload the dependent first, then the dependency succeeds
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<DependentPlugin>());
     EXPECT_EQ(ReturnValue::Success, reg.unload_plugin<TestPlugin>());
+}
+
+TEST_F(PluginTest, RetainTypesOnUnload)
+{
+    auto& reg = velk_.plugin_registry();
+    auto rp = ext::make_object<RetainingPlugin, IPlugin>();
+
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(rp));
+    ASSERT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+
+    ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<RetainingPlugin>());
+
+    // Types should still be registered because retainTypesOnUnload was set
+    EXPECT_NE(nullptr, velk_.type_registry().get_class_info(PluginWidget::class_id()));
+}
+
+TEST_F(PluginTest, UpdateNotifiesOptedInPlugins)
+{
+    auto& reg = velk_.plugin_registry();
+    auto up = ext::make_object<UpdatingPlugin, IPlugin>();
+    auto* raw = static_cast<UpdatingPlugin*>(up.get());
+
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
+    EXPECT_EQ(0, raw->updateCount);
+
+    velk_.update();
+    EXPECT_EQ(1, raw->updateCount);
+
+    velk_.update();
+    EXPECT_EQ(2, raw->updateCount);
+}
+
+TEST_F(PluginTest, UpdateSkipsPluginsWithoutFlag)
+{
+    auto& reg = velk_.plugin_registry();
+
+    // TestPlugin does not set enableUpdate, so it should not receive update
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(plugin_));
+
+    // Just verify update() does not crash with a non-opted-in plugin loaded
+    velk_.update();
+}
+
+TEST_F(PluginTest, UpdateProvidesTimeInfo)
+{
+    auto& reg = velk_.plugin_registry();
+    auto up = ext::make_object<UpdatingPlugin, IPlugin>();
+    auto* raw = static_cast<UpdatingPlugin*>(up.get());
+
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
+
+    // Supply explicit time values (microseconds)
+    velk_.update({1'000'000}); // t = 1s
+    EXPECT_EQ(0, raw->lastInfo.timeSinceInit.us);       // First update is the baseline
+    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us); // First update has no previous
+
+    velk_.update({1'500'000}); // t = 1.5s
+    EXPECT_EQ(500'000, raw->lastInfo.timeSinceInit.us);
+    EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
+
+    velk_.update({2'000'000}); // t = 2s
+    EXPECT_EQ(1'000'000, raw->lastInfo.timeSinceInit.us);
+    EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
+}
+
+TEST_F(PluginTest, UpdateAutoTime)
+{
+    auto& reg = velk_.plugin_registry();
+    auto up = ext::make_object<UpdatingPlugin, IPlugin>();
+    auto* raw = static_cast<UpdatingPlugin*>(up.get());
+
+    ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
+
+    // First call sets the baseline
+    velk_.update();
+    EXPECT_EQ(0, raw->lastInfo.timeSinceInit.us);
+    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us);
+
+    // Second call should have non-negative timeSinceInit and timeSinceLastUpdate
+    velk_.update();
+    EXPECT_GE(raw->lastInfo.timeSinceInit.us, 0);
+    EXPECT_GE(raw->lastInfo.timeSinceLastUpdate.us, 0);
 }
 
 #ifdef TEST_PLUGIN_DLL_PATH

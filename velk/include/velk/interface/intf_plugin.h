@@ -7,7 +7,8 @@
 
 namespace velk {
 
-class IVelk; // Forward declaration
+class IVelk;       // Forward declaration
+struct UpdateInfo; // Forward declaration
 
 /** @brief Packs major.minor.patch into a single uint32_t.
  *  Layout: [major:8][minor:8][patch:16] */
@@ -57,6 +58,13 @@ struct PluginInfo
     Uid uid() const { return factory.get_class_info().uid; }
 };
 
+/** @brief Plugin configuration set during initialize to control system behavior. */
+struct PluginConfig
+{
+    bool retainTypesOnUnload = false; ///< If true, plugin-owned types are kept after unload.
+    bool enableUpdate = false;        ///< If true, update() is called during instance().update().
+};
+
 /**
  * @brief Interface that plugins implement to register types and hook into the Velk runtime.
  *
@@ -70,9 +78,11 @@ class IPlugin : public Interface<IPlugin, IObject>
 {
 public:
     /** @brief Called when the plugin is loaded. Register types and perform setup here. */
-    virtual ReturnValue initialize(IVelk& velk) = 0;
+    virtual ReturnValue initialize(IVelk& velk, PluginConfig& config) = 0;
     /** @brief Called when the plugin is unloaded. Unregister types and clean up here. */
     virtual ReturnValue shutdown(IVelk& velk) = 0;
+    /** @brief Called during instance().update() when enableUpdate is set in PluginConfig. */
+    virtual void update(const UpdateInfo& info) = 0;
     /** @brief Returns the static plugin descriptor. */
     virtual const PluginInfo& get_plugin_info() const = 0;
 

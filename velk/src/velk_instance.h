@@ -42,7 +42,7 @@ public:
     IAny::Ptr create_any(Uid type) const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, int32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
-    void update() const override;
+    void update(Duration time) const override;
     IFuture::Ptr create_future() const override;
     IFunction::Ptr create_callback(IFunction::CallableFn* fn) const override;
     IFunction::Ptr create_owned_callback(void* context, IFunction::BoundFn* fn,
@@ -75,6 +75,7 @@ private:
         Uid uid;
         IPlugin::Ptr plugin;
         LibraryHandle library; ///< Non-empty when plugin was loaded from a shared library.
+        PluginConfig config;   ///< Configuration set by the plugin during initialize.
         bool operator<(const PluginEntry& o) const { return uid < o.uid; }
     };
 
@@ -89,6 +90,9 @@ private:
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     ILogSink::Ptr sink_;                               ///< Custom log sink (empty = default stderr).
     LogLevel level_{LogLevel::Info};                   ///< Minimum log level.
+    mutable int64_t first_update_us_{};                 ///< Time of the first update() call.
+    mutable int64_t last_update_us_{};                 ///< Time of the previous update() call.
+    mutable bool last_update_was_explicit_{};          ///< Whether previous update used explicit time.
 };
 
 } // namespace velk

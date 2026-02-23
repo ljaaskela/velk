@@ -9,6 +9,9 @@ Velk supports plugins as a way to modularly register types and extend the runtim
   - [Versioning](#versioning)
   - [Dependencies](#dependencies)
   - [Versioned dependencies](#versioned-dependencies)
+- [Plugin configuration](#plugin-configuration)
+  - [Retaining types on unload](#retaining-types-on-unload)
+  - [Update notifications](#update-notifications)
 - [Loading plugins](#loading-plugins)
   - [Inline plugins](#inline-plugins)
   - [From a shared library](#from-a-shared-library)
@@ -26,7 +29,7 @@ Derive from `ext::Plugin<T>` and implement `initialize` and `shutdown`:
 class MyPlugin : public velk::ext::Plugin<MyPlugin>
 {
 public:
-    velk::ReturnValue initialize(velk::IVelk& velk) override
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig& config) override
     {
         return register_type<MyWidget>(velk);
     }
@@ -127,6 +130,67 @@ public:
 
 A dependency without a version (bare `Uid`) accepts any version.
 
+## Plugin configuration
+
+The `initialize` method receives a mutable `PluginConfig&` that the plugin can modify to opt into system behaviors. The system default-constructs the config before calling `initialize`, stores the result, and consults it during the plugin's lifetime.
+
+```cpp
+struct PluginConfig
+{
+    bool retainTypesOnUnload = false; ///< If true, plugin-owned types are kept after unload.
+    bool enableUpdate = false;        ///< If true, update() is called during instance().update().
+};
+```
+
+### Retaining types on unload
+
+By default, when a plugin is unloaded all types it registered during `initialize` are automatically removed from the type registry. Setting `retainTypesOnUnload = true` keeps them registered:
+
+```cpp
+velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig& config) override
+{
+    config.retainTypesOnUnload = true;
+    return register_type<MyWidget>(velk);
+}
+```
+
+After unloading this plugin, `MyWidget` remains in the type registry and can still be created by UID.
+
+### Update notifications
+
+Plugins can receive periodic update notifications by setting `enableUpdate = true` and overriding `update()`:
+
+```cpp
+class MyPlugin : public velk::ext::Plugin<MyPlugin>
+{
+public:
+    VELK_PLUGIN_UID("...");
+
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig& config) override
+    {
+        config.enableUpdate = true;
+        return velk::ReturnValue::Success;
+    }
+
+    velk::ReturnValue shutdown(velk::IVelk&) override { return velk::ReturnValue::Success; }
+
+    void update(const velk::UpdateInfo& info) override
+    {
+        // info.timeSinceInit       - time since the first update() call
+        // info.timeSinceLastUpdate - time since the previous update() call
+    }
+};
+```
+
+`ext::Plugin<T>` provides a default no-op `update()`, so plugins that don't need it don't have to override it.
+
+`instance().update()` accepts an optional `Duration` parameter representing the current time in microseconds. When omitted (or zero), the system uses `std::chrono::steady_clock`. When provided, all time deltas are computed from the caller-supplied values:
+
+```cpp
+velk::instance().update();                   // auto time from system clock
+velk::instance().update({1'000'000});        // explicit: 1 second (microseconds)
+```
+
 ## Loading plugins
 
 ### Inline plugins
@@ -138,7 +202,7 @@ auto plugin = velk::ext::make_object<MyPlugin, velk::IPlugin>();
 velk::instance().plugin_registry().load_plugin(plugin);
 ```
 
-`load_plugin` calls the plugin's `initialize(IVelk&)` method, where it can register types and perform setup. If `initialize` returns a failure, the plugin is not stored.
+`load_plugin` calls the plugin's `initialize(IVelk&, PluginConfig&)` method, where it can register types, configure plugin behavior, and perform setup. If `initialize` returns a failure, the plugin is not stored.
 
 ### From a shared library
 
@@ -154,7 +218,7 @@ public:
     VELK_PLUGIN_UID("a1b2c3d4-e5f6-7890-abcd-ef1234567890");
     VELK_PLUGIN_NAME("My Plugin");
 
-    velk::ReturnValue initialize(velk::IVelk& velk) override
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig&) override
     {
         return register_type<MyWidget>(velk);
     }
@@ -198,7 +262,7 @@ reg.unload_plugin(MyPlugin::class_id());
 reg.unload_plugin<MyPlugin>();
 ```
 
-Unloading calls the plugin's `shutdown(IVelk&)` method, then sweeps all types that the plugin registered from the type registry. For library-loaded plugins, the shared library handle is closed after the plugin is released.
+Unloading calls the plugin's `shutdown(IVelk&)` method, then removes all types that the plugin registered from the type registry (unless the plugin set `retainTypesOnUnload = true` in its config). For library-loaded plugins, the shared library handle is closed after the plugin is released.
 
 ## Multi-plugin libraries
 
@@ -210,7 +274,7 @@ class SubPlugin : public velk::ext::Plugin<SubPlugin>
 public:
     VELK_PLUGIN_UID("...");
 
-    velk::ReturnValue initialize(velk::IVelk& velk) override { /* ... */ }
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig&) override { /* ... */ }
     velk::ReturnValue shutdown(velk::IVelk& velk) override { return velk::ReturnValue::Success; }
 };
 
@@ -220,7 +284,7 @@ public:
     VELK_PLUGIN_UID("...");
     VELK_PLUGIN_NAME("My Bundle");
 
-    velk::ReturnValue initialize(velk::IVelk& velk) override
+    velk::ReturnValue initialize(velk::IVelk& velk, velk::PluginConfig&) override
     {
         auto rv = register_type<MyWidget>(velk);
         if (failed(rv)) {
