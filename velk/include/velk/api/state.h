@@ -6,77 +6,6 @@
 #include <velk/interface/intf_object.h>
 
 namespace velk {
-namespace detail {
-
-/** @brief RAII read-only accessor to an interface's State struct. Null-safe. */
-template <class T>
-class StateReader
-{
-public:
-    StateReader() = default;
-    explicit StateReader(const typename T::State* state) : state_(state) {}
-    explicit operator bool() const { return state_ != nullptr; }
-    const typename T::State* operator->() const { return state_; }
-    const typename T::State& operator*() const { return *state_; }
-    StateReader(const StateReader&) = default;
-    StateReader& operator=(const StateReader&) = default;
-
-private:
-    const typename T::State* state_{};
-};
-
-/** @brief RAII write accessor; fires notify on destruction. Null-safe. */
-template <class T>
-class StateWriter
-{
-public:
-    StateWriter() = default;
-    StateWriter(typename T::State* state, const IInterface* meta) : state_(state), meta_(meta) {}
-    ~StateWriter()
-    {
-        if (state_ && meta_) {
-            if (auto* m = interface_cast<IMetadata>(meta_)) {
-                m->notify(MemberKind::Property, T::UID, Notification::Changed);
-            }
-        }
-    }
-    StateWriter(const StateWriter&) = delete;
-    StateWriter& operator=(const StateWriter&) = delete;
-    StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_)
-    {
-        o.state_ = nullptr;
-        o.meta_ = nullptr;
-    }
-    StateWriter& operator=(StateWriter&&) = delete;
-
-    explicit operator bool() const { return state_ != nullptr; }
-    typename T::State* operator->() { return state_; }
-    typename T::State& operator*() { return *state_; }
-
-private:
-    typename T::State* state_{};
-    const IInterface* meta_{};
-};
-
-} // namespace detail
-
-// -- IMetadata member template definitions --
-
-template <class T>
-detail::StateReader<T> IMetadata::read() const
-{
-    auto* state = const_cast<IMetadata*>(this)->template get_property_state<T>();
-    return detail::StateReader<T>(state);
-}
-
-template <class T>
-detail::StateWriter<T> IMetadata::write()
-{
-    auto* state = this->template get_property_state<T>();
-    return detail::StateWriter<T>(state, state ? this : nullptr);
-}
-
-// -- Free functions --
 
 /**
  * @brief Type-safe property state access. Returns a typed pointer to T::State.
@@ -107,6 +36,18 @@ detail::StateWriter<T> write_state(U* object)
 }
 
 /**
+ * @brief Returns a shared_ptr to the object, optionally cast to interface T.
+ * @tparam T The target interface type (defaults to IObject).
+ * @param object The object to retrieve the self pointer from.
+ */
+template <class T = IObject, class U>
+typename T::Ptr get_self(U* object)
+{
+    auto* obj = interface_cast<IObject>(object);
+    return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr {};
+}
+
+/**
  * @brief Writes to T::State via a callback, with optional deferral.
  *
  * When @p type is Immediate, the callback executes synchronously and on_changed fires when it returns.
@@ -121,11 +62,8 @@ detail::StateWriter<T> write_state(U* object)
 template <class T, class U, class Fn>
 void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
 {
-    auto* meta = interface_cast<IMetadata>(object);
-    if (!meta) {
-        return;
-    }
-    auto* state = meta->template get_property_state<T>();
+    auto meta = interface_cast<IMetadata>(object);
+    auto* state = get_property_state<T>(meta);
     if (!state) {
         return;
     }
@@ -134,11 +72,10 @@ void write_state(U* object, Fn&& fn, InvokeType type = Immediate)
         meta->notify(MemberKind::Property, T::UID, Notification::Changed);
         return;
     }
-    auto* obj = interface_cast<IObject>(object);
-    if (!obj) {
+    IObject::WeakPtr weak(get_self(object));
+    if (!weak.lock()) {
         return;
     }
-    IObject::WeakPtr weak(obj->get_self());
     Callback cb([weak, f = std::forward<Fn>(fn)](FnArgs) mutable -> ReturnValue {
         auto locked = weak.lock();
         if (!locked) {

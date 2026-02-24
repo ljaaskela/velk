@@ -2,6 +2,7 @@
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
 #include <velk/api/property.h>
+#include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
 #include <velk/interface/intf_event.h>

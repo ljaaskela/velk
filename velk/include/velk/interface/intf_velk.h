@@ -56,8 +56,8 @@ struct DeferredTask
 /** @brief Deferred property write queued for the next update() call. */
 struct DeferredPropertySet
 {
-    IPropertyInternal::WeakPtr property;  ///< Weak ref to the property. Skipped if expired before flush.
-    IAny::Ptr value;                      ///< Cloned value to apply.
+    IPropertyInternal::WeakPtr property; ///< Weak ref to the property. Skipped if expired before flush.
+    IAny::Ptr value;                     ///< Cloned value to apply.
 };
 
 /** @brief Information passed to each update cycle. */

@@ -4,7 +4,7 @@ add_library(velk SHARED
     src/function.cpp
     src/function.h
     include/velk/velk_export.h
-include/velk/array_view.h
+    include/velk/array_view.h
     include/velk/common.h
     include/velk/memory.h
     include/velk/string_view.h
@@ -43,6 +43,7 @@ include/velk/array_view.h
     include/velk/api/future.h
     include/velk/api/function.h
     include/velk/api/function_context.h
+    include/velk/api/state.h
     include/velk/api/traits.h
     include/velk/api/velk.h
     include/velk/ext/any.h

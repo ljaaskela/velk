@@ -45,11 +45,48 @@ public:
 
 namespace detail {
 
-// Forward declarations; defined in <velk/api/state.h>.
+/** @brief RAII read-only accessor to an interface's State struct. Null-safe. */
 template <class T>
-class StateReader;
+class StateReader
+{
+public:
+    StateReader() = default;
+    explicit StateReader(const typename T::State* state) : state_(state) {}
+    explicit operator bool() const { return state_ != nullptr; }
+    const typename T::State* operator->() const { return state_; }
+    const typename T::State& operator*() const { return *state_; }
+    StateReader(const StateReader&) = default;
+    StateReader& operator=(const StateReader&) = default;
+
+private:
+    const typename T::State* state_{};
+};
+
+/** @brief RAII write accessor; fires notify on destruction. Null-safe. */
 template <class T>
-class StateWriter;
+class StateWriter
+{
+public:
+    StateWriter() = default;
+    StateWriter(typename T::State* state, const IInterface* meta) : state_(state), meta_(meta) {}
+    ~StateWriter(); // defined after IMetadata
+    StateWriter(const StateWriter&) = delete;
+    StateWriter& operator=(const StateWriter&) = delete;
+    StateWriter(StateWriter&& o) noexcept : state_(o.state_), meta_(o.meta_)
+    {
+        o.state_ = nullptr;
+        o.meta_ = nullptr;
+    }
+    StateWriter& operator=(StateWriter&&) = delete;
+
+    explicit operator bool() const { return state_ != nullptr; }
+    typename T::State* operator->() { return state_; }
+    typename T::State& operator*() { return *state_; }
+
+private:
+    typename T::State* state_{};
+    const IInterface* meta_{};
+};
 
 } // namespace detail
 
@@ -78,6 +115,30 @@ public:
     template <class T>
     detail::StateWriter<T> write();
 };
+
+template <class T>
+detail::StateReader<T> IMetadata::read() const
+{
+    auto* state = const_cast<IMetadata*>(this)->template get_property_state<T>();
+    return detail::StateReader<T>(state);
+}
+
+template <class T>
+detail::StateWriter<T> IMetadata::write()
+{
+    auto* state = this->template get_property_state<T>();
+    return detail::StateWriter<T>(state, state ? this : nullptr);
+}
+
+template <class T>
+detail::StateWriter<T>::~StateWriter()
+{
+    if (state_ && meta_) {
+        if (auto* m = interface_cast<IMetadata>(meta_)) {
+            m->notify(MemberKind::Property, T::UID, Notification::Changed);
+        }
+    }
+}
 
 /**
  * @brief Null-safe property lookup on an IMetadata pointer.
@@ -798,9 +859,5 @@ struct FnRawBind
     _VELK_FOR_EACH(_VELK_TRAMPOLINE, __VA_ARGS__) \
     VELK_METADATA(__VA_ARGS__)                    \
     _VELK_FOR_EACH(_VELK_ACC, __VA_ARGS__)
-
-// State accessors (StateReader, StateWriter, read_state, write_state, get_property_state) are defined
-// in api/state.h. Included here so that intf_metadata.h remains a self-contained header.
-#include <velk/api/state.h>
 
 #endif // VELK_INTF_METADATA_H
