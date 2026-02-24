@@ -13,6 +13,10 @@ add_library(velk SHARED
     src/metadata_container.h
     src/future.cpp
     src/future.h
+    src/type_registry.cpp
+    src/type_registry.h
+    src/plugin_registry.cpp
+    src/plugin_registry.h
     src/velk_instance.cpp
     src/velk_instance.h
     src/library_handle.h

@@ -44,7 +44,7 @@ template <class T = IObject, class U>
 typename T::Ptr get_self(U* object)
 {
     auto* obj = interface_cast<IObject>(object);
-    return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr {};
+    return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr{};
 }
 
 /**
