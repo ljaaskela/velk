@@ -11,6 +11,18 @@
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_velk.h>
 
+namespace velk::detail {
+
+/** @brief Constructs an IObject::Ptr from a control block, or nullptr if expired. */
+inline IObject::Ptr make_self_ptr(control_block* block)
+{
+    return block && block->ptr && block->strong.load(std::memory_order_acquire)
+               ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
+               : nullptr;
+}
+
+} // namespace velk::detail
+
 namespace velk::ext {
 
 /** @brief Creates a new T, sets self-pointer, and wraps it in a shared_ptr. */
@@ -129,14 +141,7 @@ public: // IObject
     string_view get_class_name() const override { return class_name(); }
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
-    IObject::Ptr get_self() const override
-    {
-        auto* block = this->get_block();
-        // No self set, or object already destroyed (strong count reached zero) -> return {}
-        return block && block->ptr && block->strong.load(std::memory_order_acquire)
-                   ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
-                   : nullptr;
-    }
+    IObject::Ptr get_self() const override { return detail::make_self_ptr(this->get_block()); }
 
     template <class T>
     typename T::Ptr get_self() const

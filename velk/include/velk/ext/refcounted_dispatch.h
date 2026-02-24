@@ -7,6 +7,17 @@
 
 namespace velk {
 
+namespace detail {
+
+/** @brief Marks a ref-counted object as dead and releases its control block. */
+inline void release_ref_counted(control_block& block)
+{
+    block.strong.store(0, std::memory_order_release);
+    release_control_block(block);
+}
+
+} // namespace detail
+
 namespace ext {
 /**
  * @brief Adds intrusive reference counting to InterfaceDispatch.
@@ -41,11 +52,7 @@ public:
      * Zeroes the strong count so that any outstanding weak_ptr sees the object
      * as expired, then releases the "strong group" weak ref on the block.
      */
-    ~RefCountedDispatch() override
-    {
-        data_.block->strong.store(0, std::memory_order_release);
-        detail::release_control_block(*data_.block);
-    }
+    ~RefCountedDispatch() override { detail::release_ref_counted(*data_.block); }
 
 public:
     /** @brief Returns the control block for shared_ptr/weak_ptr support. */
