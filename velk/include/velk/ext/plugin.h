@@ -1,6 +1,7 @@
 #ifndef VELK_EXT_PLUGIN_H
 #define VELK_EXT_PLUGIN_H
 
+#include <velk/ext/member_traits.h>
 #include <velk/ext/object.h>
 #include <velk/interface/intf_plugin.h>
 
@@ -38,30 +39,9 @@ namespace velk::ext {
 template <class FinalClass>
 class Plugin : public Object<FinalClass, IPlugin>
 {
-    template <class T, class = void>
-    struct has_plugin_name : std::false_type
-    {};
-    template <class T>
-    struct has_plugin_name<T, std::void_t<decltype(T::plugin_name)>> : std::true_type
-    {};
-
-    template <class T, class = void>
-    struct has_plugin_version : std::false_type
-    {};
-    template <class T>
-    struct has_plugin_version<T, std::void_t<decltype(T::plugin_version)>> : std::true_type
-    {};
-
-    template <class T, class = void>
-    struct has_plugin_deps : std::false_type
-    {};
-    template <class T>
-    struct has_plugin_deps<T, std::void_t<decltype(T::plugin_deps)>> : std::true_type
-    {};
-
     static constexpr string_view resolve_name()
     {
-        if constexpr (has_plugin_name<FinalClass>::value) {
+        if constexpr (detail::has_plugin_name<FinalClass>::value) {
             return FinalClass::plugin_name;
         } else {
             return FinalClass::class_name();
@@ -70,7 +50,7 @@ class Plugin : public Object<FinalClass, IPlugin>
 
     static constexpr uint32_t resolve_version()
     {
-        if constexpr (has_plugin_version<FinalClass>::value) {
+        if constexpr (detail::has_plugin_version<FinalClass>::value) {
             return FinalClass::plugin_version;
         } else {
             return 0;
@@ -79,7 +59,7 @@ class Plugin : public Object<FinalClass, IPlugin>
 
     static constexpr array_view<PluginDependency> resolve_deps()
     {
-        if constexpr (has_plugin_deps<FinalClass>::value) {
+        if constexpr (detail::has_plugin_deps<FinalClass>::value) {
             return {FinalClass::plugin_deps, sizeof(FinalClass::plugin_deps) / sizeof(PluginDependency)};
         } else {
             return {};

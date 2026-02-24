@@ -4,6 +4,7 @@
 #include <velk/api/traits.h>
 #include <velk/common.h>
 #include <velk/ext/interface_dispatch.h>
+#include <velk/ext/member_traits.h>
 #include <velk/ext/refcounted_dispatch.h>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_object.h>
@@ -104,13 +105,6 @@ template <class FinalClass, class... Interfaces>
 class ObjectCore
     : public ObjectCoreBase<(detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
 {
-    template <class T, class = void>
-    struct has_class_uid : std::false_type
-    {};
-    template <class T>
-    struct has_class_uid<T, std::void_t<decltype(T::class_uid)>> : std::true_type
-    {};
-
 public:
     ObjectCore() = default;
     ~ObjectCore() override = default;
@@ -122,7 +116,7 @@ public:
      */
     static constexpr Uid class_id() noexcept
     {
-        if constexpr (has_class_uid<FinalClass>::value) {
+        if constexpr (detail::has_class_uid<FinalClass>::value) {
             return FinalClass::class_uid;
         } else {
             return type_uid<FinalClass>();
