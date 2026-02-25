@@ -362,6 +362,23 @@ static void BM_CreatePlainVector(benchmark::State& state)
 }
 BENCHMARK(BM_CreatePlainVector);
 
+static void BM_CreateVelkVector(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto uid = HiveData::class_id();
+
+    for (auto _ : state) {
+        std::vector<IObject::Ptr> vec;
+        vec.reserve(kHiveCount);
+        for (size_t i = 0; i < kHiveCount; ++i) {
+            vec.push_back(instance().create<IObject>(uid));
+        }
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_CreateVelkVector);
+
 static void BM_CreateHive(benchmark::State& state)
 {
     ensureRegistered();
@@ -409,6 +426,35 @@ static void BM_IteratePlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_IteratePlainVector);
+
+static void BM_IterateVelkVector(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+
+    std::vector<IObject::Ptr> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        auto obj = instance().create<IObject>(HiveData::class_id());
+        auto* ps = interface_cast<IPropertyState>(obj);
+        auto* s = ps->get_property_state<IHiveData>();
+        s->f0 = static_cast<float>(i);
+        s->i0 = static_cast<int>(i);
+        vec.push_back(std::move(obj));
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        for (auto& obj : vec) {
+            auto* ps = interface_cast<IPropertyState>(obj);
+            auto* s = ps->get_property_state<IHiveData>();
+            sum += s->f0 + s->f1 + s->f2 + s->f3 + s->f4;
+            sum += static_cast<float>(s->i0 + s->i1 + s->i2 + s->i3 + s->i4);
+        }
+        benchmark::DoNotOptimize(sum);
+    }
+}
+BENCHMARK(BM_IterateVelkVector);
 
 static void BM_IterateHive(benchmark::State& state)
 {
@@ -474,6 +520,42 @@ static void BM_IterateWritePlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_IterateWritePlainVector);
+
+static void BM_IterateWriteVelkVector(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+
+    std::vector<IObject::Ptr> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec.push_back(instance().create<IObject>(HiveData::class_id()));
+    }
+
+    float counter = 0.f;
+    for (auto _ : state) {
+        float v = counter;
+        for (auto& obj : vec) {
+            auto* ps = interface_cast<IPropertyState>(obj);
+            auto* s = ps->get_property_state<IHiveData>();
+            s->f0 = v;
+            s->f1 = v;
+            s->f2 = v;
+            s->f3 = v;
+            s->f4 = v;
+            int iv = static_cast<int>(v);
+            s->i0 = iv;
+            s->i1 = iv;
+            s->i2 = iv;
+            s->i3 = iv;
+            s->i4 = iv;
+            v += 1.f;
+        }
+        benchmark::ClobberMemory();
+        counter = v;
+    }
+}
+BENCHMARK(BM_IterateWriteVelkVector);
 
 static void BM_IterateWriteHive(benchmark::State& state)
 {
@@ -541,6 +623,36 @@ static void BM_ChurnPlainVector(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ChurnPlainVector);
+
+static void BM_ChurnVelkVector(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    auto uid = HiveData::class_id();
+
+    std::vector<IObject::Ptr> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec.push_back(instance().create<IObject>(uid));
+    }
+
+    for (auto _ : state) {
+        // Erase every 4th element (iterate backwards to keep indices stable).
+        for (size_t i = vec.size(); i > 0; --i) {
+            if ((i - 1) % 4 == 0) {
+                vec.erase(vec.begin() + static_cast<ptrdiff_t>(i - 1));
+            }
+        }
+
+        // Repopulate back to 512.
+        while (vec.size() < kHiveCount) {
+            vec.push_back(instance().create<IObject>(uid));
+        }
+
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_ChurnVelkVector);
 
 static void BM_ChurnHive(benchmark::State& state)
 {
