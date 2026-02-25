@@ -3,11 +3,15 @@
 #include <velk/api/event.h>
 #include <velk/api/function.h>
 #include <velk/api/property.h>
+#include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/interface/hive/intf_hive_registry.h>
 #include <velk/interface/intf_metadata.h>
 
 #include <benchmark/benchmark.h>
+
+#include <vector>
 
 using namespace velk;
 
@@ -263,3 +267,320 @@ static void BM_ControlBlockNewDelete(benchmark::State& state)
     }
 }
 BENCHMARK(BM_ControlBlockNewDelete);
+
+// ---------------------------------------------------------------------------
+// Hive vs vector-of-structs comparison
+// ---------------------------------------------------------------------------
+
+class PlainData
+{
+public:
+    PlainData() : f0(0.f), f1(1.f), f2(2.f), f3(3.f), f4(4.f), i0(0), i1(1), i2(2), i3(3), i4(4) {}
+
+    float f0, f1, f2, f3, f4;
+    int i0, i1, i2, i3, i4;
+};
+
+class IHiveData : public Interface<IHiveData>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, float, f0, 0.f),
+        (PROP, float, f1, 1.f),
+        (PROP, float, f2, 2.f),
+        (PROP, float, f3, 3.f),
+        (PROP, float, f4, 4.f),
+        (PROP, int, i0, 0),
+        (PROP, int, i1, 1),
+        (PROP, int, i2, 2),
+        (PROP, int, i3, 3),
+        (PROP, int, i4, 4)
+    )
+};
+
+class HiveData : public ext::Object<HiveData, IHiveData>
+{};
+
+static constexpr size_t kHiveCount = 512;
+
+static void ensureHiveRegistered()
+{
+    static bool done = false;
+    if (!done) {
+        register_type<HiveData>(instance());
+        done = true;
+    }
+}
+
+// --- Memory reporting ---
+
+static void BM_MemoryPlainVector(benchmark::State& state)
+{
+    for (auto _ : state) {
+        std::vector<PlainData> vec(kHiveCount);
+        benchmark::DoNotOptimize(vec.data());
+    }
+    state.counters["bytes"] = static_cast<double>(kHiveCount * sizeof(PlainData));
+}
+BENCHMARK(BM_MemoryPlainVector);
+
+static void BM_MemoryHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+
+    for (auto _ : state) {
+        auto hive = registry->get_hive<HiveData>();
+        for (size_t i = 0; i < kHiveCount; ++i) {
+            hive->add();
+        }
+        benchmark::DoNotOptimize(hive.get());
+        // Teardown: remove all objects.
+        state.PauseTiming();
+        hive->for_each(nullptr, [](void*, IObject& obj) -> bool {
+            obj.unref(); // release hive's ref
+            return true;
+        });
+        state.ResumeTiming();
+    }
+    state.counters["obj_size"] = static_cast<double>(sizeof(HiveData));
+
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_MemoryHive);
+
+// --- Creation speed ---
+
+static void BM_CreatePlainVector(benchmark::State& state)
+{
+    for (auto _ : state) {
+        std::vector<PlainData> vec(kHiveCount);
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_CreatePlainVector);
+
+static void BM_CreateHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto hive = registry->get_hive<HiveData>();
+
+    for (auto _ : state) {
+        for (size_t i = 0; i < kHiveCount; ++i) {
+            auto obj = hive->add();
+            benchmark::DoNotOptimize(obj.get());
+        }
+        // Teardown
+        state.PauseTiming();
+        hive->for_each(nullptr, [](void*, IObject& obj) -> bool {
+            obj.unref();
+            return true;
+        });
+        state.ResumeTiming();
+    }
+
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_CreateHive);
+
+// --- Iteration speed: read all 10 fields, accumulate ---
+
+static void BM_IteratePlainVector(benchmark::State& state)
+{
+    std::vector<PlainData> vec(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec[i].f0 = static_cast<float>(i);
+        vec[i].i0 = static_cast<int>(i);
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        for (auto& d : vec) {
+            sum += d.f0 + d.f1 + d.f2 + d.f3 + d.f4;
+            sum += static_cast<float>(d.i0 + d.i1 + d.i2 + d.i3 + d.i4);
+        }
+        benchmark::DoNotOptimize(sum);
+    }
+}
+BENCHMARK(BM_IteratePlainVector);
+
+static void BM_IterateHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto hive = registry->get_hive<HiveData>();
+
+    std::vector<IObject::Ptr> refs;
+    refs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        auto obj = hive->add();
+        auto* ps = interface_cast<IPropertyState>(obj);
+        auto* s = ps->get_property_state<IHiveData>();
+        s->f0 = static_cast<float>(i);
+        s->i0 = static_cast<int>(i);
+        refs.push_back(std::move(obj));
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        hive->for_each(&sum, [](void* ctx, IObject& obj) -> bool {
+            auto* ps = interface_cast<IPropertyState>(&obj);
+            auto* s = ps->get_property_state<IHiveData>();
+            float& sum = *static_cast<float*>(ctx);
+            sum += s->f0 + s->f1 + s->f2 + s->f3 + s->f4;
+            sum += static_cast<float>(s->i0 + s->i1 + s->i2 + s->i3 + s->i4);
+            return true;
+        });
+        benchmark::DoNotOptimize(sum);
+    }
+
+    refs.clear();
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_IterateHive);
+
+// --- Iteration speed: write all 10 fields ---
+
+static void BM_IterateWritePlainVector(benchmark::State& state)
+{
+    std::vector<PlainData> vec(kHiveCount);
+
+    for (auto _ : state) {
+        float v = 0.f;
+        for (auto& d : vec) {
+            d.f0 = v;
+            d.f1 = v;
+            d.f2 = v;
+            d.f3 = v;
+            d.f4 = v;
+            int iv = static_cast<int>(v);
+            d.i0 = iv;
+            d.i1 = iv;
+            d.i2 = iv;
+            d.i3 = iv;
+            d.i4 = iv;
+            v += 1.f;
+        }
+        benchmark::ClobberMemory();
+    }
+}
+BENCHMARK(BM_IterateWritePlainVector);
+
+static void BM_IterateWriteHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto hive = registry->get_hive<HiveData>();
+
+    std::vector<IObject::Ptr> refs;
+    refs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        refs.push_back(hive->add());
+    }
+
+    float counter = 0.f;
+    for (auto _ : state) {
+        hive->for_each(&counter, [](void* ctx, IObject& obj) -> bool {
+            float& v = *static_cast<float*>(ctx);
+            auto* ps = interface_cast<IPropertyState>(&obj);
+            auto* s = ps->get_property_state<IHiveData>();
+            s->f0 = v;
+            s->f1 = v;
+            s->f2 = v;
+            s->f3 = v;
+            s->f4 = v;
+            int iv = static_cast<int>(v);
+            s->i0 = iv;
+            s->i1 = iv;
+            s->i2 = iv;
+            s->i3 = iv;
+            s->i4 = iv;
+            v += 1.f;
+            return true;
+        });
+        benchmark::ClobberMemory();
+    }
+
+    refs.clear();
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_IterateWriteHive);
+
+// --- Churn: erase every 4th element, then repopulate back to 512 ---
+
+static void BM_ChurnPlainVector(benchmark::State& state)
+{
+    std::vector<PlainData> vec(kHiveCount);
+
+    for (auto _ : state) {
+        // Erase every 4th element (iterate backwards to keep indices stable).
+        for (size_t i = vec.size(); i > 0; --i) {
+            if ((i - 1) % 4 == 0) {
+                vec.erase(vec.begin() + static_cast<ptrdiff_t>(i - 1));
+            }
+        }
+
+        // Repopulate back to 512.
+        while (vec.size() < kHiveCount) {
+            vec.emplace_back();
+        }
+
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_ChurnPlainVector);
+
+static void BM_ChurnHive(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveRegistry>(ClassId::HiveRegistry);
+    auto hive = registry->get_hive<HiveData>();
+
+    // Pre-populate.
+    std::vector<IObject::Ptr> refs;
+    refs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        refs.push_back(hive->add());
+    }
+
+    for (auto _ : state) {
+        // Remove every 4th element.
+        for (size_t i = 0; i < refs.size(); i += 4) {
+            hive->remove(*refs[i]);
+            refs[i].reset();
+        }
+
+        // Repopulate the removed slots.
+        for (size_t i = 0; i < refs.size(); i += 4) {
+            refs[i] = hive->add();
+        }
+
+        benchmark::DoNotOptimize(hive.get());
+    }
+
+    // Teardown.
+    for (auto& r : refs) {
+        if (r) {
+            hive->remove(*r);
+            r.reset();
+        }
+    }
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_ChurnHive);
