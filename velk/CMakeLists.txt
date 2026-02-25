@@ -52,6 +52,7 @@ add_library(velk SHARED
     include/velk/api/velk.h
     include/velk/ext/any.h
     include/velk/ext/core_object.h
+    include/velk/ext/member_traits.h
     include/velk/ext/metadata.h
     include/velk/ext/object.h
     include/velk/ext/event.h

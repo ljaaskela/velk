@@ -7,6 +7,49 @@
 
 #include <tuple>
 
+namespace velk::detail {
+
+/**
+ * @brief Non-template base holding IMetadata pointer and delegation helpers.
+ *
+ * Avoids duplicating the metadata delegation logic in every Object<> instantiation.
+ */
+class ObjectMetadataBase
+{
+protected:
+    ~ObjectMetadataBase() { delete meta_; }
+
+    array_view<MemberDesc> meta_get_static_metadata() const
+    {
+        return meta_ ? meta_->get_static_metadata() : array_view<MemberDesc>{};
+    }
+    IProperty::Ptr meta_get_property(string_view name) const
+    {
+        return meta_ ? meta_->get_property(name) : nullptr;
+    }
+    IEvent::Ptr meta_get_event(string_view name) const { return meta_ ? meta_->get_event(name) : nullptr; }
+    IFunction::Ptr meta_get_function(string_view name) const
+    {
+        return meta_ ? meta_->get_function(name) : nullptr;
+    }
+    void meta_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
+    {
+        if (meta_) {
+            meta_->notify(kind, interfaceUid, notification);
+        }
+    }
+    void meta_set_container(IMetadata* metadata)
+    {
+        if (!meta_) {
+            meta_ = metadata;
+        }
+    }
+
+    IMetadata* meta_{};
+};
+
+} // namespace velk::detail
+
 namespace velk::ext {
 
 /**
@@ -19,7 +62,8 @@ namespace velk::ext {
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template <class FinalClass, class... Interfaces>
-class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>
+class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>,
+               protected detail::ObjectMetadataBase
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
@@ -27,46 +71,20 @@ public:
     static constexpr array_view<MemberDesc> class_metadata{metadata.data(), metadata.size()};
 
     Object() = default;
-    ~Object() override { delete meta_; }
+    ~Object() override = default;
 
 public: // IMetadata overrides
-    /** @brief Returns the static metadata descriptors, or an empty view if none. */
-    array_view<MemberDesc> get_static_metadata() const override
-    {
-        return meta_ ? meta_->get_static_metadata() : array_view<MemberDesc>{};
-    }
-    /** @brief Looks up a property by name, or returns nullptr. */
-    IProperty::Ptr get_property(string_view name) const override
-    {
-        return meta_ ? meta_->get_property(name) : nullptr;
-    }
-    /** @brief Looks up an event by name, or returns nullptr. */
-    IEvent::Ptr get_event(string_view name) const override
-    {
-        return meta_ ? meta_->get_event(name) : nullptr;
-    }
-    /** @brief Looks up a function by name, or returns nullptr. */
-    IFunction::Ptr get_function(string_view name) const override
-    {
-        return meta_ ? meta_->get_function(name) : nullptr;
-    }
-    /** @brief Broadcasts a notification to matching instantiated members. */
+    array_view<MemberDesc> get_static_metadata() const override { return meta_get_static_metadata(); }
+    IProperty::Ptr get_property(string_view name) const override { return meta_get_property(name); }
+    IEvent::Ptr get_event(string_view name) const override { return meta_get_event(name); }
+    IFunction::Ptr get_function(string_view name) const override { return meta_get_function(name); }
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
     {
-        if (meta_) {
-            meta_->notify(kind, interfaceUid, notification);
-        }
+        meta_notify(kind, interfaceUid, notification);
     }
 
 public: // IMetadataContainer override
-    /** @brief Accepts the runtime metadata container (called once by Velk at construction). */
-    void set_metadata_container(IMetadata* metadata) override
-    {
-        // Allow one set (called by Velk at construction)
-        if (!meta_) {
-            meta_ = metadata;
-        }
-    }
+    void set_metadata_container(IMetadata* metadata) override { meta_set_container(metadata); }
 
 public: // IPropertyState override
     /** @brief Returns a pointer to the State struct for the given interface UID. */
@@ -93,7 +111,6 @@ private:
         }
     };
 
-    IMetadata* meta_{};
     // Heterogeneous storage for each interface's State struct (e.g. IMyWidget::State,
     // ISerializable::State). Requires std::tuple because each State is a different type
     // with its own size, alignment, and constructor/destructor. This is safe across the

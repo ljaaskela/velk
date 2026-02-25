@@ -4,11 +4,24 @@
 #include <velk/api/traits.h>
 #include <velk/common.h>
 #include <velk/ext/interface_dispatch.h>
+#include <velk/ext/member_traits.h>
 #include <velk/ext/refcounted_dispatch.h>
 #include <velk/interface/intf_any.h>
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_velk.h>
+
+namespace velk::detail {
+
+/** @brief Constructs an IObject::Ptr from a control block, or nullptr if expired. */
+inline IObject::Ptr make_self_ptr(control_block* block)
+{
+    return block && block->ptr && block->strong.load(std::memory_order_acquire)
+               ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
+               : nullptr;
+}
+
+} // namespace velk::detail
 
 namespace velk::ext {
 
@@ -104,13 +117,6 @@ template <class FinalClass, class... Interfaces>
 class ObjectCore
     : public ObjectCoreBase<(detail::has_iobject_in_chain<Interfaces>() || ...), Interfaces...>::type
 {
-    template <class T, class = void>
-    struct has_class_uid : std::false_type
-    {};
-    template <class T>
-    struct has_class_uid<T, std::void_t<decltype(T::class_uid)>> : std::true_type
-    {};
-
 public:
     ObjectCore() = default;
     ~ObjectCore() override = default;
@@ -122,7 +128,7 @@ public:
      */
     static constexpr Uid class_id() noexcept
     {
-        if constexpr (has_class_uid<FinalClass>::value) {
+        if constexpr (detail::has_class_uid<FinalClass>::value) {
             return FinalClass::class_uid;
         } else {
             return type_uid<FinalClass>();
@@ -135,14 +141,7 @@ public: // IObject
     string_view get_class_name() const override { return class_name(); }
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
-    IObject::Ptr get_self() const override
-    {
-        auto* block = this->get_block();
-        // No self set, or object already destroyed (strong count reached zero) -> return {}
-        return block && block->ptr && block->strong.load(std::memory_order_acquire)
-                   ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
-                   : nullptr;
-    }
+    IObject::Ptr get_self() const override { return detail::make_self_ptr(this->get_block()); }
 
     template <class T>
     typename T::Ptr get_self() const

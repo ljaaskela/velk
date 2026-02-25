@@ -3,6 +3,7 @@
 
 #include <velk/common.h>
 #include <velk/interface/intf_interface.h>
+#include <velk/interface/types.h>
 
 namespace velk {
 
@@ -21,18 +22,15 @@ public:
 };
 
 /**
- * @brief Casts a raw IObject pointer to a shared_ptr of the target interface type.
- * @tparam T The target interface type.
- * @param obj The raw object pointer.
- * @return A shared_ptr<T> if the cast succeeds, empty shared_ptr otherwise.
+ * @brief Returns a shared_ptr to the object, optionally cast to interface T.
+ * @tparam T The target interface type (defaults to IObject).
+ * @param object The object to retrieve the self pointer from.
  */
-template <class T>
-typename T::Ptr interface_pointer_cast(IObject* obj)
+template <class T = IObject, class U>
+typename T::Ptr get_self(U* object)
 {
-    if (!obj) {
-        return {};
-    }
-    return interface_pointer_cast<T>(obj->get_self());
+    auto* obj = interface_cast<IObject>(object);
+    return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr{};
 }
 
 } // namespace velk

@@ -36,18 +36,6 @@ detail::StateWriter<T> write_state(U* object)
 }
 
 /**
- * @brief Returns a shared_ptr to the object, optionally cast to interface T.
- * @tparam T The target interface type (defaults to IObject).
- * @param object The object to retrieve the self pointer from.
- */
-template <class T = IObject, class U>
-typename T::Ptr get_self(U* object)
-{
-    auto* obj = interface_cast<IObject>(object);
-    return obj ? interface_pointer_cast<T>(obj->get_self()) : typename T::Ptr{};
-}
-
-/**
  * @brief Writes to T::State via a callback, with optional deferral.
  *
  * When @p type is Immediate, the callback executes synchronously and on_changed fires when it returns.
