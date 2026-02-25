@@ -35,9 +35,10 @@ namespace velk::ext {
  * Derived classes implement initialize and shutdown.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
+ * @tparam ExtraInterfaces Additional interfaces the plugin exposes (optional).
  */
-template <class FinalClass>
-class Plugin : public Object<FinalClass, IPlugin>
+template <class FinalClass, class... ExtraInterfaces>
+class Plugin : public Object<FinalClass, IPlugin, ExtraInterfaces...>
 {
     static constexpr string_view resolve_name()
     {

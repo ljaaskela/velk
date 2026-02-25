@@ -133,6 +133,7 @@ class PluginTest : public ::testing::Test
 {
 protected:
     IVelk& velk_ = instance();
+    size_t builtin_count_ = velk_.plugin_registry().plugin_count(); ///< Built-in plugins (e.g. HivePlugin).
     IPlugin::Ptr plugin_ = ext::make_object<TestPlugin, IPlugin>();
     TestPlugin* tp_ = static_cast<TestPlugin*>(plugin_.get());
 
@@ -192,9 +193,9 @@ TEST_F(PluginTest, PluginCount)
 {
     auto& reg = velk_.plugin_registry();
 
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
     reg.load_plugin(plugin_);
-    EXPECT_EQ(1u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_ + 1, reg.plugin_count());
 }
 
 TEST_F(PluginTest, PluginTypesRegistered)
@@ -215,7 +216,7 @@ TEST_F(PluginTest, UnloadPlugin)
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin<TestPlugin>());
     EXPECT_EQ(1, tp_->shutdownCount);
     EXPECT_EQ(nullptr, reg.find_plugin<TestPlugin>());
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
 TEST_F(PluginTest, UnloadAutoUnregistersTypes)
@@ -244,7 +245,7 @@ TEST_F(PluginTest, InvalidReturnsError)
 {
     auto& reg = velk_.plugin_registry();
 
-    ASSERT_EQ(ReturnValue::InvalidArgument, reg.load_plugin({}));
+    ASSERT_EQ(ReturnValue::InvalidArgument, reg.load_plugin(IPlugin::Ptr{}));
     EXPECT_EQ(0, tp_->initCount);
 }
 
@@ -272,14 +273,14 @@ TEST_F(PluginTest, FailedInitializeDoesNotLoad)
 
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin(fp));
     EXPECT_EQ(nullptr, reg.find_plugin<FailingPlugin>());
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
 TEST_F(PluginTest, LoadFromPathNonExistentFails)
 {
     auto& reg = velk_.plugin_registry();
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin_from_path("nonexistent_plugin.dll"));
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
 TEST_F(PluginTest, LoadFromPathNullFails)
@@ -295,7 +296,7 @@ TEST_F(PluginTest, LoadFromPathInvalidDllFails)
     // On Windows LoadLibrary will fail on an .exe, which is fine (tests FAIL path).
     auto& reg = velk_.plugin_registry();
     EXPECT_EQ(ReturnValue::Fail, reg.load_plugin_from_path("tests.exe"));
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
 }
 
 TEST_F(PluginTest, PluginInfoCollectsStaticMetadata)
@@ -488,7 +489,7 @@ TEST_F(PluginTest, LoadFromPathSuccess)
 {
     auto& reg = velk_.plugin_registry();
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
-    EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
+    EXPECT_EQ(builtin_count_ + 2, reg.plugin_count()); // host + sub-plugin
 
     auto* plugin = reg.find_plugin(DllTestPluginUid);
     ASSERT_NE(nullptr, plugin);
@@ -500,7 +501,7 @@ TEST_F(PluginTest, LoadFromPathDoubleLoadReturnsNothingToDo)
     auto& reg = velk_.plugin_registry();
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     EXPECT_EQ(ReturnValue::NothingToDo, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
-    EXPECT_EQ(2u, reg.plugin_count()); // host + sub-plugin
+    EXPECT_EQ(builtin_count_ + 2, reg.plugin_count()); // host + sub-plugin
 }
 
 TEST_F(PluginTest, LoadFromPathThenUnload)
@@ -508,7 +509,7 @@ TEST_F(PluginTest, LoadFromPathThenUnload)
     auto& reg = velk_.plugin_registry();
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
     EXPECT_EQ(nullptr, reg.find_plugin(DllTestPluginUid));
 }
 
@@ -518,14 +519,14 @@ TEST_F(PluginTest, LoadFromPathMultiPlugin)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin_from_path(TEST_PLUGIN_DLL_PATH));
 
     // Host plugin and sub-plugin should both be loaded
-    EXPECT_EQ(2u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_ + 2, reg.plugin_count());
     EXPECT_NE(nullptr, reg.find_plugin(DllTestPluginUid));
     EXPECT_NE(nullptr, reg.find_plugin(DllSubPluginUid));
     EXPECT_EQ(string_view("DllSubPlugin"), reg.find_plugin(DllSubPluginUid)->get_name());
 
     // Unloading the host should also unload the sub-plugin (via shutdown)
     ASSERT_EQ(ReturnValue::Success, reg.unload_plugin(DllTestPluginUid));
-    EXPECT_EQ(0u, reg.plugin_count());
+    EXPECT_EQ(builtin_count_, reg.plugin_count());
     EXPECT_EQ(nullptr, reg.find_plugin(DllSubPluginUid));
 }
 #endif

@@ -1,12 +1,16 @@
 #include "velk_instance.h"
 
 #include "function.h"
+#include "plugins/hive/hive_plugin.h"
 
 #include <velk/interface/types.h>
 
 namespace velk {
 
-VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_) {}
+VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_)
+{
+    type_registry_.register_type(HivePlugin::get_factory());
+}
 
 VelkInstance::~VelkInstance()
 {
