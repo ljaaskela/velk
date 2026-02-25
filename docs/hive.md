@@ -8,8 +8,9 @@ Objects in a hive are full Velk objects with reference counting, metadata, and i
 
 ## Contents
 
+- [Class diagram](#class-diagram)
 - [Getting started](#getting-started)
-- [Hive registry](#hive-registry)
+- [Hive store](#hive-store)
 - [Adding objects](#adding-objects)
 - [Removing objects](#removing-objects)
 - [Iterating objects](#iterating-objects)
@@ -19,9 +20,52 @@ Objects in a hive are full Velk objects with reference counting, metadata, and i
 - [Memory layout](#memory-layout)
 - [Performance](#performance)
 
+## Class diagram
+
+```mermaid
+classDiagram
+    direction TB
+
+    class IHiveStore {
+        <<interface>>
+        get_hive(classUid)
+        find_hive(classUid)
+        hive_count()
+        for_each_hive()
+    }
+
+    class IHive {
+        <<interface>>
+        add()
+        remove(object)
+        contains(object)
+        for_each(visitor)
+        size() / empty()
+    }
+
+    class IObject {
+        <<interface>>
+        get_self()
+    }
+
+    class HiveStore {
+        ClassId::HiveStore
+    }
+
+    class Hive {
+        ClassId::Hive
+    }
+
+    IHiveStore <|.. HiveStore : implements
+    IHive <|.. Hive : implements
+    IObject <|-- IHive : extends
+    IHiveStore --> "0..*" IHive : manages
+    IHive --> "0..*" IObject : stores
+```
+
 ## Getting started
 
-The hive system is built into Velk as an internal plugin. No setup is required. Create a hive registry and start adding objects:
+The hive system is built into Velk as an internal plugin. No setup is required. Create a hive store and start adding objects:
 
 ```cpp
 #include <velk/interface/hive/intf_hive_store.h>
@@ -36,9 +80,9 @@ auto hive = registry->get_hive<MyWidget>();
 auto obj = hive->add();
 ```
 
-## Hive registry
+## Hive store
 
-The hive registry manages hives, one per class UID. Create one via `ClassId::HiveStore` and use the `IHiveStore` interface for lazy creation and lookup:
+The hive store manages hives, one per class UID. Create one via `ClassId::HiveStore` and use the `IHiveStore` interface for lazy creation and lookup:
 
 ```cpp
 auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
@@ -65,7 +109,7 @@ registry->for_each_hive(nullptr, [](void*, IHive& hive) -> bool {
 });
 ```
 
-Multiple hive registries can coexist independently. Each registry maintains its own set of hives.
+Multiple hive stores can coexist independently. Each store maintains its own set of hives.
 
 ## Adding objects
 
@@ -133,7 +177,20 @@ When `remove()` is called, the hive releases its strong reference. If no externa
 
 When the last reference to a zombie drops, the destructor runs in place and the slot is returned to the page's free list for reuse.
 
-When a hive is destroyed (e.g. its registry is released), all active objects are released. Any objects that still have external references become orphans. The underlying page memory is kept alive until the last orphan is destroyed, then freed automatically.
+When a hive is destroyed (e.g. its store is released), all active objects are released. Any objects that still have external references become orphans. The underlying page memory is kept alive until the last orphan is destroyed, then freed automatically.
+
+### Slot lifecycle
+
+Each slot in a hive page transitions through three states:
+
+```mermaid
+stateDiagram-v2
+    [*] --> Free
+    Free --> Active : add()
+    Active --> Free : remove(), no external refs
+    Active --> Zombie : remove(), external refs held
+    Zombie --> Free : last ref dropped
+```
 
 ## Memory layout
 
