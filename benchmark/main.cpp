@@ -6,6 +6,7 @@
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/api/hive/iterate.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
@@ -494,6 +495,41 @@ static void BM_IterateHive(benchmark::State& state)
 }
 BENCHMARK(BM_IterateHive);
 
+static void BM_IterateHiveState(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+    auto hive = registry->get_hive<HiveData>();
+
+    std::vector<IObject::Ptr> refs;
+    refs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        auto obj = hive->add();
+        auto* ps = interface_cast<IPropertyState>(obj);
+        auto* s = ps->get_property_state<IHiveData>();
+        s->f0 = static_cast<float>(i);
+        s->i0 = static_cast<int>(i);
+        refs.push_back(std::move(obj));
+    }
+
+    for (auto _ : state) {
+        float sum = 0.f;
+        for_each_hive<IHiveData>(*hive, [&](IObject&, IHiveData::State& s) {
+            sum += s.f0 + s.f1 + s.f2 + s.f3 + s.f4;
+            sum += static_cast<float>(s.i0 + s.i1 + s.i2 + s.i3 + s.i4);
+            return true;
+        });
+        benchmark::DoNotOptimize(sum);
+    }
+
+    refs.clear();
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_IterateHiveState);
+
 // --- Iteration speed: write all 10 fields ---
 
 static void BM_IterateWritePlainVector(benchmark::State& state)
@@ -599,6 +635,47 @@ static void BM_IterateWriteHive(benchmark::State& state)
     instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_IterateWriteHive);
+
+static void BM_IterateWriteHiveState(benchmark::State& state)
+{
+    ensureRegistered();
+    ensureHiveRegistered();
+    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
+    auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
+    auto hive = registry->get_hive<HiveData>();
+
+    std::vector<IObject::Ptr> refs;
+    refs.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        refs.push_back(hive->add());
+    }
+
+    float counter = 0.f;
+    for (auto _ : state) {
+        float v = counter;
+        for_each_hive<IHiveData>(*hive, [&](IObject&, IHiveData::State& s) {
+            s.f0 = v;
+            s.f1 = v;
+            s.f2 = v;
+            s.f3 = v;
+            s.f4 = v;
+            int iv = static_cast<int>(v);
+            s.i0 = iv;
+            s.i1 = iv;
+            s.i2 = iv;
+            s.i3 = iv;
+            s.i4 = iv;
+            return true;
+        });
+        benchmark::ClobberMemory();
+        counter += kHiveCount;
+    }
+
+    refs.clear();
+    registry.reset();
+    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
+}
+BENCHMARK(BM_IterateWriteHiveState);
 
 // --- Churn: erase every 4th element, then repopulate back to 512 ---
 

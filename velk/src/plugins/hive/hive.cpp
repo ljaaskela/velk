@@ -39,6 +39,15 @@ size_t align_up(size_t size, size_t alignment)
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
+inline void prefetch_line(const void* addr)
+{
+#ifdef _WIN32
+    _mm_prefetch(static_cast<const char*>(addr), _MM_HINT_T0);
+#else
+    __builtin_prefetch(addr, 0, 1);
+#endif
+}
+
 /** @brief Returns the index of the lowest set bit, or 64 if none. */
 inline unsigned bitscan_forward64(uint64_t mask)
 {
@@ -447,7 +456,17 @@ bool Hive::contains(const IObject& object) const
     return find_slot(&object, page_idx, slot_idx);
 }
 
-void Hive::for_each(void* context, VisitorFn visitor) const
+/**
+ * @brief Shared bitmask scan loop with prefetching.
+ *
+ * Iterates all active slots across all pages. For each active slot, prefetches
+ * the next active slot at (slot_ptr + prefetch_offset), then calls the visitor.
+ * The visitor returns false to stop early.
+ *
+ * @tparam VisitFn bool(IObject* obj, size_t slot_index) - return false to stop.
+ */
+template <class VisitFn>
+void Hive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
@@ -456,7 +475,7 @@ void Hive::for_each(void* context, VisitorFn visitor) const
             uint64_t bits = page.active_bits[w];
             while (bits) {
                 unsigned b = bitscan_forward64(bits);
-                bits &= bits - 1; // clear lowest set bit
+                bits &= bits - 1;
                 size_t i = w * 64 + b;
                 // Re-check the live bit: a visitor callback may have triggered
                 // hive_destroy (via unref) which clears the bit for a slot in
@@ -464,13 +483,41 @@ void Hive::for_each(void* context, VisitorFn visitor) const
                 if (!(page.active_bits[w] & (uint64_t(1) << b))) {
                     continue;
                 }
-                auto* obj = static_cast<IObject*>(slot_ptr(page, i));
-                if (!visitor(context, *obj)) {
+                // Prefetch next active slot.
+                uint64_t remaining = bits;
+                if (remaining) {
+                    unsigned nb = bitscan_forward64(remaining);
+                    prefetch_line(static_cast<char*>(slot_ptr(page, w * 64 + nb)) + prefetch_offset);
+                } else if (w + 1 < num_words) {
+                    for (size_t nw = w + 1; nw < num_words; ++nw) {
+                        uint64_t next_bits = page.active_bits[nw];
+                        if (next_bits) {
+                            prefetch_line(
+                                static_cast<char*>(slot_ptr(page, nw * 64 + bitscan_forward64(next_bits))) +
+                                prefetch_offset);
+                            break;
+                        }
+                    }
+                }
+                if (!visit(slot_ptr(page, i))) {
                     return;
                 }
             }
         }
     }
+}
+
+void Hive::for_each(void* context, VisitorFn visitor) const
+{
+    scan_active(0, [&](void* slot) { return visitor(context, *static_cast<IObject*>(slot)); });
+}
+
+void Hive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
+{
+    scan_active(state_offset, [&](void* slot) {
+        auto* obj = static_cast<IObject*>(slot);
+        return visitor(context, *obj, reinterpret_cast<char*>(slot) + state_offset);
+    });
 }
 
 } // namespace velk

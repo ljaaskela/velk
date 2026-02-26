@@ -1,5 +1,6 @@
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/api/hive/iterate.h>
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
@@ -419,4 +420,108 @@ TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
     ASSERT_NE(nullptr, meta);
     auto prop = meta->get_property("x");
     EXPECT_TRUE(prop);
+}
+
+// --- for_each_state and for_each_hive tests ---
+
+TEST_F(HiveTest, ForEachStateVisitsAllWithCorrectValues)
+{
+    auto hive = registry_->get_hive(HiveWidget::class_id());
+    std::vector<IObject::Ptr> refs;
+    for (int i = 0; i < 5; ++i) {
+        auto obj = hive->add();
+        auto* ps = interface_cast<IPropertyState>(obj);
+        auto* s = ps->get_property_state<IHiveWidget>();
+        s->x = static_cast<float>(i * 10);
+        s->y = static_cast<float>(i * 20);
+        refs.push_back(std::move(obj));
+    }
+
+    ptrdiff_t offset = detail::compute_state_offset(*hive, IHiveWidget::UID);
+    ASSERT_GE(offset, 0);
+
+    float sum_x = 0.f;
+    hive->for_each_state(offset, &sum_x, [](void* ctx, IObject&, void* state) -> bool {
+        auto& s = *static_cast<IHiveWidget::State*>(state);
+        *static_cast<float*>(ctx) += s.x;
+        return true;
+    });
+    // sum_x should be 0 + 10 + 20 + 30 + 40 = 100
+    EXPECT_FLOAT_EQ(100.f, sum_x);
+
+    // Clean up
+    for (auto& r : refs) {
+        hive->remove(*r);
+    }
+}
+
+TEST_F(HiveTest, ForEachStateEarlyTermination)
+{
+    auto hive = fresh_hive();
+    std::vector<IObject::Ptr> refs;
+    for (int i = 0; i < 5; ++i) {
+        refs.push_back(hive->add());
+    }
+
+    ptrdiff_t offset = detail::compute_state_offset(*hive, IHiveGadget::UID);
+    ASSERT_GE(offset, 0);
+
+    int count = 0;
+    hive->for_each_state(offset, &count, [](void* ctx, IObject&, void*) -> bool {
+        ++(*static_cast<int*>(ctx));
+        return false; // stop after first
+    });
+    EXPECT_EQ(1, count);
+}
+
+TEST_F(HiveTest, ForEachStateEmptyHive)
+{
+    auto hive = fresh_hive();
+
+    // Empty hive: for_each_state with any offset should visit nothing.
+    int count = 0;
+    hive->for_each_state(0, &count, [](void* ctx, IObject&, void*) -> bool {
+        ++(*static_cast<int*>(ctx));
+        return true;
+    });
+    EXPECT_EQ(0, count);
+}
+
+TEST_F(HiveTest, ForEachHiveTypedAccess)
+{
+    auto hive = registry_->get_hive(HiveWidget::class_id());
+    std::vector<IObject::Ptr> refs;
+    for (int i = 0; i < 3; ++i) {
+        auto obj = hive->add();
+        auto* ps = interface_cast<IPropertyState>(obj);
+        auto* s = ps->get_property_state<IHiveWidget>();
+        s->x = static_cast<float>(i + 1);
+        refs.push_back(std::move(obj));
+    }
+
+    float sum = 0.f;
+    int count = 0;
+    for_each_hive<IHiveWidget>(*hive, [&](IObject&, IHiveWidget::State& s) {
+        sum += s.x;
+        ++count;
+        return true;
+    });
+    // x values: 1, 2, 3
+    EXPECT_FLOAT_EQ(6.f, sum);
+    EXPECT_EQ(3, count);
+
+    for (auto& r : refs) {
+        hive->remove(*r);
+    }
+}
+
+TEST_F(HiveTest, ForEachHiveOnEmptyHive)
+{
+    auto hive = fresh_hive();
+    int count = 0;
+    for_each_hive<IHiveGadget>(*hive, [&](IObject&, IHiveGadget::State&) {
+        ++count;
+        return true;
+    });
+    EXPECT_EQ(0, count);
 }

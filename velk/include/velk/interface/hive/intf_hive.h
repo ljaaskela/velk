@@ -3,6 +3,8 @@
 
 #include <velk/interface/intf_object.h>
 
+#include <cstddef>
+
 namespace velk {
 
 namespace ClassId {
@@ -48,6 +50,29 @@ public:
      */
     using VisitorFn = bool (*)(void* context, IObject& object);
     virtual void for_each(void* context, VisitorFn visitor) const = 0;
+
+    /**
+     * @brief Iterates all live objects, passing a pre-computed state pointer.
+     *
+     * All objects in a hive share the same class layout, so the byte offset
+     * from object start to a given interface's State struct is constant. By
+     * computing the offset once and passing it here, the visitor receives a
+     * direct state pointer via pointer arithmetic, avoiding per-element
+     * interface_cast and virtual get_property_state() calls. This is
+     * useful for tight loops where the visitor body is cheap relative to
+     * the virtual dispatch overhead (bulk reads, writes, physics ticks).
+     *
+     * Prefer the typed for_each_hive<T> wrapper in api/hive/iterate.h,
+     * which computes the offset automatically. Use this method directly
+     * when you need to cache the offset across repeated iterations or
+     * pass through a C-style context pointer.
+     *
+     * @param state_offset Byte offset from object start to the state struct.
+     * @param context Opaque pointer forwarded to the visitor.
+     * @param visitor Called with (context, object, state_ptr). Return false to stop early.
+     */
+    using StateVisitorFn = bool (*)(void* context, IObject& object, void* state);
+    virtual void for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const = 0;
 };
 
 } // namespace velk
