@@ -4,6 +4,7 @@
 #include <velk/interface/hive/intf_hive_store.h>
 #include <velk/interface/intf_metadata.h>
 
+#include <limits>
 #include <type_traits>
 
 namespace velk {
