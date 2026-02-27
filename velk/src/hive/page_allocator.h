@@ -1,6 +1,8 @@
 #ifndef VELK_PAGE_ALLOCATOR_H
 #define VELK_PAGE_ALLOCATOR_H
 
+#include <velk/interface/hive/intf_hive.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -72,18 +74,30 @@ inline size_t bitmask_words(size_t capacity)
 }
 
 /** @brief Returns the page capacity for a given page index. */
-inline size_t next_page_capacity(size_t page_count)
+inline size_t next_page_capacity(const HivePageCapacity& capacity, size_t page_count)
 {
     switch (page_count) {
     case 0:
-        return 16;
+        return capacity.page_1;
     case 1:
-        return 64;
+        return capacity.page_2;
     case 2:
-        return 256;
+        return capacity.page_3;
     default:
-        return 1024;
+        return capacity.page_n;
     }
+}
+
+inline HivePageCapacity check_capacity(const HivePageCapacity& capacity)
+{
+    auto max = [](const size_t& lhs, const size_t& rhs) noexcept { return lhs < rhs ? rhs : lhs; };
+
+    auto rv = capacity;
+    rv.page_1 = max(rv.page_1, size_t(1));
+    rv.page_2 = max(rv.page_2, rv.page_1);
+    rv.page_3 = max(rv.page_3, rv.page_2);
+    rv.page_n = max(rv.page_n, rv.page_3);
+    return rv;
 }
 
 /** @brief Builds an intrusive freelist through slot memory. */
@@ -114,24 +128,6 @@ inline size_t pop_free_slot(void* slots, size_t slot_size, size_t& free_head)
     free_head = next;
     return index;
 }
-
-/**
- * @brief Page for simple pool allocators (RawHiveImpl).
- *
- * Stores a contiguous array of slots with an active bitmask and
- * intrusive freelist. No reference counting, zombie, or orphan
- * management (those belong to ObjectHive's HivePage).
- */
-struct SimpleHivePage
-{
-    void* allocation{nullptr};
-    uint64_t* active_bits{nullptr};
-    void* slots{nullptr};
-    size_t capacity{0};
-    size_t free_head{PAGE_SENTINEL};
-    size_t live_count{0};
-    size_t slot_size{0};
-};
 
 } // namespace velk
 

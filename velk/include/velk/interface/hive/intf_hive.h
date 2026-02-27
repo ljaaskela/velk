@@ -15,6 +15,33 @@ inline constexpr Uid RawHive{"a7e1c3f0-5b29-4d8a-9f1e-3c7d2a8b4e60"};
 } // namespace ClassId
 
 /**
+ * @brief The HivePageCapacity struct can be used to configure the allocation policy for each page in a hive.
+ */
+struct HivePageCapacity
+{
+    /**
+     *  @brief Number of elements on page 1.
+     *  @default 16
+     */
+    size_t page_1{16u};
+    /**
+     *  @brief Number of elements on page 2.
+     *  @default 64
+     */
+    size_t page_2{64u};
+    /**
+     *  @brief Number of elements on page 3.
+     *  @default 256
+     */
+    size_t page_3{256u};
+    /**
+     *  @brief Number of elements on page 4+.
+     *  @default 1024
+     */
+    size_t page_n{1024u};
+};
+
+/**
  * @brief Common base interface for all hive types.
  *
  * Provides element UID, size, and empty queries shared by both
@@ -31,6 +58,19 @@ public:
 
     /** @brief Returns true if the hive contains no elements. */
     virtual bool empty() const = 0;
+
+    /** @brief Returns the current page allocation policy. */
+    virtual HivePageCapacity get_page_capacity() const = 0;
+
+    /**
+     *  @brief Sets the allocation policy for new pages. Requires that each page as at least one element and
+     *         that at least as many items as the previous page.
+     *  @note Any changes will only affect new pages, it will have no effect on existing allocations.
+     *        Typically this function should be called immediately after creating a hive, before instantiating
+     *        any objects to it.
+     *  @param capacity The page allocation policy to set.
+     */
+    virtual void set_page_capacity(const HivePageCapacity& capacity) = 0;
 };
 
 /**

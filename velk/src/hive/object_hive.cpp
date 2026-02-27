@@ -5,8 +5,6 @@
 #include <velk/api/velk.h>
 #include <velk/interface/intf_metadata.h>
 
-#include <new>
-
 namespace velk {
 
 /**
@@ -197,6 +195,16 @@ bool ObjectHive::empty() const
     return live_count_ == 0;
 }
 
+HivePageCapacity ObjectHive::get_page_capacity() const
+{
+    return capacity_;
+}
+
+void ObjectHive::set_page_capacity(const HivePageCapacity& capacity)
+{
+    capacity_ = check_capacity(capacity);
+}
+
 void* ObjectHive::slot_ptr(HivePage& page, size_t index) const
 {
     return static_cast<char*>(page.slots) + index * slot_size_;
@@ -265,7 +273,7 @@ void ObjectHive::push_free(HivePage& page, size_t index, size_t slot_sz)
 
 size_t ObjectHive::next_page_capacity() const
 {
-    return ::velk::next_page_capacity(pages_.size());
+    return ::velk::next_page_capacity(capacity_, pages_.size());
 }
 
 bool ObjectHive::find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const

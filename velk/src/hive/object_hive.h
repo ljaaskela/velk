@@ -64,6 +64,9 @@ public:
     Uid get_element_uid() const override;
     size_t size() const override;
     bool empty() const override;
+    HivePageCapacity get_page_capacity() const override;
+    void set_page_capacity(const HivePageCapacity& capacity) override;
+
     IObject::Ptr add() override;
     ReturnValue remove(IObject& object) override;
     bool contains(const IObject& object) const override;
@@ -102,6 +105,7 @@ private:
     size_t live_count_{0};
     HivePage* current_page_{nullptr}; ///< Hint: last page with free slots.
     std::vector<std::unique_ptr<HivePage>> pages_;
+    HivePageCapacity capacity_;
 };
 
 } // namespace velk

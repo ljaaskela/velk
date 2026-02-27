@@ -15,6 +15,7 @@ ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
         return ReturnValue::Fail;
     }
     if (type == Deferred) {
+        // Create a clone with value "from" and store it in the deferred callback
         auto clone = data_->clone();
         if (clone && clone->copy_from(from) == ReturnValue::Success) {
             instance().queue_deferred_property({get_self<IPropertyInternal>(), std::move(clone)});
@@ -22,6 +23,7 @@ ReturnValue PropertyImpl::set_value(const IAny& from, InvokeType type)
         }
         return ReturnValue::Fail;
     }
+    // type == Immediate, just copy the value
     auto ret = data_->copy_from(from);
     if (ret == ReturnValue::Success && !external_) {
         invoke_event(on_changed(), data_.get());

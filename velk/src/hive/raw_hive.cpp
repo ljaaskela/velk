@@ -36,14 +36,24 @@ bool RawHiveImpl::empty() const
     return live_count_ == 0;
 }
 
-void* RawHiveImpl::slot_ptr(const SimpleHivePage& page, size_t index) const
+HivePageCapacity RawHiveImpl::get_page_capacity() const
+{
+    return capacity_;
+}
+
+void RawHiveImpl::set_page_capacity(const HivePageCapacity& capacity)
+{
+    capacity_ = check_capacity(capacity);
+}
+
+void* RawHiveImpl::slot_ptr(const RawHivePage& page, size_t index) const
 {
     return static_cast<char*>(page.slots) + index * slot_size_;
 }
 
 void RawHiveImpl::alloc_page(size_t capacity)
 {
-    auto page = std::make_unique<SimpleHivePage>();
+    auto page = std::make_unique<RawHivePage>();
     page->capacity = capacity;
     page->slot_size = slot_size_;
 
@@ -74,7 +84,7 @@ void* RawHiveImpl::allocate()
 {
     std::lock_guard<std::shared_mutex> lock(mutex_);
 
-    SimpleHivePage* target = nullptr;
+    RawHivePage* target = nullptr;
     if (current_page_ && current_page_->free_head != PAGE_SENTINEL) {
         target = current_page_;
     } else {
@@ -87,7 +97,7 @@ void* RawHiveImpl::allocate()
     }
 
     if (!target) {
-        alloc_page(next_page_capacity(pages_.size()));
+        alloc_page(next_page_capacity(capacity_, pages_.size()));
         target = pages_.back().get();
     }
 

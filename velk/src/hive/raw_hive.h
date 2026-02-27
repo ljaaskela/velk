@@ -14,6 +14,24 @@
 namespace velk {
 
 /**
+ * @brief Page for simple pool allocators (RawHiveImpl).
+ *
+ * Stores a contiguous array of slots with an active bitmask and
+ * intrusive freelist. No reference counting, zombie, or orphan
+ * management (those belong to ObjectHive's HivePage).
+ */
+struct RawHivePage
+{
+    void* allocation{nullptr};
+    uint64_t* active_bits{nullptr};
+    void* slots{nullptr};
+    size_t capacity{0};
+    size_t free_head{PAGE_SENTINEL};
+    size_t live_count{0};
+    size_t slot_size{0};
+};
+
+/**
  * @brief Concrete implementation of IRawHive.
  *
  * Provides type-erased slot allocation using the same SimpleHivePage
@@ -37,6 +55,9 @@ public:
     size_t size() const override;
     bool empty() const override;
 
+    HivePageCapacity get_page_capacity() const override;
+    void set_page_capacity(const HivePageCapacity& capacity) override;
+
     // IRawHive overrides
     void* allocate() override;
     void deallocate(void* ptr) override;
@@ -45,7 +66,7 @@ public:
     void clear(void* context, DestroyFn destroy) override;
 
 private:
-    void* slot_ptr(const SimpleHivePage& page, size_t index) const;
+    void* slot_ptr(const RawHivePage& page, size_t index) const;
     void alloc_page(size_t capacity);
 
     mutable std::shared_mutex mutex_;
@@ -53,8 +74,9 @@ private:
     size_t slot_size_{0};
     size_t slot_align_{0};
     size_t live_count_{0};
-    SimpleHivePage* current_page_{nullptr};
-    std::vector<std::unique_ptr<SimpleHivePage>> pages_;
+    RawHivePage* current_page_{nullptr};
+    std::vector<std::unique_ptr<RawHivePage>> pages_;
+    HivePageCapacity capacity_;
 };
 
 } // namespace velk
