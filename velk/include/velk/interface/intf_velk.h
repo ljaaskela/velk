@@ -15,6 +15,8 @@
 
 namespace velk {
 
+class IMetadata;
+
 /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
 struct DeferredArgs : public ::velk::NoCopyMove
 {
@@ -114,13 +116,18 @@ public:
      */
     virtual void update(Duration time = {}) const = 0;
 
+    /** @brief Creates a MetadataContainer for the given class info and owner. */
+    virtual IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
+    /** @brief Destroys a MetadataContainer previously created by create_metadata_container. */
+    virtual void destroy_metadata_container(IMetadata* meta) const = 0;
+
     /** @brief Creates an instance of a registered type by its UID. */
-    virtual IInterface::Ptr create(Uid uid) const = 0;
+    virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;
     /** @brief Creates a new IAny value container for the given type UID. */
     virtual IAny::Ptr create_any(Uid type) const = 0;
     /** @brief Creates a new property instance with the given type and optional initial value. */
     virtual IProperty::Ptr create_property(Uid type, const IAny::Ptr& value,
-                                           int32_t flags = ObjectFlags::None) const = 0;
+                                           uint32_t flags = ObjectFlags::None) const = 0;
     /** @brief Creates a new future/promise pair. */
     virtual IFuture::Ptr create_future() const = 0;
     /** @brief Creates a callback-backed IFunction from a raw function pointer. */
@@ -133,7 +140,7 @@ public:
      * @tparam T The value type for the property.
      */
     template <class T>
-    IProperty::Ptr create_property(const IAny::Ptr& value = {}, int32_t flags = ObjectFlags::None) const
+    IProperty::Ptr create_property(const IAny::Ptr& value = {}, uint32_t flags = ObjectFlags::None) const
     {
         return create_property(type_uid<T>(), value, flags);
     }
@@ -142,9 +149,9 @@ public:
      * @tparam T The target interface type.
      */
     template <class T>
-    typename T::Ptr create(Uid uid) const
+    typename T::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const
     {
-        return interface_pointer_cast<T>(create(uid));
+        return interface_pointer_cast<T>(create(uid, flags));
     }
 };
 

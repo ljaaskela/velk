@@ -16,8 +16,8 @@ namespace velk::detail {
 /** @brief Constructs an IObject::Ptr from a control block, or nullptr if expired. */
 inline IObject::Ptr make_self_ptr(control_block* block)
 {
-    return block && block->ptr && block->strong.load(std::memory_order_acquire)
-               ? IObject::Ptr(static_cast<IObject*>(block->ptr), block)
+    return block && block->get_ptr() && block->strong.load(std::memory_order_acquire)
+               ? IObject::Ptr(static_cast<IObject*>(block->get_ptr()), block)
                : nullptr;
 }
 
@@ -27,13 +27,14 @@ namespace velk::ext {
 
 /** @brief Creates a new T, sets self-pointer, and wraps it in a shared_ptr. */
 template <class T>
-IObject::Ptr make_object()
+IObject::Ptr make_object(uint32_t flags = ObjectFlags::None)
 {
     auto* obj = new T;
-    IObject::Ptr result(static_cast<IObject*>(obj), obj->get_block(), adopt_ref);
-    auto* block = obj->get_block();
-    if (block && !block->ptr) {
-        block->ptr = result.get();
+    detail::BlockAccess::set_flags(*obj, flags);
+    auto* block = detail::BlockAccess::get(*obj);
+    IObject::Ptr result(static_cast<IObject*>(obj), block, adopt_ref);
+    if (block && !block->get_ptr()) {
+        block->set_ptr(result.get());
     }
     return result;
 }
@@ -60,7 +61,27 @@ public:
     ~ObjectFactory() override = default;
 
 public:
-    IObject::Ptr create_instance() const override { return make_object<FinalClass>(); }
+    IObject::Ptr create_instance(uint32_t flags = ObjectFlags::None) const override
+    {
+        return make_object<FinalClass>(flags);
+    }
+    size_t get_instance_size() const override { return sizeof(FinalClass); }
+    size_t get_instance_alignment() const override { return alignof(FinalClass); }
+    IObject* construct_in_place(void* location, control_block* block = nullptr,
+                                uint32_t flags = ObjectFlags::None) const override
+    {
+        auto* obj = new (location) FinalClass();
+        detail::BlockAccess::set_flags(*obj, flags);
+        if (block) {
+            detail::dealloc_control_block(detail::BlockAccess::get(*obj));
+            detail::BlockAccess::replace(*obj, block);
+        }
+        return static_cast<IObject*>(obj);
+    }
+    void destroy_in_place(void* location) const override
+    {
+        static_cast<FinalClass*>(location)->~FinalClass();
+    }
 };
 
 /**
@@ -142,6 +163,8 @@ public: // IObject
 
     /** @brief Returns a shared_ptr to this object, or empty if expired. */
     IObject::Ptr get_self() const override { return detail::make_self_ptr(this->get_block()); }
+
+    uint32_t get_object_flags() const override { return this->get_object_data().flags; }
 
     template <class T>
     typename T::Ptr get_self() const

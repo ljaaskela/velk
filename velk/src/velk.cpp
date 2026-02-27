@@ -64,16 +64,25 @@ struct block_pool
 {
     control_block* head{nullptr};
     int32_t size{0};
+    external_control_block* ext_head{nullptr};
+    int32_t ext_size{0};
 };
 
 void drain_pool(block_pool* pool)
 {
     while (pool->head) {
-        auto* next = static_cast<control_block*>(pool->head->ptr);
+        auto* next = static_cast<control_block*>(pool->head->get_ptr());
         delete pool->head;
         pool->head = next;
     }
     pool->size = 0;
+    while (pool->ext_head) {
+        auto* next =
+            static_cast<external_control_block*>(static_cast<control_block*>(pool->ext_head->get_ptr()));
+        delete pool->ext_head;
+        pool->ext_head = next;
+    }
+    pool->ext_size = 0;
 }
 
 #ifdef _WIN32
@@ -241,29 +250,61 @@ block_pool* get_pool_ptr()
 
 VELK_EXPORT control_block* detail::alloc_control_block(bool external)
 {
-    // External blocks (24 bytes) are not pooled; the pool only holds 16-byte
-    // control_blocks. Both paths go through the DLL to avoid cross-module
-    // heap mismatches.
     if (external) {
-        return new external_control_block{{1, 1, nullptr}, nullptr};
+        auto* pool = get_pool_ptr();
+        if (pool && pool->ext_head) {
+            auto* b = pool->ext_head;
+            pool->ext_head = static_cast<external_control_block*>(static_cast<control_block*>(b->get_ptr()));
+            --pool->ext_size;
+            b->strong.store(1, std::memory_order_relaxed);
+            b->weak.store(1, std::memory_order_relaxed);
+            b->set_ptr(nullptr);
+            b->destroy = nullptr;
+            return b;
+        }
+        auto* b = new external_control_block;
+        b->strong.store(1, std::memory_order_relaxed);
+        return b;
     }
     auto* pool = get_pool_ptr();
     if (pool && pool->head) {
         auto* b = pool->head;
-        pool->head = static_cast<control_block*>(b->ptr);
+        pool->head = static_cast<control_block*>(b->get_ptr());
         --pool->size;
         b->strong.store(1, std::memory_order_relaxed);
         b->weak.store(1, std::memory_order_relaxed);
-        b->ptr = nullptr;
+        b->set_ptr(nullptr);
         return b;
     }
-    return new control_block{1, 1, nullptr};
+    auto* b = new control_block;
+    b->strong.store(1, std::memory_order_relaxed);
+    return b;
 }
 
 VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool external)
 {
+    // Embedded blocks live inside a larger allocation and must not be deleted or pooled.
+    // When external+embedded, call the destroy callback as a "weak dealloc" notification
+    // so the owning container (e.g. Hive) can track outstanding weak references.
+    if (block->is_embedded()) {
+        if (external) {
+            auto* ecb = static_cast<external_control_block*>(block);
+            if (ecb->destroy) {
+                ecb->destroy(ecb);
+            }
+        }
+        return;
+    }
+
     if (external) {
-        delete static_cast<external_control_block*>(block);
+        auto* pool = get_pool_ptr();
+        if (!pool || pool->ext_size >= block_pool_max_size) {
+            delete static_cast<external_control_block*>(block);
+            return;
+        }
+        block->set_ptr(pool->ext_head);
+        pool->ext_head = static_cast<external_control_block*>(block);
+        ++pool->ext_size;
         return;
     }
     auto* pool = get_pool_ptr();
@@ -271,7 +312,7 @@ VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool extern
         delete block;
         return;
     }
-    block->ptr = pool->head;
+    block->set_ptr(pool->head);
     pool->head = block;
     ++pool->size;
 }
@@ -281,13 +322,27 @@ VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool extern
 VELK_EXPORT control_block* detail::alloc_control_block(bool external)
 {
     if (external) {
-        return new external_control_block{{1, 1, nullptr}, nullptr};
+        auto* b = new external_control_block;
+        b->strong.store(1, std::memory_order_relaxed);
+        return b;
     }
-    return new control_block{1, 1, nullptr};
+    auto* b = new control_block;
+    b->strong.store(1, std::memory_order_relaxed);
+    return b;
 }
 
 VELK_EXPORT void detail::dealloc_control_block(control_block* block, bool external)
 {
+    if (block->is_embedded()) {
+        if (external) {
+            auto* ecb = static_cast<external_control_block*>(block);
+            if (ecb->destroy) {
+                ecb->destroy(ecb);
+            }
+        }
+        return;
+    }
+
     if (external) {
         delete static_cast<external_control_block*>(block);
     } else {

@@ -493,7 +493,7 @@ void demo_sizes()
     cout << "  RefCountedDispatch<1>    " << sizeof(ext::RefCountedDispatch<IMyWidget>) << endl;
     cout << "  ObjectCore<X, 1 intf>    " << sizeof(ext::ObjectCore<MyWidget, IMyWidget>) << endl;
     cout << "  ObjectCore<X, 3 intfs>   "
-         << sizeof(ext::ObjectCore<MyWidget, IMetadataContainer, IMyWidget, ISerializable>) << endl;
+         << sizeof(ext::ObjectCore<MyWidget, IMetadata, IMyWidget, ISerializable>) << endl;
 
     // Any types
     cout << "Any types:" << endl;

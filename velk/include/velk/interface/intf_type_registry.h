@@ -21,6 +21,8 @@ public:
     virtual ReturnValue unregister_type(const IObjectFactory& factory) = 0;
     /** @brief Returns the ClassInfo for a registered type, or nullptr if not found. */
     virtual const ClassInfo* get_class_info(Uid classUid) const = 0;
+    /** @brief Returns the factory for a registered type, or nullptr if not found. */
+    virtual const IObjectFactory* find_factory(Uid classUid) const = 0;
 
     /**
      * @brief Registers a type using its static get_factory() method.

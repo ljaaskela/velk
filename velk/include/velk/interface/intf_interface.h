@@ -132,60 +132,88 @@ protected:
 };
 
 /**
- * @brief Casts a shared IInterface pointer to a derived interface type.
+ * @brief Casts a shared pointer to a derived interface type.
  * @tparam T The target interface type.
+ * @tparam U Deduced element type of the source shared_ptr (must be non-const).
  * @param obj The source pointer.
  * @return A shared_ptr<T> if the interface is supported, nullptr otherwise.
+ *
+ * When T is U or a base of U, the cast is a no-op (no virtual dispatch).
  */
-template <class T>
-typename T::Ptr interface_pointer_cast(const IInterface::Ptr& obj)
+template <class T, class U, class = std::enable_if_t<!std::is_const_v<U>>>
+typename T::Ptr interface_pointer_cast(const shared_ptr<U>& obj)
 {
-    if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
-        return typename T::Ptr(p, obj.block());
+    if constexpr (std::is_base_of_v<T, U>) {
+        return typename T::Ptr(obj.get(), obj.block());
+    } else {
+        if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
+            return typename T::Ptr(p, obj.block());
+        }
+        return {};
     }
-    return {};
 }
 
 /**
- * @brief Casts a shared const IInterface pointer to a derived const interface type.
+ * @brief Casts a shared const pointer to a derived const interface type.
  * @tparam T The target interface type.
  * @tparam U Deduced element type of the shared_ptr. Must be const-qualified (SFINAE).
  * @param obj The source pointer.
  * @return A shared_ptr<const T> if the interface is supported, nullptr otherwise.
+ *
+ * When T is U or a base of U, the cast is a no-op (no virtual dispatch).
  */
 template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 typename T::ConstPtr interface_pointer_cast(const shared_ptr<U>& obj)
 {
-    if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
-        return typename T::ConstPtr(p, obj.block());
+    if constexpr (std::is_base_of_v<T, std::remove_const_t<U>>) {
+        return typename T::ConstPtr(obj.get(), obj.block());
+    } else {
+        if (auto* p = obj ? obj->template get_interface<T>() : nullptr) {
+            return typename T::ConstPtr(p, obj.block());
+        }
+        return {};
     }
-    return {};
 }
 
 /**
- * @brief Casts an IInterface pointer to a derived interface type.
+ * @brief Casts a pointer to a derived interface type.
  * @tparam T The target interface type.
+ * @tparam U Deduced source type (must derive from IInterface).
  * @param obj The source pointer.
  * @return A pointer to T if the interface is supported, nullptr otherwise.
+ *
+ * When T is U or a base of U, the cast is a no-op (no virtual dispatch).
  */
-template <class T>
-T* interface_cast(IInterface* obj)
+template <class T, class U, class = std::enable_if_t<!std::is_const_v<U>>>
+T* interface_cast(U* obj)
 {
-    return obj ? obj->template get_interface<T>() : nullptr;
+    if constexpr (std::is_base_of_v<T, U>) {
+        return obj;
+    } else {
+        return obj ? obj->template get_interface<T>() : nullptr;
+    }
+}
+
+/** @copydoc interface_cast */
+template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
+const T* interface_cast(U* obj)
+{
+    if constexpr (std::is_base_of_v<T, std::remove_const_t<U>>) {
+        return obj;
+    } else {
+        return obj ? obj->template get_interface<T>() : nullptr;
+    }
 }
 
 /** @copydoc interface_cast(IInterface*) */
-template <class T>
-const T* interface_cast(const IInterface* obj)
+template <class T, class U, class = std::enable_if_t<!std::is_const_v<U>>>
+T* interface_cast(const shared_ptr<U>& obj)
 {
-    return obj ? obj->template get_interface<T>() : nullptr;
-}
-
-/** @copydoc interface_cast(IInterface*) */
-template <class T>
-T* interface_cast(const IInterface::Ptr& obj)
-{
-    return obj ? obj->template get_interface<T>() : nullptr;
+    if constexpr (std::is_base_of_v<T, U>) {
+        return obj.get();
+    } else {
+        return obj ? obj->template get_interface<T>() : nullptr;
+    }
 }
 
 /**
@@ -195,7 +223,11 @@ T* interface_cast(const IInterface::Ptr& obj)
 template <class T, class U, class = std::enable_if_t<std::is_const_v<U>>>
 const T* interface_cast(const shared_ptr<U>& obj)
 {
-    return obj ? obj->template get_interface<T>() : nullptr;
+    if constexpr (std::is_base_of_v<T, std::remove_const_t<U>>) {
+        return obj.get();
+    } else {
+        return obj ? obj->template get_interface<T>() : nullptr;
+    }
 }
 
 } // namespace velk

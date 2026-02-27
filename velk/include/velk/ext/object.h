@@ -2,6 +2,7 @@
 #define VELK_EXT_OBJECT_H
 
 #include <velk/api/property.h>
+#include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 #include <velk/ext/metadata.h>
 
@@ -13,16 +14,26 @@ namespace velk::detail {
  * @brief Non-template base holding IMetadata pointer and delegation helpers.
  *
  * Avoids duplicating the metadata delegation logic in every Object<> instantiation.
+ * The MetadataContainer is created lazily on first runtime metadata access.
+ * ClassInfo and owner are passed in from the Object template rather than stored.
  */
 class ObjectMetadataBase
 {
 protected:
-    ~ObjectMetadataBase() { delete meta_; }
-
-    array_view<MemberDesc> meta_get_static_metadata() const
+    ~ObjectMetadataBase()
     {
-        return meta_ ? meta_->get_static_metadata() : array_view<MemberDesc>{};
+        if (meta_) {
+            instance().destroy_metadata_container(meta_);
+        }
     }
+
+    void ensure_metadata(const ClassInfo& info, IInterface* owner) const
+    {
+        if (!meta_) {
+            meta_ = instance().create_metadata_container(info, owner);
+        }
+    }
+
     IProperty::Ptr meta_get_property(string_view name) const
     {
         return meta_ ? meta_->get_property(name) : nullptr;
@@ -38,14 +49,8 @@ protected:
             meta_->notify(kind, interfaceUid, notification);
         }
     }
-    void meta_set_container(IMetadata* metadata)
-    {
-        if (!meta_) {
-            meta_ = metadata;
-        }
-    }
 
-    IMetadata* meta_{};
+    mutable IMetadata* meta_{};
 };
 
 } // namespace velk::detail
@@ -57,13 +62,13 @@ namespace velk::ext {
  *
  * Extends ObjectCore with IMetadata support. Metadata is automatically collected
  * from all Interfaces that declare metadata through VELK_INTERFACE.
+ * The MetadataContainer is created lazily on first runtime metadata access.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template <class FinalClass, class... Interfaces>
-class Object : public ObjectCore<FinalClass, IMetadataContainer, Interfaces...>,
-               protected detail::ObjectMetadataBase
+class Object : public ObjectCore<FinalClass, IMetadata, Interfaces...>, protected detail::ObjectMetadataBase
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
@@ -73,18 +78,36 @@ public:
     Object() = default;
     ~Object() override = default;
 
-public: // IMetadata overrides
-    array_view<MemberDesc> get_static_metadata() const override { return meta_get_static_metadata(); }
-    IProperty::Ptr get_property(string_view name) const override { return meta_get_property(name); }
-    IEvent::Ptr get_event(string_view name) const override { return meta_get_event(name); }
-    IFunction::Ptr get_function(string_view name) const override { return meta_get_function(name); }
-    void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
+private:
+    void ensure_meta() const
     {
-        meta_notify(kind, interfaceUid, notification);
+        ensure_metadata(FinalClass::get_factory().get_class_info(),
+                        static_cast<IInterface*>(const_cast<IObject*>(static_cast<const IObject*>(this))));
     }
 
-public: // IMetadataContainer override
-    void set_metadata_container(IMetadata* metadata) override { meta_set_container(metadata); }
+public: // IMetadata overrides
+    array_view<MemberDesc> get_static_metadata() const override { return class_metadata; }
+    IProperty::Ptr get_property(string_view name) const override
+    {
+        ensure_meta();
+        return meta_get_property(name);
+    }
+    IEvent::Ptr get_event(string_view name) const override
+    {
+        ensure_meta();
+        return meta_get_event(name);
+    }
+    IFunction::Ptr get_function(string_view name) const override
+    {
+        ensure_meta();
+        return meta_get_function(name);
+    }
+    void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
+    {
+        // No need to ensure_meta(). If container has not been initialized there won't be anything
+        // to notify either.
+        meta_notify(kind, interfaceUid, notification);
+    }
 
 public: // IPropertyState override
     /** @brief Returns a pointer to the State struct for the given interface UID. */

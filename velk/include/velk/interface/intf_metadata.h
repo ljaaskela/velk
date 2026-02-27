@@ -174,18 +174,6 @@ inline IFunction::Ptr get_function(const IMetadata* meta, string_view name)
 }
 
 /**
- * @brief Abstract interface for runtime metadata storage.
- */
-class IMetadataContainer : public Interface<IMetadataContainer, IMetadata>
-{
-public:
-    /**
-     * @brief Set metadata container. Called internally by the library.
-     */
-    virtual void set_metadata_container(IMetadata* metadata) = 0;
-};
-
-/**
  * @brief Invoke a function from target object metadata.
  * @param o The object to query for the function.
  * @param name Name of the function to query.
@@ -376,7 +364,7 @@ State& default_state()
  * static constexpr PropertyKind pk = detail::PropBind<State, &State::width>::kind;
  * @endcode
  */
-template <class State, auto Mem, int32_t Flags = 0>
+template <class State, auto Mem, uint32_t Flags = 0>
 struct PropBind
 {
     using value_type = decltype(member_type_helper(Mem)); ///< The member's value type.

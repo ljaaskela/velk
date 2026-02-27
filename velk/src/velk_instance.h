@@ -4,6 +4,7 @@
 #include "plugin_registry.h"
 #include "type_registry.h"
 
+#include <velk/api/hive/raw_hive.h>
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_velk.h>
@@ -12,6 +13,8 @@
 #include <vector>
 
 namespace velk {
+
+class MetadataContainer;
 
 /**
  * @brief Singleton implementation of IVelk.
@@ -35,9 +38,11 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
-    IInterface::Ptr create(Uid uid) const override;
+    IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
+    void destroy_metadata_container(IMetadata* meta) const override;
+    IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const override;
     IAny::Ptr create_any(Uid type) const override;
-    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, int32_t flags) const override;
+    IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const override;
     void queue_deferred_tasks(array_view<DeferredTask> tasks) const override;
     void queue_deferred_property(DeferredPropertySet task) const override;
     void update(Duration time) const override;
@@ -55,14 +60,16 @@ private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
     void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
 
-    TypeRegistry type_registry_;                       ///< Registry of class factories.
-    PluginRegistry plugin_registry_;                   ///< Registry of loaded plugins.
-    mutable std::mutex deferred_mutex_;                ///< Guards @c deferred_queue_.
+    mutable RawHive<MetadataContainer>
+        metadata_hive_;                 ///< Pool allocator for MetadataContainers (destroyed last).
+    LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
+    ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
+    TypeRegistry type_registry_;        ///< Registry of class factories.
+    PluginRegistry plugin_registry_;    ///< Registry of loaded plugins.
+    mutable std::mutex deferred_mutex_; ///< Guards @c deferred_queue_.
     mutable std::vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.
     mutable std::vector<DeferredPropertySet>
-        deferred_property_queue_;    ///< Property sets queued for the next update() call.
-    ILogSink::Ptr sink_;             ///< Custom log sink (empty = default stderr).
-    LogLevel level_{LogLevel::Info}; ///< Minimum log level.
+        deferred_property_queue_; ///< Property sets queued for the next update() call.
 };
 
 } // namespace velk

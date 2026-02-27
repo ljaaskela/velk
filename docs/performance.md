@@ -25,19 +25,19 @@ This document covers runtime performance and memory usage related topics.
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~13 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~17 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~9 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~11 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~14 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~120 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
-| **interface_cast** | Linear scan | ~8 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~528 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
-| **Metadata lookup (cached)** | Cache-first scan | ~28 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1-2 heap allocations | ~86 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer`; control block reused from pool |
+| **Event dispatch (deferred)** | Clone + queue | ~122 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **interface_cast** | Linear scan | ~4 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~553 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
+| **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `MetadataContainer` pool-allocated from `Hive<T>`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -87,7 +87,7 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
 2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
 3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
-4. **Allocate MetadataContainer**: One `new MetadataContainer(members, owner)`, stores a pointer to the static metadata array and the owning object
+4. **Allocate MetadataContainer**: Pool-allocated from a `Hive<MetadataContainer>` (placement-new into a pre-allocated page slot with mutex); stores a pointer to the static metadata array and the owning object
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
@@ -116,8 +116,8 @@ The per-thread pool is a singly-linked free-list that reuses the block's own `pt
 
 | Operation | new/delete | Pooled |
 |---|---|---|
-| Control block alloc + dealloc | ~25 ns | ~6 ns |
-| Object creation (end-to-end) | ~115 ns | ~87 ns |
+| Control block alloc + dealloc | ~26 ns | ~6 ns |
+| Object creation (end-to-end) | ~115 ns | ~55 ns |
 
 Pooling is enabled by default and can be controlled via the `VELK_ENABLE_BLOCK_POOL` CMake option.
 
@@ -193,10 +193,10 @@ An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The
 
 ### Example: Minimal object with 1 member
 
-A minimal object implements a single interface with one property. `ext::Object` adds `IMetadataContainer`, giving 3 interfaces in the dispatch pack (IObject, IMetadataContainer, IToggle).
+A minimal object implements a single interface with one property. `ext::Object` adds `IMetadata`, giving 3 interfaces in the dispatch pack (IObject, IMetadata, IToggle). The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-Toggle (96 bytes)                           MetadataContainer (72 bytes, heap)
+Toggle (96 bytes)                           MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               64  │      │ base (InterfaceDispatch)   16  │
 │   (3 vptrs + MI padding)         │      │ members_ (array_view)      16  │
@@ -208,14 +208,14 @@ Toggle (96 bytes)                           MetadataContainer (72 bytes, heap)
 └──────────────────────────────────┘
 ```
 
-With no members accessed, the total footprint is **168 bytes** (96 object + 72 MetadataContainer). Accessing the one property adds 24 bytes to the `instances_` vector, bringing the total to **192 bytes**.
+With no members accessed, the MetadataContainer is not allocated. The total footprint is **96 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **192 bytes**.
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadataContainer, totaling 4 interfaces in the dispatch pack (IObject, IMetadataContainer, IMyWidget, ISerializable).
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata, totaling 4 interfaces in the dispatch pack (IObject, IMetadata, IMyWidget, ISerializable). The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap)
+MyWidget (152 bytes)                        MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               88  │      │ base (InterfaceDispatch)   16  │
 │   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
@@ -237,9 +237,9 @@ Member instances are created lazily, only when first accessed via `get_property(
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| Toggle, no members accessed | 96 | 72 | 0 | **168 bytes** |
+| Toggle, no members accessed | 96 | 0 (lazy) | 0 | **96 bytes** |
 | Toggle, 1 member accessed | 96 | 72 | 1 × 24 = 24 | **192 bytes** |
-| MyWidget, no members accessed | 152 | 72 | 0 | **224 bytes** |
+| MyWidget, no members accessed | 152 | 0 (lazy) | 0 | **152 bytes** |
 | MyWidget, 3 members accessed | 152 | 72 | 3 × 24 = 72 | **296 bytes** |
 | MyWidget, all 6 members accessed | 152 | 72 | 6 × 24 = 144 | **368 bytes** |
 
@@ -262,7 +262,7 @@ Measured ObjectCore sizes (MSVC x64):
 | Configuration | Interfaces | Size |
 |---|---|---|
 | `ext::ObjectCore<X, I>` (1 extra interface) | 2 (IObject + I) | **56 bytes** |
-| `ext::ObjectCore<X, IMetadataContainer, IMyWidget, ISerializable>` | 4 | **104 bytes** |
+| `ext::ObjectCore<X, IMetadata, IMyWidget, ISerializable>` | 4 | **104 bytes** |
 
 ### Base types
 

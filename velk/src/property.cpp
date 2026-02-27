@@ -67,10 +67,6 @@ ReturnValue PropertyImpl::set_value_silent(const IAny& from)
     }
     return ret;
 }
-void PropertyImpl::set_flags(int32_t flags)
-{
-    get_object_data().flags = flags;
-}
 
 ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, InvokeType invokeType)
 {

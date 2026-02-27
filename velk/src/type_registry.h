@@ -24,9 +24,10 @@ public:
     ReturnValue register_type(const IObjectFactory& factory) override;
     ReturnValue unregister_type(const IObjectFactory& factory) override;
     const ClassInfo* get_class_info(Uid classUid) const override;
+    const IObjectFactory* find_factory(Uid classUid) const override;
 
     /** @brief Creates an instance of a registered type by its UID. */
-    IInterface::Ptr create(Uid uid) const;
+    IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const;
     /** @brief Sets the current owner context for subsequent register_type calls. */
     void set_owner(Uid uid);
     /** @brief Erases all entries owned by the given plugin UID. */

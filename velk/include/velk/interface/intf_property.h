@@ -61,11 +61,6 @@ public:
      *         ReturnValue::NothingToDo if unchanged or if the property is externally notified.
      */
     virtual ReturnValue set_value_silent(const IAny& from) = 0;
-    /**
-     * @brief Sets object flags (e.g. ObjectFlags::ReadOnly) on the property.
-     * @param flags Bitwise combination of ObjectFlags constants.
-     */
-    virtual void set_flags(int32_t flags) = 0;
 };
 
 } // namespace velk

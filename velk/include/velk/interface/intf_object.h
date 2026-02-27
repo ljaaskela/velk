@@ -19,6 +19,9 @@ public:
 
     /** @brief Returns a shared_ptr to this object, or empty if not available. */
     virtual Ptr get_self() const = 0;
+
+    /** @brief Returns the object's flags (bitwise combination of ObjectFlags). */
+    virtual uint32_t get_object_flags() const = 0;
 };
 
 /**

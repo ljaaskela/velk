@@ -58,8 +58,9 @@ enum ReturnValue : int16_t
 
 /** @brief General-purpose object flags. Checked by runtime implementations. */
 namespace ObjectFlags {
-inline constexpr int32_t None = 0;
-inline constexpr int32_t ReadOnly = 1 << 0; ///< Property rejects writes via set_value/set_data.
+inline constexpr uint32_t None = 0;
+inline constexpr uint32_t ReadOnly = 1 << 0;    ///< Property rejects writes via set_value/set_data.
+inline constexpr uint32_t HiveManaged = 1 << 1; ///< Object is managed by a Hive.
 } // namespace ObjectFlags
 
 /** @brief Returns true if the return value indicates success (non-negative). */

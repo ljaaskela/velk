@@ -2,7 +2,9 @@
 
 #include "function.h"
 #include "future.h"
-#include "metadata_container.h"
+#include "hive/hive_store.h"
+#include "hive/object_hive.h"
+#include "hive/raw_hive.h"
 #include "property.h"
 
 #include <velk/ext/any.h>
@@ -17,6 +19,9 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<PropertyImpl>();
     ITypeRegistry::register_type<FunctionImpl>();
     ITypeRegistry::register_type<FutureImpl>();
+    ITypeRegistry::register_type<HiveStore>();
+    ITypeRegistry::register_type<ObjectHive>();
+    ITypeRegistry::register_type<RawHiveImpl>();
 
     ITypeRegistry::register_type<ext::AnyValue<float>>();
     ITypeRegistry::register_type<ext::AnyValue<double>>();
@@ -72,16 +77,10 @@ ReturnValue TypeRegistry::unregister_type(const IObjectFactory& factory)
     return ReturnValue::Success;
 }
 
-IInterface::Ptr TypeRegistry::create(Uid uid) const
+IInterface::Ptr TypeRegistry::create(Uid uid, uint32_t flags) const
 {
     if (auto* factory = find(uid)) {
-        if (auto object = factory->create_instance()) {
-            if (auto* meta = interface_cast<IMetadataContainer>(object)) {
-                auto& info = factory->get_class_info();
-                meta->set_metadata_container(new MetadataContainer(info.members, object.get()));
-            }
-            return object;
-        }
+        return factory->create_instance(flags);
     }
     return {};
 }
@@ -92,6 +91,11 @@ const ClassInfo* TypeRegistry::get_class_info(Uid classUid) const
         return &factory->get_class_info();
     }
     return nullptr;
+}
+
+const IObjectFactory* TypeRegistry::find_factory(Uid classUid) const
+{
+    return find(classUid);
 }
 
 void TypeRegistry::set_owner(Uid uid)

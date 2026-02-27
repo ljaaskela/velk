@@ -91,6 +91,22 @@ ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
     return ReturnValue::Success;
 }
 
+ReturnValue PluginRegistry::load_plugin(Uid pluginUid)
+{
+    auto plugin = interface_pointer_cast<IPlugin>(types_.create(pluginUid));
+    if (!plugin) {
+        detail::velk_log(log_,
+                         LogLevel::Error,
+                         __FILE__,
+                         __LINE__,
+                         "Failed to create plugin from UID %016llx%016llx",
+                         static_cast<unsigned long long>(pluginUid.hi),
+                         static_cast<unsigned long long>(pluginUid.lo));
+        return ReturnValue::Fail;
+    }
+    return load_plugin(plugin);
+}
+
 ReturnValue PluginRegistry::load_plugin_from_path(const char* path)
 {
     if (!path || !*path) {
@@ -253,14 +269,16 @@ void PluginRegistry::notify_plugins(Duration time) const
         t.timeSinceFirstUpdate.us = current_us;
     }
 
-    UpdateInfo info;
-    info.timeSinceInit = {current_us - t.timeSinceInit.us};
-    info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
-    info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
-    t.timeSinceLastUpdate.us = current_us;
+    if (!update_plugins_.empty()) {
+        UpdateInfo info;
+        info.timeSinceInit = {current_us - t.timeSinceInit.us};
+        info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
+        info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
+        t.timeSinceLastUpdate.us = current_us;
 
-    for (auto* plugin : update_plugins_) {
-        plugin->update(info);
+        for (auto* plugin : update_plugins_) {
+            plugin->update(info);
+        }
     }
 }
 

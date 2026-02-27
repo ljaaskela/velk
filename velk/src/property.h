@@ -34,7 +34,6 @@ protected: // IPropertyInternal
     IAny::ConstPtr get_any() const override;
     ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Immediate) override;
     ReturnValue set_value_silent(const IAny& from) override;
-    void set_flags(int32_t flags) override;
 
 private:
     IAny::Ptr data_;

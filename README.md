@@ -36,6 +36,7 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
 | **Properties** | <p>`Property<T>` with get/set and automatic change notifications<p>Type-erased values through `Any<T>` wrappers over a generic `IAny` container<p>Direct state access to read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
 | **Events** | Observable events with multiple handlers, immediate or deferred |
 | **Functions** | <p>Overridable virtual functions with optional typed parameters and native return types, automatically wrapped into `IAny::Ptr`<p>Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution<p>Deferred function calls and event handlers for batch execution during `instance().update()` |
+| **Hive storage** | Dense, typed containers that store objects contiguously in [cache-friendly pages](docs/hive.md) with slot reuse, zombie lifecycle, and automatic page management |
 | **Performance-focused** | <p>Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
 
 ## Documentation
@@ -46,6 +47,7 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
 | [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
 | [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation, futures and promises |
 | [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
+| [Hive](docs/hive.md) | Dense object storage, hive registry, zombie lifecycle, memory layout |
 | [Plugins](docs/plugins.md) | Writing plugins, DLL loading, dependencies, multi-plugin bundles |
 | [VELK_INTERFACE](docs/velk-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
 
@@ -60,6 +62,7 @@ velk/
   docs/                   Documentation
     architecture.md       Layers, headers, type hierarchy, key types
     guide.md              Extended usage guide
+    hive.md               Dense object storage and hive registry
     performance.md        Performance and memory usage
     plugins.md            Plugin system: writing, loading, dependencies, bundles
     velk-interface.md     VELK_INTERFACE macro reference

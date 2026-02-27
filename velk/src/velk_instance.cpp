@@ -1,12 +1,26 @@
 #include "velk_instance.h"
 
 #include "function.h"
+#include "hive/raw_hive.h"
+#include "metadata_container.h"
 
 #include <velk/interface/types.h>
 
 namespace velk {
 
-VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_) {}
+static IRawHive::Ptr create_metadata_hive()
+{
+    auto obj = ext::make_object<RawHiveImpl>();
+    auto* hive = static_cast<RawHiveImpl*>(obj.get());
+    hive->init(type_uid<MetadataContainer>(), sizeof(MetadataContainer), alignof(MetadataContainer));
+    return interface_pointer_cast<IRawHive>(obj);
+}
+
+VelkInstance::VelkInstance()
+    : metadata_hive_(create_metadata_hive()),
+      type_registry_(*this),
+      plugin_registry_(*this, type_registry_)
+{}
 
 VelkInstance::~VelkInstance()
 {
@@ -18,9 +32,19 @@ ILog& get_logger(const VelkInstance& instance)
     return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
 }
 
-IInterface::Ptr VelkInstance::create(Uid uid) const
+IMetadata* VelkInstance::create_metadata_container(const ClassInfo& info, IInterface* owner) const
 {
-    return type_registry_.create(uid);
+    return metadata_hive_.emplace(info.members, owner);
+}
+
+void VelkInstance::destroy_metadata_container(IMetadata* meta) const
+{
+    metadata_hive_.deallocate(static_cast<MetadataContainer*>(meta));
+}
+
+IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const
+{
+    return type_registry_.create(uid, flags);
 }
 
 IAny::Ptr VelkInstance::create_any(Uid type) const
@@ -28,11 +52,10 @@ IAny::Ptr VelkInstance::create_any(Uid type) const
     return interface_pointer_cast<IAny>(create(type));
 }
 
-IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, int32_t flags) const
+IProperty::Ptr VelkInstance::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
 {
-    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property));
+    auto property = interface_pointer_cast<IProperty>(create(ClassId::Property, flags));
     if (auto pi = interface_cast<IPropertyInternal>(property)) {
-        pi->set_flags(flags);
         if (value && is_compatible(value, type)) {
             if (pi->set_any(value)) {
                 return property;

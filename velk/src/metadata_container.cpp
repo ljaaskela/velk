@@ -26,7 +26,10 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     IInterface::Ptr created;
     switch (desc.kind) {
     case MemberKind::Property: {
-        created = ext::make_object<PropertyImpl>();
+        {
+            auto* pk = desc.propertyKind();
+            created = ext::make_object<PropertyImpl>(pk ? pk->flags : ObjectFlags::None);
+        }
         if (auto* pi = created->get_interface<IPropertyInternal>()) {
             if (auto* pk = desc.propertyKind()) {
                 // Try state-backed ref first
@@ -46,10 +49,6 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
                             pi->set_any(any);
                         }
                     }
-                }
-                // Apply flags (e.g. ReadOnly) to the PropertyImpl
-                if (pk->flags) {
-                    pi->set_flags(pk->flags);
                 }
             }
         }

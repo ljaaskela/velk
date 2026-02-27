@@ -38,7 +38,7 @@ struct PropertyKind
     const IAny* (*getDefault)() = nullptr;
     /** @brief Creates an AnyRef pointing into the State struct at @p stateBase. */
     IAny::Ptr (*createRef)(void* stateBase) = nullptr;
-    int32_t flags{ObjectFlags::None}; ///< ObjectFlags to apply to the created PropertyImpl.
+    uint32_t flags{ObjectFlags::None}; ///< ObjectFlags to apply to the created PropertyImpl.
 };
 
 /** @brief Describes a single argument of a typed function. */

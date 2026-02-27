@@ -246,19 +246,18 @@ TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
     ASSERT_NE(info, nullptr);
 
     // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
-    // Pack is {IObject, IMetadataContainer, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
-    // Chain walks: IObject, IMetadataContainer->IMetadata->IPropertyState,
-    //             ITestWidget, ITestSerializable, ITestMath, ITestRaw (IObject deduplicated)
-    EXPECT_EQ(info->interfaces.size(), 8u);
+    // Pack is {IObject, IMetadata, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
+    // Chain walks: IObject, IMetadata->IPropertyState,
+    //             ITestWidget, ITestSerializable, ITestMath, ITestRaw
+    EXPECT_EQ(info->interfaces.size(), 7u);
 
     EXPECT_EQ(info->interfaces[0].uid, IObject::UID);
-    EXPECT_EQ(info->interfaces[1].uid, IMetadataContainer::UID);
-    EXPECT_EQ(info->interfaces[2].uid, IMetadata::UID);
-    EXPECT_EQ(info->interfaces[3].uid, IPropertyState::UID);
-    EXPECT_EQ(info->interfaces[4].uid, ITestWidget::UID);
-    EXPECT_EQ(info->interfaces[5].uid, ITestSerializable::UID);
-    EXPECT_EQ(info->interfaces[6].uid, ITestMath::UID);
-    EXPECT_EQ(info->interfaces[7].uid, ITestRaw::UID);
+    EXPECT_EQ(info->interfaces[1].uid, IMetadata::UID);
+    EXPECT_EQ(info->interfaces[2].uid, IPropertyState::UID);
+    EXPECT_EQ(info->interfaces[3].uid, ITestWidget::UID);
+    EXPECT_EQ(info->interfaces[4].uid, ITestSerializable::UID);
+    EXPECT_EQ(info->interfaces[5].uid, ITestMath::UID);
+    EXPECT_EQ(info->interfaces[6].uid, ITestRaw::UID);
 }
 
 TEST_F(ObjectTest, StaticDefaultValues)
