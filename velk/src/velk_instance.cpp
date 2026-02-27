@@ -2,16 +2,12 @@
 
 #include "function.h"
 #include "metadata_container.h"
-#include "plugins/hive/hive_plugin.h"
 
 #include <velk/interface/types.h>
 
 namespace velk {
 
-VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_)
-{
-    type_registry_.register_type(HivePlugin::get_factory());
-}
+VelkInstance::VelkInstance() : type_registry_(*this), plugin_registry_(*this, type_registry_) {}
 
 VelkInstance::~VelkInstance()
 {
@@ -25,7 +21,12 @@ ILog& get_logger(const VelkInstance& instance)
 
 IMetadata* VelkInstance::create_metadata_container(const ClassInfo& info, IInterface* owner) const
 {
-    return new MetadataContainer(info.members, owner);
+    return metadata_hive_.emplace(info.members, owner);
+}
+
+void VelkInstance::destroy_metadata_container(IMetadata* meta) const
+{
+    metadata_hive_.deallocate(static_cast<MetadataContainer*>(meta));
 }
 
 IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const

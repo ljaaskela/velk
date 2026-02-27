@@ -133,7 +133,7 @@ class PluginTest : public ::testing::Test
 {
 protected:
     IVelk& velk_ = instance();
-    size_t builtin_count_ = velk_.plugin_registry().plugin_count(); ///< Built-in plugins (e.g. HivePlugin).
+    size_t builtin_count_ = velk_.plugin_registry().plugin_count(); ///< Plugin count at test start.
     IPlugin::Ptr plugin_ = ext::make_object<TestPlugin, IPlugin>();
     TestPlugin* tp_ = static_cast<TestPlugin*>(plugin_.get());
 

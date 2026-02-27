@@ -20,7 +20,12 @@ namespace velk::detail {
 class ObjectMetadataBase
 {
 protected:
-    ~ObjectMetadataBase() { delete meta_; }
+    ~ObjectMetadataBase()
+    {
+        if (meta_) {
+            instance().destroy_metadata_container(meta_);
+        }
+    }
 
     void ensure_metadata(const ClassInfo& info, IInterface* owner) const
     {

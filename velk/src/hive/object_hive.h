@@ -1,5 +1,7 @@
-#ifndef VELK_PLUGINS_HIVE_H
-#define VELK_PLUGINS_HIVE_H
+#ifndef VELK_PLUGINS_OBJECT_HIVE_H
+#define VELK_PLUGINS_OBJECT_HIVE_H
+
+#include "page_allocator.h"
 
 #include <velk/ext/core_object.h>
 #include <velk/interface/hive/intf_hive.h>
@@ -8,11 +10,10 @@
 #include <atomic>
 #include <cstdint>
 #include <memory>
+#include <shared_mutex>
 #include <vector>
 
 namespace velk {
-
-static constexpr size_t HIVE_SENTINEL = ~size_t(0);
 
 enum class SlotState : uint8_t
 {
@@ -31,34 +32,35 @@ struct HivePage
     HiveControlBlock* hcbs{nullptr};        ///< Contiguous HCB array (embedded, points into allocation).
     void* slots{nullptr};                   ///< Aligned contiguous slot memory (points into allocation).
     size_t capacity{0};                     ///< Total slots in page.
-    size_t free_head{HIVE_SENTINEL};        ///< Intrusive freelist head.
+    size_t free_head{PAGE_SENTINEL};        ///< Intrusive freelist head.
     size_t live_count{0};                   ///< Active + Zombie count.
     size_t slot_size{0};                    ///< Aligned slot size in bytes.
     const IObjectFactory* factory{nullptr}; ///< Factory for objects in this page.
     std::atomic<size_t> weak_hcb_count{0};  ///< Embedded HCBs with outstanding weak_ptrs (orphan tracking).
+    std::shared_mutex* hive_mutex{nullptr};  ///< Points to owning ObjectHive's mutex (null when orphaned).
     bool orphaned{false};                   ///< Page detached from Hive (destructor ran).
 };
 
 /**
- * @brief Concrete implementation of IHive.
+ * @brief Concrete implementation of IObjectHive.
  *
  * Stores objects of a single class in cache-friendly contiguous pages using
  * placement-new. Slot reuse is handled via an intrusive per-page free list.
  * Objects remain alive after removal as long as external references exist
  * (zombie state); the slot is reclaimed when the last reference drops.
  */
-class Hive final : public ext::ObjectCore<Hive, IHive>
+class ObjectHive final : public ext::ObjectCore<ObjectHive, IObjectHive>
 {
 public:
-    VELK_CLASS_UID(ClassId::Hive);
+    VELK_CLASS_UID(ClassId::ObjectHive);
 
-    Hive() = default;
-    ~Hive() override;
+    ObjectHive() = default;
+    ~ObjectHive() override;
 
     /** @brief Initializes the hive for the given class UID. */
     void init(Uid classUid);
 
-    // IHive overrides
+    // IObjectHive overrides
     Uid get_element_class_uid() const override;
     size_t size() const override;
     bool empty() const override;
@@ -92,9 +94,7 @@ private:
     /** @brief Finds the page and slot index for a given object pointer. Returns false if not found. */
     bool find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const;
 
-    /** @brief Number of uint64_t words needed for a bitmask covering @p capacity slots. */
-    static size_t bitmask_words(size_t capacity) { return (capacity + 63) / 64; }
-
+    mutable std::shared_mutex mutex_;
     Uid element_class_uid_;
     const IObjectFactory* factory_{nullptr};
     size_t slot_size_{0};
@@ -106,4 +106,4 @@ private:
 
 } // namespace velk
 
-#endif // VELK_PLUGINS_HIVE_H
+#endif // VELK_PLUGINS_OBJECT_HIVE_H

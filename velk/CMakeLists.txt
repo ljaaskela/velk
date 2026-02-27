@@ -62,12 +62,12 @@ add_library(velk SHARED
     include/velk/api/hive/iterate.h
     include/velk/interface/hive/intf_hive.h
     include/velk/interface/hive/intf_hive_store.h
-    src/plugins/hive/hive.cpp
-    src/plugins/hive/hive.h
-    src/plugins/hive/hive_store.cpp
-    src/plugins/hive/hive_store.h
-    src/plugins/hive/hive_plugin.h
-    src/plugins/hive/hive_plugin.cpp
+    src/hive/hive.h
+    src/hive/page_allocator.h
+    src/hive/object_hive.cpp
+    src/hive/object_hive.h
+    src/hive/hive_store.cpp
+    src/hive/hive_store.h
     )
 
 target_include_directories(velk
@@ -75,7 +75,7 @@ target_include_directories(velk
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/plugins/hive
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/hive
 )
 
 option(VELK_ENABLE_BLOCK_POOL "Enable thread-local control_block pooling" ON)

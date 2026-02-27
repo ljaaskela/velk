@@ -25,19 +25,19 @@ This document covers runtime performance and memory usage related topics.
 
 | Operation | Cost | Measured | Notes |
 |---|---|---|---|
-| **Property get** | 1 virtual call + `memcpy` | ~13 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
-| **Property set** | 1 virtual call + `memcpy` | ~17 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
+| **Property get** | 1 virtual call + `memcpy` | ~12 ns | Via `Property<T>` wrapper; queries `IPropertyInternal`, then `IAny::get_data` |
+| **Property set** | 1 virtual call + `memcpy` | ~18 ns | Reverse path through `IAny::set_data`; fires `on_changed` if value differs |
 | **Direct state read** | Pointer dereference | ~1 ns | `IPropertyState::get_property_state<T>()` returns `T::State*`; read fields directly |
 | **Direct state write** | Pointer dereference | <1 ns | Write fields via state pointer; no virtual dispatch |
 | **Function invoke** | 1 indirect call | ~14 ns | `target_fn_(target_context_, args)`, context/function-pointer pair, no virtual dispatch |
 | **Typed-arg trampoline** | Arg extraction + indirect call | ~42 ns | `FnBind` reads each arg via `IAny::get_data()`, then calls the virtual `fn_Name(...)` |
 | **Raw function invoke** | 1 indirect call | ~16 ns | `FnRawBind` passes `FnArgs` through unchanged, no extraction overhead |
 | **Event dispatch (immediate)** | Loop over handlers | ~11 ns | Iterates immediate handlers in-place; no allocations |
-| **Event dispatch (deferred)** | Clone + queue | ~120 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
-| **interface_cast** | Linear scan | ~8 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
-| **Metadata lookup (cold)** | Linear scan + alloc | ~528 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
-| **Metadata lookup (cached)** | Cache-first scan | ~28 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1-2 heap allocations | ~86 ns | Factory lookup (`O(log N)`), then allocate object + `MetadataContainer`; control block reused from pool |
+| **Event dispatch (deferred)** | Clone + queue | ~122 ns | Clones args once into `shared_ptr`, queues `DeferredTask`; mutex lock on insertion |
+| **interface_cast** | Linear scan | ~7 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable |
+| **Metadata lookup (cold)** | Linear scan + alloc | ~553 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
+| **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
+| **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `MetadataContainer` pool-allocated from `Hive<T>`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -87,7 +87,7 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
 2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
 3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
-4. **Allocate MetadataContainer**: One `new MetadataContainer(members, owner)`, stores a pointer to the static metadata array and the owning object
+4. **Allocate MetadataContainer**: Pool-allocated from a `Hive<MetadataContainer>` (placement-new into a pre-allocated page slot with mutex); stores a pointer to the static metadata array and the owning object
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
@@ -116,8 +116,8 @@ The per-thread pool is a singly-linked free-list that reuses the block's own `pt
 
 | Operation | new/delete | Pooled |
 |---|---|---|
-| Control block alloc + dealloc | ~25 ns | ~6 ns |
-| Object creation (end-to-end) | ~115 ns | ~87 ns |
+| Control block alloc + dealloc | ~26 ns | ~6 ns |
+| Object creation (end-to-end) | ~115 ns | ~55 ns |
 
 Pooling is enabled by default and can be controlled via the `VELK_ENABLE_BLOCK_POOL` CMake option.
 

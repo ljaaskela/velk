@@ -2,6 +2,8 @@
 
 #include "function.h"
 #include "future.h"
+#include "hive/hive_store.h"
+#include "hive/object_hive.h"
 #include "property.h"
 
 #include <velk/ext/any.h>
@@ -16,6 +18,8 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<PropertyImpl>();
     ITypeRegistry::register_type<FunctionImpl>();
     ITypeRegistry::register_type<FutureImpl>();
+    ITypeRegistry::register_type<HiveStore>();
+    ITypeRegistry::register_type<ObjectHive>();
 
     ITypeRegistry::register_type<ext::AnyValue<float>>();
     ITypeRegistry::register_type<ext::AnyValue<double>>();

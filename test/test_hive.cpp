@@ -11,7 +11,7 @@ using namespace velk;
 
 // --- Test interface and object for hive storage ---
 
-class IHiveWidget : public Interface<IHiveWidget>
+class IObjectHiveWidget : public Interface<IObjectHiveWidget>
 {
 public:
     VELK_INTERFACE(
@@ -20,11 +20,11 @@ public:
     )
 };
 
-class HiveWidget : public ext::Object<HiveWidget, IHiveWidget>
+class HiveWidget : public ext::Object<HiveWidget, IObjectHiveWidget>
 {};
 
 // A second type so that tests needing a fresh hive can use it.
-class IHiveGadget : public Interface<IHiveGadget>
+class IObjectHiveGadget : public Interface<IObjectHiveGadget>
 {
 public:
     VELK_INTERFACE(
@@ -32,7 +32,7 @@ public:
     )
 };
 
-class HiveGadget : public ext::Object<HiveGadget, IHiveGadget>
+class HiveGadget : public ext::Object<HiveGadget, IObjectHiveGadget>
 {};
 
 // --- Test fixture ---
@@ -46,7 +46,6 @@ protected:
     {
         register_type<HiveWidget>(velk_);
         register_type<HiveGadget>(velk_);
-        velk_.plugin_registry().load_plugin(ClassId::HivePlugin);
         registry_ = velk_.create<IHiveStore>(ClassId::HiveStore);
         ASSERT_TRUE(registry_);
     }
@@ -54,13 +53,12 @@ protected:
     void TearDown() override
     {
         registry_.reset();
-        velk_.plugin_registry().unload_plugin(ClassId::HivePlugin);
         unregister_type<HiveGadget>(velk_);
         unregister_type<HiveWidget>(velk_);
     }
 
     /** @brief Returns a fresh hive for HiveGadget (never used by other tests). */
-    IHive::Ptr fresh_hive() { return registry_->get_hive(HiveGadget::class_id()); }
+    IObjectHive::Ptr fresh_hive() { return registry_->get_hive(HiveGadget::class_id()); }
 
     IHiveStore::Ptr registry_;
 };
@@ -115,14 +113,14 @@ TEST_F(HiveTest, ForEachHive)
     registry_->get_hive(HiveWidget::class_id());
 
     int count = 0;
-    registry_->for_each_hive(&count, [](void* ctx, IHive&) -> bool {
+    registry_->for_each_hive(&count, [](void* ctx, IObjectHive&) -> bool {
         ++(*static_cast<int*>(ctx));
         return true;
     });
     EXPECT_GE(count, 1);
 }
 
-// --- IHive tests (use fresh_hive() for isolation) ---
+// --- IObjectHive tests (use fresh_hive() for isolation) ---
 
 TEST_F(HiveTest, NewHiveIsEmpty)
 {
@@ -152,7 +150,7 @@ TEST_F(HiveTest, AddedObjectHasCorrectType)
     auto obj = hive->add();
     EXPECT_EQ(HiveGadget::class_id(), obj->get_class_uid());
 
-    auto* gadget = interface_cast<IHiveGadget>(obj);
+    auto* gadget = interface_cast<IObjectHiveGadget>(obj);
     ASSERT_NE(nullptr, gadget);
 }
 
@@ -305,7 +303,7 @@ TEST_F(HiveTest, HiveIsVelkObject)
 {
     auto hive = fresh_hive();
 
-    // IHive inherits IObject, so we can query class info
+    // IObjectHive inherits IObject, so we can query class info
     auto* obj = interface_cast<IObject>(hive);
     ASSERT_NE(nullptr, obj);
     EXPECT_FALSE(obj->get_class_name().empty());
@@ -412,7 +410,7 @@ TEST_F(HiveTest, MetadataAvailableOnHiveObjects)
     auto hive = registry_->get_hive(HiveWidget::class_id());
     auto obj = hive->add();
 
-    auto* widget = interface_cast<IHiveWidget>(obj);
+    auto* widget = interface_cast<IObjectHiveWidget>(obj);
     ASSERT_NE(nullptr, widget);
 
     // Properties should be accessible via metadata.
@@ -431,18 +429,18 @@ TEST_F(HiveTest, ForEachStateVisitsAllWithCorrectValues)
     for (int i = 0; i < 5; ++i) {
         auto obj = hive->add();
         auto* ps = interface_cast<IPropertyState>(obj);
-        auto* s = ps->get_property_state<IHiveWidget>();
+        auto* s = ps->get_property_state<IObjectHiveWidget>();
         s->x = static_cast<float>(i * 10);
         s->y = static_cast<float>(i * 20);
         refs.push_back(std::move(obj));
     }
 
-    ptrdiff_t offset = detail::compute_state_offset(*hive, IHiveWidget::UID);
+    ptrdiff_t offset = detail::compute_state_offset(*hive, IObjectHiveWidget::UID);
     ASSERT_GE(offset, 0);
 
     float sum_x = 0.f;
     hive->for_each_state(offset, &sum_x, [](void* ctx, IObject&, void* state) -> bool {
-        auto& s = *static_cast<IHiveWidget::State*>(state);
+        auto& s = *static_cast<IObjectHiveWidget::State*>(state);
         *static_cast<float*>(ctx) += s.x;
         return true;
     });
@@ -463,7 +461,7 @@ TEST_F(HiveTest, ForEachStateEarlyTermination)
         refs.push_back(hive->add());
     }
 
-    ptrdiff_t offset = detail::compute_state_offset(*hive, IHiveGadget::UID);
+    ptrdiff_t offset = detail::compute_state_offset(*hive, IObjectHiveGadget::UID);
     ASSERT_GE(offset, 0);
 
     int count = 0;
@@ -494,14 +492,14 @@ TEST_F(HiveTest, ForEachHiveTypedAccess)
     for (int i = 0; i < 3; ++i) {
         auto obj = hive->add();
         auto* ps = interface_cast<IPropertyState>(obj);
-        auto* s = ps->get_property_state<IHiveWidget>();
+        auto* s = ps->get_property_state<IObjectHiveWidget>();
         s->x = static_cast<float>(i + 1);
         refs.push_back(std::move(obj));
     }
 
     float sum = 0.f;
     int count = 0;
-    for_each_hive<IHiveWidget>(*hive, [&](IObject&, IHiveWidget::State& s) {
+    for_each_hive<IObjectHiveWidget>(*hive, [&](IObject&, IObjectHiveWidget::State& s) {
         sum += s.x;
         ++count;
         return true;
@@ -519,7 +517,7 @@ TEST_F(HiveTest, ForEachHiveOnEmptyHive)
 {
     auto hive = fresh_hive();
     int count = 0;
-    for_each_hive<IHiveGadget>(*hive, [&](IObject&, IHiveGadget::State&) {
+    for_each_hive<IObjectHiveGadget>(*hive, [&](IObject&, IObjectHiveGadget::State&) {
         ++count;
         return true;
     });

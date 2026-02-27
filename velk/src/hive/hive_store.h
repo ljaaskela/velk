@@ -20,8 +20,8 @@ public:
     VELK_CLASS_UID(ClassId::HiveStore);
 
     // IHiveStore overrides
-    IHive::Ptr get_hive(Uid classUid) override;
-    IHive::Ptr find_hive(Uid classUid) const override;
+    IObjectHive::Ptr get_hive(Uid classUid) override;
+    IObjectHive::Ptr find_hive(Uid classUid) const override;
     size_t hive_count() const override;
     void for_each_hive(void* context, HiveVisitorFn visitor) const override;
 
@@ -29,7 +29,7 @@ private:
     struct HiveEntry
     {
         Uid uid;
-        IHive::Ptr hive;
+        IObjectHive::Ptr hive;
         bool operator<(const HiveEntry& o) const { return uid < o.uid; }
     };
 

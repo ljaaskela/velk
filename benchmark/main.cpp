@@ -12,6 +12,7 @@
 
 #include <benchmark/benchmark.h>
 #include <memory>
+#include <mutex>
 #include <vector>
 
 using namespace velk;
@@ -350,27 +351,25 @@ static void BM_MemoryHive(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
 
     for (auto _ : state) {
         auto hive = registry->get_hive<HiveData>();
+        std::vector<IObject::Ptr> refs;
+        refs.reserve(kHiveCount);
         for (size_t i = 0; i < kHiveCount; ++i) {
-            hive->add();
+            refs.push_back(hive->add());
         }
         benchmark::DoNotOptimize(hive.get());
         // Teardown: remove all objects.
         state.PauseTiming();
-        hive->for_each(nullptr, [](void*, IObject& obj) -> bool {
-            obj.unref(); // release hive's ref
-            return true;
-        });
+        for (auto& r : refs) {
+            hive->remove(*r);
+            r.reset();
+        }
         state.ResumeTiming();
     }
     state.counters["obj_size"] = static_cast<double>(sizeof(HiveData));
-
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_MemoryHive);
 
@@ -419,26 +418,26 @@ static void BM_CreateHive(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
+    std::vector<IObject::Ptr> teardown_refs;
+    teardown_refs.reserve(kHiveCount);
     for (auto _ : state) {
         for (size_t i = 0; i < kHiveCount; ++i) {
             auto obj = hive->add();
             benchmark::DoNotOptimize(obj.get());
+            teardown_refs.push_back(std::move(obj));
         }
         // Teardown
         state.PauseTiming();
-        hive->for_each(nullptr, [](void*, IObject& obj) -> bool {
-            obj.unref();
-            return true;
-        });
+        for (auto& r : teardown_refs) {
+            hive->remove(*r);
+            r.reset();
+        }
+        teardown_refs.clear();
         state.ResumeTiming();
     }
-
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_CreateHive);
 
@@ -519,7 +518,6 @@ static void BM_IterateHive(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
@@ -548,8 +546,6 @@ static void BM_IterateHive(benchmark::State& state)
     }
 
     refs.clear();
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_IterateHive);
 
@@ -557,7 +553,6 @@ static void BM_IterateHiveState(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
@@ -583,8 +578,6 @@ static void BM_IterateHiveState(benchmark::State& state)
     }
 
     refs.clear();
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_IterateHiveState);
 
@@ -687,7 +680,6 @@ static void BM_IterateWriteHive(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
@@ -721,8 +713,6 @@ static void BM_IterateWriteHive(benchmark::State& state)
     }
 
     refs.clear();
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_IterateWriteHive);
 
@@ -730,7 +720,6 @@ static void BM_IterateWriteHiveState(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
@@ -762,8 +751,6 @@ static void BM_IterateWriteHiveState(benchmark::State& state)
     }
 
     refs.clear();
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_IterateWriteHiveState);
 
@@ -847,11 +834,60 @@ static void BM_ChurnVelkVector(benchmark::State& state)
 }
 BENCHMARK(BM_ChurnVelkVector);
 
+static void BM_ChurnPlainVectorLocked(benchmark::State& state)
+{
+    std::vector<PlainData> vec(kHiveCount);
+    std::mutex mtx;
+
+    for (auto _ : state) {
+        for (size_t i = vec.size(); i > 0; --i) {
+            if ((i - 1) % 4 == 0) {
+                std::lock_guard lock(mtx);
+                vec.erase(vec.begin() + static_cast<ptrdiff_t>(i - 1));
+            }
+        }
+
+        while (vec.size() < kHiveCount) {
+            std::lock_guard lock(mtx);
+            vec.emplace_back();
+        }
+
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_ChurnPlainVectorLocked);
+
+static void BM_ChurnHeapVectorLocked(benchmark::State& state)
+{
+    std::vector<std::unique_ptr<HeapBase>> vec;
+    vec.reserve(kHiveCount);
+    for (size_t i = 0; i < kHiveCount; ++i) {
+        vec.push_back(std::make_unique<HeapObject>());
+    }
+    std::mutex mtx;
+
+    for (auto _ : state) {
+        for (size_t i = vec.size(); i > 0; --i) {
+            if ((i - 1) % 4 == 0) {
+                std::lock_guard lock(mtx);
+                vec.erase(vec.begin() + static_cast<ptrdiff_t>(i - 1));
+            }
+        }
+
+        while (vec.size() < kHiveCount) {
+            std::lock_guard lock(mtx);
+            vec.push_back(std::make_unique<HeapObject>());
+        }
+
+        benchmark::DoNotOptimize(vec.data());
+    }
+}
+BENCHMARK(BM_ChurnHeapVectorLocked);
+
 static void BM_ChurnHive(benchmark::State& state)
 {
     ensureRegistered();
     ensureHiveRegistered();
-    instance().plugin_registry().load_plugin(ClassId::HivePlugin);
     auto registry = instance().create<IHiveStore>(ClassId::HiveStore);
     auto hive = registry->get_hive<HiveData>();
 
@@ -884,7 +920,5 @@ static void BM_ChurnHive(benchmark::State& state)
             r.reset();
         }
     }
-    registry.reset();
-    instance().plugin_registry().unload_plugin(ClassId::HivePlugin);
 }
 BENCHMARK(BM_ChurnHive);

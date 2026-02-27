@@ -9,7 +9,7 @@
 namespace velk {
 namespace detail {
 
-inline ptrdiff_t compute_state_offset(IHive& hive, Uid interfaceUid)
+inline ptrdiff_t compute_state_offset(IObjectHive& hive, Uid interfaceUid)
 {
     if (hive.empty()) {
         return -1;
@@ -47,7 +47,7 @@ using HiveStateVisitorFn = bool(IObject&, typename StateInterface::State&);
 /**
  * @brief Iterates all live objects in a hive with a typed lambda.
  *
- * Convenience wrapper around IHive::for_each that accepts a capturing lambda
+ * Convenience wrapper around IObjectHive::for_each that accepts a capturing lambda
  * instead of a void* context + function pointer pair.
  *
  * @tparam Fn Callable matching HiveVisitorFn. Return false to stop early.
@@ -55,7 +55,7 @@ using HiveStateVisitorFn = bool(IObject&, typename StateInterface::State&);
  * @param fn Visitor function.
  */
 template <class Fn>
-void for_each_hive(IHive& hive, Fn&& fn)
+void for_each_hive(IObjectHive& hive, Fn&& fn)
 {
     static_assert(std::is_invocable_r_v<bool, Fn, IObject&>,
                   "Visitor must be callable as bool(IObject&)");
@@ -86,7 +86,7 @@ void for_each_hive(IHive& hive, Fn&& fn)
  * @param fn Visitor function.
  */
 template <class StateInterface, class Fn>
-void for_each_hive(IHive& hive, Fn&& fn)
+void for_each_hive(IObjectHive& hive, Fn&& fn)
 {
     static_assert(std::is_invocable_r_v<bool, Fn, IObject&, typename StateInterface::State&>,
                   "Visitor must be callable as bool(IObject&, StateInterface::State&)");

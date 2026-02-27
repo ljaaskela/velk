@@ -118,6 +118,8 @@ public:
 
     /** @brief Creates a MetadataContainer for the given class info and owner. */
     virtual IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
+    /** @brief Destroys a MetadataContainer previously created by create_metadata_container. */
+    virtual void destroy_metadata_container(IMetadata* meta) const = 0;
 
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;

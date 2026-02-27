@@ -9,7 +9,7 @@ namespace velk {
 
 namespace ClassId {
 /** @brief Dense, typed container of objects sharing the same class ID. */
-inline constexpr Uid Hive{"331d944c-be7d-4bb4-b5cf-91d34c1383b9"};
+inline constexpr Uid ObjectHive{"331d944c-be7d-4bb4-b5cf-91d34c1383b9"};
 } // namespace ClassId
 
 /**
@@ -22,7 +22,7 @@ inline constexpr Uid Hive{"331d944c-be7d-4bb4-b5cf-91d34c1383b9"};
  *
  * Inherits IObject so that each hive is itself a first-class Velk object.
  */
-class IHive : public Interface<IHive, IObject>
+class IObjectHive : public Interface<IObjectHive, IObject>
 {
 public:
     /** @brief Returns the class UID of the objects stored in this hive. */

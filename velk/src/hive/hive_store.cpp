@@ -1,6 +1,6 @@
 #include "hive_store.h"
 
-#include "hive.h"
+#include "object_hive.h"
 
 #include <velk/api/velk.h>
 
@@ -8,7 +8,7 @@
 
 namespace velk {
 
-IHive::Ptr HiveStore::get_hive(Uid classUid)
+IObjectHive::Ptr HiveStore::get_hive(Uid classUid)
 {
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);
@@ -24,16 +24,16 @@ IHive::Ptr HiveStore::get_hive(Uid classUid)
     }
 
     // Create and initialize a new hive for this class UID.
-    auto hive_obj = ext::make_object<Hive>();
-    auto* hive = static_cast<Hive*>(hive_obj.get());
+    auto hive_obj = ext::make_object<ObjectHive>();
+    auto* hive = static_cast<ObjectHive*>(hive_obj.get());
     hive->init(classUid);
-    auto hive_ptr = interface_pointer_cast<IHive>(hive_obj);
+    auto hive_ptr = interface_pointer_cast<IObjectHive>(hive_obj);
 
     hives_.insert(it, HiveEntry{classUid, hive_ptr});
     return hive_ptr;
 }
 
-IHive::Ptr HiveStore::find_hive(Uid classUid) const
+IObjectHive::Ptr HiveStore::find_hive(Uid classUid) const
 {
     HiveEntry key{classUid, {}};
     auto it = std::lower_bound(hives_.begin(), hives_.end(), key);

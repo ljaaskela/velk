@@ -269,14 +269,16 @@ void PluginRegistry::notify_plugins(Duration time) const
         t.timeSinceFirstUpdate.us = current_us;
     }
 
-    UpdateInfo info;
-    info.timeSinceInit = {current_us - t.timeSinceInit.us};
-    info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
-    info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
-    t.timeSinceLastUpdate.us = current_us;
+    if (!update_plugins_.empty()) {
+        UpdateInfo info;
+        info.timeSinceInit = {current_us - t.timeSinceInit.us};
+        info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
+        info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
+        t.timeSinceLastUpdate.us = current_us;
 
-    for (auto* plugin : update_plugins_) {
-        plugin->update(info);
+        for (auto* plugin : update_plugins_) {
+            plugin->update(info);
+        }
     }
 }
 

@@ -1,71 +1,13 @@
-#include "hive.h"
+#include "object_hive.h"
+
+#include "page_allocator.h"
 
 #include <velk/api/velk.h>
 #include <velk/interface/intf_metadata.h>
 
-#include <cstdlib>
-#include <cstring>
 #include <new>
 
-#ifdef _WIN32
-#include <intrin.h>
-#include <malloc.h>
-#endif
-
 namespace velk {
-
-namespace {
-
-void* aligned_alloc_impl(size_t alignment, size_t size)
-{
-#ifdef _WIN32
-    return _aligned_malloc(size, alignment);
-#else
-    return std::aligned_alloc(alignment, size);
-#endif
-}
-
-void aligned_free_impl(void* ptr)
-{
-#ifdef _WIN32
-    _aligned_free(ptr);
-#else
-    std::free(ptr);
-#endif
-}
-
-size_t align_up(size_t size, size_t alignment)
-{
-    return (size + alignment - 1) & ~(alignment - 1);
-}
-
-inline void prefetch_line(const void* addr)
-{
-#ifdef _WIN32
-    _mm_prefetch(static_cast<const char*>(addr), _MM_HINT_T0);
-#else
-    __builtin_prefetch(addr, 0, 1);
-#endif
-}
-
-/** @brief Returns the index of the lowest set bit, or 64 if none. */
-inline unsigned bitscan_forward64(uint64_t mask)
-{
-#ifdef _WIN32
-    unsigned long idx;
-    if (_BitScanForward64(&idx, mask)) {
-        return static_cast<unsigned>(idx);
-    }
-    return 64;
-#else
-    if (mask == 0) {
-        return 64;
-    }
-    return static_cast<unsigned>(__builtin_ctzll(mask));
-#endif
-}
-
-} // anonymous namespace
 
 /**
  * @brief Extended control block for hive-managed objects.
@@ -116,6 +58,9 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
     bool last_weak = hcb->ecb.release_weak();
 
     if (!orphan) {
+        // Lock the owning hive's mutex to protect page state (freelist, bitmask, counts).
+        std::lock_guard<std::shared_mutex> lock(*page->hive_mutex);
+
         // Normal mode: block stays embedded in the page. If outstanding
         // weak_ptrs exist, set the destroy callback to hive_weak_release
         // so the page can track when they all drop.
@@ -136,8 +81,7 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
         page->active_bits[word] &= ~(uint64_t(1) << bit);
 
         page->state[slot_index] = SlotState::Free;
-        std::memcpy(slot, &page->free_head, sizeof(size_t));
-        page->free_head = slot_index;
+        push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
     } else {
         // Orphan mode: page was detached from the Hive.
         if (!last_weak) {
@@ -176,7 +120,7 @@ static void hive_destroy_orphan(external_control_block* ecb)
 
 // --- Hive implementation ---
 
-Hive::~Hive()
+ObjectHive::~ObjectHive()
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
@@ -211,8 +155,10 @@ Hive::~Hive()
         bool has_weak_hcbs = page.weak_hcb_count.load(std::memory_order_acquire) > 0;
 
         if (has_zombies || has_weak_hcbs) {
-            // Transfer page ownership to an orphan.
+            // Transfer page ownership to an orphan. Null out the mutex pointer
+            // since the ObjectHive (and its mutex) are being destroyed.
             page.orphaned = true;
+            page.hive_mutex = nullptr;
             for (size_t i = 0; i < page.capacity; ++i) {
                 if (page.state[i] == SlotState::Zombie) {
                     page.hcbs[i].ecb.destroy = hive_destroy_orphan;
@@ -226,7 +172,7 @@ Hive::~Hive()
     }
 }
 
-void Hive::init(Uid classUid)
+void ObjectHive::init(Uid classUid)
 {
     element_class_uid_ = classUid;
     factory_ = instance().type_registry().find_factory(classUid);
@@ -236,32 +182,32 @@ void Hive::init(Uid classUid)
     }
 }
 
-Uid Hive::get_element_class_uid() const
+Uid ObjectHive::get_element_class_uid() const
 {
     return element_class_uid_;
 }
 
-size_t Hive::size() const
+size_t ObjectHive::size() const
 {
     return live_count_;
 }
 
-bool Hive::empty() const
+bool ObjectHive::empty() const
 {
     return live_count_ == 0;
 }
 
-void* Hive::slot_ptr(HivePage& page, size_t index) const
+void* ObjectHive::slot_ptr(HivePage& page, size_t index) const
 {
     return static_cast<char*>(page.slots) + index * slot_size_;
 }
 
-void* Hive::slot_ptr(const HivePage& page, size_t index) const
+void* ObjectHive::slot_ptr(const HivePage& page, size_t index) const
 {
     return static_cast<char*>(page.slots) + index * slot_size_;
 }
 
-void Hive::alloc_page(size_t capacity)
+void ObjectHive::alloc_page(size_t capacity)
 {
     auto page = std::make_unique<HivePage>();
     page->capacity = capacity;
@@ -294,20 +240,15 @@ void Hive::alloc_page(size_t capacity)
     std::memset(page->active_bits, 0, bits_bytes);
 
     // Build intrusive freelist through slot memory.
-    for (size_t i = 0; i < capacity - 1; ++i) {
-        size_t next = i + 1;
-        std::memcpy(static_cast<char*>(page->slots) + i * slot_size_, &next, sizeof(size_t));
-    }
-    size_t sentinel = HIVE_SENTINEL;
-    std::memcpy(static_cast<char*>(page->slots) + (capacity - 1) * slot_size_, &sentinel, sizeof(size_t));
-    page->free_head = 0;
+    build_freelist(page->slots, capacity, slot_size_, page->free_head);
     page->live_count = 0;
 
+    page->hive_mutex = &mutex_;
     current_page_ = page.get();
     pages_.push_back(std::move(page));
 }
 
-void Hive::free_page(HivePage& page)
+void ObjectHive::free_page(HivePage& page)
 {
     aligned_free_impl(page.allocation);
     page.allocation = nullptr;
@@ -317,27 +258,17 @@ void Hive::free_page(HivePage& page)
     page.slots = nullptr;
 }
 
-void Hive::push_free(HivePage& page, size_t index, size_t slot_sz)
+void ObjectHive::push_free(HivePage& page, size_t index, size_t slot_sz)
 {
-    std::memcpy(static_cast<char*>(page.slots) + index * slot_sz, &page.free_head, sizeof(size_t));
-    page.free_head = index;
+    push_free_slot(page.slots, index, slot_sz, page.free_head);
 }
 
-size_t Hive::next_page_capacity() const
+size_t ObjectHive::next_page_capacity() const
 {
-    switch (pages_.size()) {
-    case 0:
-        return 16;
-    case 1:
-        return 64;
-    case 2:
-        return 256;
-    default:
-        return 1024;
-    }
+    return ::velk::next_page_capacity(pages_.size());
 }
 
-bool Hive::find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const
+bool ObjectHive::find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const
 {
     auto obj_addr = reinterpret_cast<uintptr_t>(obj);
     for (size_t pi = 0; pi < pages_.size(); ++pi) {
@@ -359,19 +290,21 @@ bool Hive::find_slot(const void* obj, size_t& page_idx, size_t& slot_idx) const
     return false;
 }
 
-IObject::Ptr Hive::add()
+IObject::Ptr ObjectHive::add()
 {
     if (!factory_) {
         return {};
     }
 
+    std::lock_guard<std::shared_mutex> lock(mutex_);
+
     // Check cached page hint first, then scan.
     HivePage* target = nullptr;
-    if (current_page_ && current_page_->free_head != HIVE_SENTINEL) {
+    if (current_page_ && current_page_->free_head != PAGE_SENTINEL) {
         target = current_page_;
     } else {
         for (auto& page_ptr : pages_) {
-            if (page_ptr->free_head != HIVE_SENTINEL) {
+            if (page_ptr->free_head != PAGE_SENTINEL) {
                 target = page_ptr.get();
                 break;
             }
@@ -386,10 +319,7 @@ IObject::Ptr Hive::add()
     current_page_ = target;
 
     // Pop slot from freelist.
-    size_t slot_idx = target->free_head;
-    size_t next_free;
-    std::memcpy(&next_free, static_cast<char*>(target->slots) + slot_idx * slot_size_, sizeof(size_t));
-    target->free_head = next_free;
+    size_t slot_idx = pop_free_slot(target->slots, slot_size_, target->free_head);
     target->state[slot_idx] = SlotState::Active;
     ++target->live_count;
 
@@ -425,33 +355,38 @@ IObject::Ptr Hive::add()
     return result;
 }
 
-ReturnValue Hive::remove(IObject& object)
+ReturnValue ObjectHive::remove(IObject& object)
 {
-    size_t page_idx, slot_idx;
-    if (!find_slot(&object, page_idx, slot_idx)) {
-        return ReturnValue::Fail;
+    {
+        std::lock_guard<std::shared_mutex> lock(mutex_);
+
+        size_t page_idx, slot_idx;
+        if (!find_slot(&object, page_idx, slot_idx)) {
+            return ReturnValue::Fail;
+        }
+
+        // Clear active bit before transitioning to Zombie.
+        size_t word = slot_idx / 64;
+        size_t bit = slot_idx % 64;
+        pages_[page_idx]->active_bits[word] &= ~(uint64_t(1) << bit);
+
+        // Transition Active -> Zombie. The object stays alive until external refs drop.
+        // When the last strong ref drops, unref() calls hive_destroy which transitions
+        // Zombie -> Free.
+        pages_[page_idx]->state[slot_idx] = SlotState::Zombie;
+        --live_count_;
     }
 
-    // Clear active bit before transitioning to Zombie.
-    size_t word = slot_idx / 64;
-    size_t bit = slot_idx % 64;
-    pages_[page_idx]->active_bits[word] &= ~(uint64_t(1) << bit);
-
-    // Transition Active -> Zombie. The object stays alive until external refs drop.
-    // When the last strong ref drops, unref() calls hive_destroy which transitions
-    // Zombie -> Free.
-    pages_[page_idx]->state[slot_idx] = SlotState::Zombie;
-    --live_count_;
-
-    // Release the hive's strong ref. If this was the last ref, unref() triggers
-    // hive_destroy which reclaims the slot.
+    // Release the hive's strong ref outside the lock. If this is the last ref,
+    // unref() triggers hive_destroy which re-acquires the lock to reclaim the slot.
     object.unref();
 
     return ReturnValue::Success;
 }
 
-bool Hive::contains(const IObject& object) const
+bool ObjectHive::contains(const IObject& object) const
 {
+    std::shared_lock lock(mutex_);
     size_t page_idx, slot_idx;
     return find_slot(&object, page_idx, slot_idx);
 }
@@ -466,7 +401,7 @@ bool Hive::contains(const IObject& object) const
  * @tparam VisitFn bool(IObject* obj, size_t slot_index) - return false to stop.
  */
 template <class VisitFn>
-void Hive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
+void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
 {
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
@@ -507,13 +442,15 @@ void Hive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
     }
 }
 
-void Hive::for_each(void* context, VisitorFn visitor) const
+void ObjectHive::for_each(void* context, VisitorFn visitor) const
 {
+    std::shared_lock lock(mutex_);
     scan_active(0, [&](void* slot) { return visitor(context, *static_cast<IObject*>(slot)); });
 }
 
-void Hive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
+void ObjectHive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
 {
+    std::shared_lock lock(mutex_);
     scan_active(state_offset, [&](void* slot) {
         auto* obj = static_cast<IObject*>(slot);
         return visitor(context, *obj, reinterpret_cast<char*>(slot) + state_offset);
