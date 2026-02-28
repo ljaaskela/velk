@@ -100,9 +100,7 @@ inline bool is_slot_active(const uint64_t* active_bits, size_t word, size_t bit)
  */
 struct IterationGuard
 {
-    explicit IterationGuard(const std::shared_mutex* m) noexcept
-        : mutex(m)
-        , prev(current())
+    explicit IterationGuard(const std::shared_mutex* m) noexcept : mutex(m), prev(current())
     {
         current() = mutex;
     }

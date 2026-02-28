@@ -230,4 +230,9 @@ void RawHiveImpl::clear(void* context, DestroyFn destroy)
     live_count_ = 0;
 }
 
+void RawHiveImpl::clear()
+{
+    clear(nullptr, nullptr);
+}
+
 } // namespace velk

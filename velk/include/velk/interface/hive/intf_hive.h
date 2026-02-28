@@ -81,6 +81,19 @@ public:
      *  @param capacity The page allocation policy to set.
      */
     virtual void set_page_capacity(const HivePageCapacity& capacity) = 0;
+
+    /**
+     * @brief Removes all elements from the hive.
+     *
+     * For object hives, releases the hive's strong reference on every active
+     * object. Objects with external references enter zombie state.
+     *
+     * For raw hives, reclaims all slots without calling destructors. Use
+     * IRawHive::clear(context, destroy) when elements need destruction.
+     *
+     * After clear(), for_each() visits no elements and size() returns 0.
+     */
+    virtual void clear() = 0;
 };
 
 /**
@@ -146,6 +159,8 @@ public:
 class IRawHive : public Interface<IRawHive, IHive>
 {
 public:
+    using IHive::clear;
+
     /** @brief Visitor callback for raw hive iteration. Return false to stop early. */
     using RawVisitorFn = bool (*)(void* context, void* element);
 

@@ -60,14 +60,16 @@ public:
     /** @brief Initializes the hive for the given class UID. */
     void init(Uid classUid);
 
-    // IObjectHive overrides
+    // IHive overrides
     HiveType get_hive_type() const override { return HiveType::ObjectHive; }
     Uid get_element_uid() const override;
     size_t size() const override;
     bool empty() const override;
+    void clear() override;
     HivePageCapacity get_page_capacity() const override;
     void set_page_capacity(const HivePageCapacity& capacity) override;
 
+    // IObjectHive overrides
     IObject::Ptr add() override;
     ReturnValue remove(IObject& object) override;
     bool contains(const IObject& object) const override;

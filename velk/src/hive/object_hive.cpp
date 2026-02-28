@@ -120,28 +120,14 @@ static void hive_destroy_orphan(external_control_block* ecb)
 
 ObjectHive::~ObjectHive()
 {
+    // Release the hive's strong ref on all active objects.
+    clear();
+
+    // Handle orphan pages: pages with zombies or outstanding weak HCBs
+    // must outlive the hive.
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
-        size_t num_words = bitmask_words(page.capacity);
 
-        // First pass: release the hive's strong ref on all Active objects.
-        // Use the bitmask for fast scanning.
-        for (size_t w = 0; w < num_words; ++w) {
-            uint64_t bits = page.active_bits[w];
-            while (bits) {
-                unsigned bit = bitscan_forward64(bits);
-                size_t i = w * 64 + bit;
-                bits &= bits - 1; // clear lowest set bit
-
-                // Clear active bit
-                clear_slot_active(page.active_bits, w, bit);
-                page.state[i] = SlotState::Zombie;
-                auto* obj = static_cast<IObject*>(slot_ptr(page, i));
-                obj->unref(); // Release hive's strong ref
-            }
-        }
-
-        // Second pass: check if any zombies or outstanding weak HCBs remain.
         bool has_zombies = false;
         for (size_t i = 0; i < page.capacity; ++i) {
             if (page.state[i] == SlotState::Zombie) {
@@ -394,6 +380,41 @@ ReturnValue ObjectHive::remove(IObject& object)
     object.unref();
 
     return ReturnValue::Success;
+}
+
+void ObjectHive::clear()
+{
+    check_iteration_guard(mutex_, "clear");
+
+    // Collect all active objects under the lock, then unref outside it.
+    // unref() may trigger hive_destroy which re-acquires the lock to reclaim slots.
+    std::vector<IObject*> to_unref;
+
+    {
+        std::lock_guard<std::shared_mutex> lock(mutex_);
+
+        for (auto& page_ptr : pages_) {
+            auto& page = *page_ptr;
+            size_t num_words = bitmask_words(page.capacity);
+            for (size_t w = 0; w < num_words; ++w) {
+                uint64_t bits = page.active_bits[w];
+                while (bits) {
+                    unsigned bit = bitscan_forward64(bits);
+                    size_t i = w * 64 + bit;
+                    bits &= bits - 1;
+
+                    clear_slot_active(page.active_bits, w, bit);
+                    page.state[i] = SlotState::Zombie;
+                    to_unref.push_back(static_cast<IObject*>(slot_ptr(page, i)));
+                }
+            }
+        }
+        live_count_ = 0;
+    }
+
+    for (auto* obj : to_unref) {
+        obj->unref();
+    }
 }
 
 bool ObjectHive::contains(const IObject& object) const
