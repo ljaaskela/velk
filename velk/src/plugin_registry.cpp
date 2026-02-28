@@ -62,7 +62,7 @@ ReturnValue PluginRegistry::load_plugin(const IPlugin::Ptr& plugin)
     if (!plugin) {
         return ReturnValue::InvalidArgument;
     }
-    Uid id = plugin->get_class_uid();
+    Uid id = interface_cast<IObject>(plugin.get())->get_class_uid();
     PluginEntry key{id, {}};
     auto it = std::lower_bound(plugins_.begin(), plugins_.end(), key);
     if (it != plugins_.end() && it->uid == id) {

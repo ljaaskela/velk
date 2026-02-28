@@ -68,13 +68,13 @@ struct PluginConfig
 /**
  * @brief Interface that plugins implement to register types and hook into the Velk runtime.
  *
- * Inherits IObject so that plugin identity (get_class_uid, get_class_name)
- * and lifetime (shared_ptr via get_self) are available directly from an IPlugin reference.
+ * IObject is provided by ext::Object (which all plugins derive from via ext::Plugin<T>),
+ * so IPlugin does not inherit IObject directly.
  *
  * Plugin authors derive via ext::Plugin<T> and implement initialize, shutdown,
  * and optionally declare static metadata (plugin_name, plugin_deps).
  */
-class IPlugin : public Interface<IPlugin, IObject>
+class IPlugin : public Interface<IPlugin>
 {
 public:
     /** @brief Called when the plugin is loaded. Register types and perform setup here. */

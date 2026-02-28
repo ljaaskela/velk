@@ -54,7 +54,7 @@ enum class HiveType : uint8_t
  * Provides element UID, size, and empty queries shared by both
  * object hives (ref-counted Velk objects) and raw hives (plain data).
  */
-class IHive : public Interface<IHive, IObject>
+class IHive : public Interface<IHive>
 {
 public:
     /** @brief Returns the type of the hive. */

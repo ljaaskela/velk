@@ -12,6 +12,7 @@
 #include <velk/interface/intf_array_property.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_interface.h>
+#include <velk/interface/intf_object.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/member_desc.h>
 #include <velk/vector.h>
@@ -28,7 +29,7 @@ namespace velk {
  * Provides contiguous, state-struct-backed property storage. MetadataContainer
  * uses this to create AnyRef instances that read/write directly into the state struct.
  */
-class IPropertyState : public Interface<IPropertyState>
+class IPropertyState : public Interface<IPropertyState, IObject>
 {
 public:
     /** @brief Returns a pointer to the State struct for the given interface UID, or nullptr. */

@@ -29,6 +29,12 @@ public:
      */
     explicit MetadataContainer(array_view<MemberDesc> members, IInterface* owner = nullptr);
 
+public: // IObject (inherited via IMetadata → IPropertyState → IObject; not used as an IObject)
+    Uid get_class_uid() const override { return {}; }
+    string_view get_class_name() const override { return {}; }
+    IObject::Ptr get_self() const override { return {}; }
+    uint32_t get_object_flags() const override { return 0; }
+
 public: // IPropertyState (inherited via IMetadata; state lives in the Object, not here)
     void* get_property_state(Uid) override { return nullptr; }
 

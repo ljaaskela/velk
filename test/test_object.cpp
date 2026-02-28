@@ -246,14 +246,15 @@ TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
     ASSERT_NE(info, nullptr);
 
     // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
-    // Pack is {IObject, IMetadata, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
-    // Chain walks: IObject, IMetadata->IPropertyState,
+    // Pack is {IMetadata, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
+    // IObject is not prepended because it is reachable via IMetadata->IPropertyState->IObject.
+    // Chain walks: IMetadata->IPropertyState->IObject,
     //             ITestWidget, ITestSerializable, ITestMath, ITestRaw
     EXPECT_EQ(info->interfaces.size(), 7u);
 
-    EXPECT_EQ(info->interfaces[0].uid, IObject::UID);
-    EXPECT_EQ(info->interfaces[1].uid, IMetadata::UID);
-    EXPECT_EQ(info->interfaces[2].uid, IPropertyState::UID);
+    EXPECT_EQ(info->interfaces[0].uid, IMetadata::UID);
+    EXPECT_EQ(info->interfaces[1].uid, IPropertyState::UID);
+    EXPECT_EQ(info->interfaces[2].uid, IObject::UID);
     EXPECT_EQ(info->interfaces[3].uid, ITestWidget::UID);
     EXPECT_EQ(info->interfaces[4].uid, ITestSerializable::UID);
     EXPECT_EQ(info->interfaces[5].uid, ITestMath::UID);

@@ -193,13 +193,13 @@ An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The
 
 ### Example: Minimal object with 1 member
 
-A minimal object implements a single interface with one property. `ext::Object` adds `IMetadata`, giving 3 interfaces in the dispatch pack (IObject, IMetadata, IToggle). The MetadataContainer is allocated lazily on first runtime metadata access.
+A minimal object implements a single interface with one property. `ext::Object` adds `IMetadata`, giving 2 interfaces in the dispatch pack (IMetadata, IToggle). IObject is not prepended because it is reachable via IMetadata's parent chain (IMetadata → IPropertyState → IObject). The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-Toggle (72 bytes)                           MetadataContainer (72 bytes, heap, lazy)
+Toggle (48 bytes)                           MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
-│ MI base layout               40  │      │ base (InterfaceDispatch)   16  │
-│   (3 vptrs + MI padding)         │      │ members_ (array_view)      16  │
+│ MI base layout               16  │      │ base (InterfaceDispatch)   16  │
+│   (2 vptrs)                      │      │ members_ (array_view)      16  │
 │ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
 │ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
@@ -208,17 +208,17 @@ Toggle (72 bytes)                           MetadataContainer (72 bytes, heap, l
 └──────────────────────────────────┘
 ```
 
-With no members accessed, the MetadataContainer is not allocated. The total footprint is **72 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **168 bytes**.
+With no members accessed, the MetadataContainer is not allocated. The total footprint is **48 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **144 bytes**.
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata, totaling 4 interfaces in the dispatch pack (IObject, IMetadata, IMyWidget, ISerializable). The MetadataContainer is allocated lazily on first runtime metadata access.
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata, totaling 3 interfaces in the dispatch pack (IMetadata, IMyWidget, ISerializable). IObject is not prepended because it is reachable via IMetadata's parent chain. The MetadataContainer is allocated lazily on first runtime metadata access.
 
 ```
-MyWidget (112 bytes)                        MetadataContainer (72 bytes, heap, lazy)
+MyWidget (80 bytes)                         MetadataContainer (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
-│ MI base layout               48  │      │ base (InterfaceDispatch)   16  │
-│   (4 vptrs + MI padding)         │      │ members_ (array_view)      16  │
+│ MI base layout               24  │      │ base (InterfaceDispatch)   16  │
+│   (3 vptrs)                      │      │ members_ (array_view)      16  │
 │ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
 │ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
@@ -237,11 +237,11 @@ Member instances are created lazily, only when first accessed via `get_property(
 
 | Scenario | Object | MetadataContainer | Cached members | Total |
 |---|---|---|---|---|
-| Toggle, no members accessed | 72 | 0 (lazy) | 0 | **72 bytes** |
-| Toggle, 1 member accessed | 72 | 72 | 1 × 24 = 24 | **168 bytes** |
-| MyWidget, no members accessed | 112 | 0 (lazy) | 0 | **112 bytes** |
-| MyWidget, 3 members accessed | 112 | 72 | 3 × 24 = 72 | **256 bytes** |
-| MyWidget, all 6 members accessed | 112 | 72 | 6 × 24 = 144 | **328 bytes** |
+| Toggle, no members accessed | 48 | 0 (lazy) | 0 | **48 bytes** |
+| Toggle, 1 member accessed | 48 | 72 | 1 × 24 = 24 | **144 bytes** |
+| MyWidget, no members accessed | 80 | 0 (lazy) | 0 | **80 bytes** |
+| MyWidget, 3 members accessed | 80 | 72 | 3 × 24 = 72 | **224 bytes** |
+| MyWidget, all 6 members accessed | 80 | 72 | 6 × 24 = 144 | **296 bytes** |
 
 The `states_` tuple contains one `State` struct per interface that declares properties via `VELK_INTERFACE`. Each `State` struct holds one field per `PROP` member, initialized with its declared default value. Properties backed by state storage use `ext::AnyRef<T>` to read/write directly into these fields.
 
@@ -254,15 +254,15 @@ Every object starts with the same infrastructure. Multiple inheritance adds one 
 The control block comes in two variants: `control_block` (16 bytes: strong + weak + ptr) for IInterface types, and `external_control_block` (24 bytes) which adds a type-erased `destroy` function pointer for non-IInterface types managed by `shared_ptr`.
 
 - **RefCountedDispatch base** (24 bytes): vptr (8) + flags (4) + padding (4) + block* (8)
-- **ObjectCore** adds IObject = **40 bytes** base (with 1 extra interface) for Property, Function, and user objects. `get_self()` reconstructs a `shared_ptr` from `control_block::ptr`.
+- **ObjectCore** adds IObject = **32 bytes** base (with 1 extra interface) for Property, Function, and user objects. `get_self()` reconstructs a `shared_ptr` from `control_block::ptr`.
 - **AnyBase** skips `self_` and uses a single inheritance chain = **24 bytes** base for Any types
 
 Measured ObjectCore sizes (MSVC x64):
 
 | Configuration | Interfaces | Size |
 |---|---|---|
-| `ext::ObjectCore<X, I>` (1 extra interface) | 2 (IObject + I) | **40 bytes** |
-| `ext::ObjectCore<X, IMetadata, IMyWidget, ISerializable>` | 4 | **72 bytes** |
+| `ext::ObjectCore<X, I>` (1 interface, IObject prepended) | 2 (IObject + I) | **32 bytes** |
+| `ext::ObjectCore<X, IMetadata, IMyWidget, ISerializable>` (IObject in chain) | 3 | **40 bytes** |
 
 ### Base types
 
@@ -275,19 +275,19 @@ AnyValue<float> (32 bytes)          ArrayAnyValue<float> (48 bytes)
 │ data_ (float) + pad     8  │      │ data_ (vector<float>)  24  │
 └────────────────────────────┘      └────────────────────────────┘
 
-PropertyImpl (80 bytes)             FunctionImpl (104 bytes)
+PropertyImpl (72 bytes)             FunctionImpl (96 bytes)
 ┌────────────────────────────┐      ┌────────────────────────────┐
-│ MI base layout          48 │      │ MI base layout          48 │
-│   (2 vptrs + MI padding)   │      │   (2 vptrs + MI padding)   │
+│ MI base layout          16 │      │ MI base layout          16 │
+│   (2 vptrs)                │      │   (2 vptrs)                │
 │ flags + padding          8 │      │ flags + padding          8 │
 │ block*                   8 │      │ block*                   8 │
 │ data_ (shared_ptr)      16 │      │ target_context_          8 │
 │ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │
 │ external_ (bool) + pad   8 │      │ owned_context_           8 │
-│ (total verified: 80)       │      │ context_deleter_         8 │
+│ (total verified: 72)       │      │ context_deleter_         8 │
 └────────────────────────────┘      │ handlers_ (vector)      24 │
                                     │ deferred_begin_ + pad    8 │
-                                    │ (total verified: 104)      │
+                                    │ (total verified: 96)       │
                                     └────────────────────────────┘
 ```
 
