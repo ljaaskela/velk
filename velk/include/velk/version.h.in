@@ -1,0 +1,19 @@
+#ifndef VELK_VERSION_H
+#define VELK_VERSION_H
+
+#include <cstdint>
+
+namespace velk {
+
+inline constexpr uint8_t  library_version_major = @PROJECT_VERSION_MAJOR@;
+inline constexpr uint8_t  library_version_minor = @PROJECT_VERSION_MINOR@;
+inline constexpr uint16_t library_version_patch = @PROJECT_VERSION_PATCH@;
+
+inline constexpr uint32_t library_version =
+    (static_cast<uint32_t>(library_version_major) << 24) |
+    (static_cast<uint32_t>(library_version_minor) << 16) |
+    static_cast<uint32_t>(library_version_patch);
+
+} // namespace velk
+
+#endif // VELK_VERSION_H

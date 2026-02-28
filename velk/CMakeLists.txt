@@ -81,9 +81,16 @@ add_library(velk SHARED
     src/hive/hive_store.h
     )
 
+configure_file(
+    include/velk/version.h.in
+    "${CMAKE_CURRENT_BINARY_DIR}/include/velk/version.h"
+    @ONLY
+)
+
 target_include_directories(velk
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
         $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/hive
@@ -119,6 +126,10 @@ install(TARGETS velk EXPORT velk-targets
 
 install(DIRECTORY include/velk
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/include/velk/version.h"
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/velk
 )
 
 install(EXPORT velk-targets
