@@ -1,5 +1,6 @@
 #include "type_registry.h"
 
+#include "array_property.h"
 #include "function.h"
 #include "future.h"
 #include "hive/hive_store.h"
@@ -18,6 +19,7 @@ namespace velk {
 TypeRegistry::TypeRegistry(ILog& log) : log_(log)
 {
     ITypeRegistry::register_type<PropertyImpl>();
+    ITypeRegistry::register_type<ArrayPropertyImpl>();
     ITypeRegistry::register_type<FunctionImpl>();
     ITypeRegistry::register_type<FutureImpl>();
     ITypeRegistry::register_type<HiveStore>();
@@ -35,6 +37,18 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<int32_t>>();
     ITypeRegistry::register_type<ext::AnyValue<int64_t>>();
     ITypeRegistry::register_type<ext::AnyValue<string>>();
+
+    ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<double>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<uint8_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<uint16_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<uint32_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<uint64_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<int8_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<int16_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<int32_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<int64_t>>();
+    ITypeRegistry::register_type<ext::ArrayAnyValue<string>>();
 }
 
 const IObjectFactory* TypeRegistry::find(Uid uid) const

@@ -1,5 +1,6 @@
 #include "metadata_container.h"
 
+#include "array_property.h"
 #include "function.h"
 #include "property.h"
 
@@ -43,6 +44,31 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
                     }
                 }
                 // Fallback to cloning default
+                if (!pi->get_any() && pk->getDefault) {
+                    if (auto* def = pk->getDefault()) {
+                        if (auto any = def->clone()) {
+                            pi->set_any(any);
+                        }
+                    }
+                }
+            }
+        }
+        break;
+    }
+    case MemberKind::ArrayProperty: {
+        auto* pk = desc.propertyKind();
+        created = ext::make_object<ArrayPropertyImpl>(pk ? pk->flags : ObjectFlags::None);
+        if (auto* pi = created->get_interface<IPropertyInternal>()) {
+            if (pk) {
+                if (pk->createRef && owner_) {
+                    if (auto* ps = interface_cast<IPropertyState>(owner_)) {
+                        if (void* base = ps->get_property_state(desc.interfaceInfo->uid)) {
+                            if (auto ref = pk->createRef(base)) {
+                                pi->set_any(ref);
+                            }
+                        }
+                    }
+                }
                 if (!pi->get_any() && pk->getDefault) {
                     if (auto* def = pk->getDefault()) {
                         if (auto any = def->clone()) {
@@ -112,7 +138,11 @@ IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind k
 
 IProperty::Ptr MetadataContainer::get_property(string_view name) const
 {
-    return interface_pointer_cast<IProperty>(find_or_create(name, MemberKind::Property));
+    auto result = find_or_create(name, MemberKind::Property);
+    if (!result) {
+        result = find_or_create(name, MemberKind::ArrayProperty);
+    }
+    return interface_pointer_cast<IProperty>(result);
 }
 
 IEvent::Ptr MetadataContainer::get_event(string_view name) const
@@ -135,7 +165,7 @@ void MetadataContainer::notify(MemberKind kind, Uid interfaceUid, Notification n
 
         switch (notification) {
         case Notification::Changed:
-            if (kind == MemberKind::Property) {
+            if (kind == MemberKind::Property || kind == MemberKind::ArrayProperty) {
                 if (auto* prop = interface_cast<IProperty>(ptr)) {
                     invoke_event(prop->on_changed(), prop->get_value().get());
                 }

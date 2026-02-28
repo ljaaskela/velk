@@ -9,10 +9,12 @@
 #include <velk/array_view.h>
 #include <velk/common.h>
 #include <velk/ext/any.h>
+#include <velk/interface/intf_array_property.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_interface.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/member_desc.h>
+#include <velk/vector.h>
 
 #include <cstdint>
 #include <type_traits>
@@ -396,6 +398,39 @@ struct PropBind
 };
 
 /**
+ * @brief Binds a pointer-to-member of type vector<T> to an ArrayPropertyKind.
+ *
+ * Similar to PropBind but produces an ArrayAnyRef<T> (which implements IArrayAny)
+ * instead of a plain AnyRef<vector<T>>. Element-level operations are provided by
+ * IArrayAny on the Any itself, so no function pointers are needed here.
+ *
+ * @tparam State The state struct type.
+ * @tparam Mem Pointer-to-member (vector<T> State::*).
+ * @tparam Flags ObjectFlags (e.g. ReadOnly).
+ */
+template <class State, auto Mem, uint32_t Flags = 0>
+struct ArrBind
+{
+    using vec_type = decltype(member_type_helper(Mem));
+    using value_type = typename vec_type::value_type;
+
+    static const IAny* getDefault()
+    {
+        static ext::AnyRef<vec_type> ref(&(default_state<State>().*Mem));
+        return &ref;
+    }
+
+    static IAny::Ptr createRef(void* base)
+    {
+        return ext::create_array_any_ref<value_type>(&(static_cast<State*>(base)->*Mem));
+    }
+
+    static constexpr PropertyKind baseKind{type_uid<vec_type>(), &getDefault, &createRef, Flags};
+
+    static constexpr ArrayPropertyKind kind{baseKind, type_uid<value_type>()};
+};
+
+/**
  * @brief Binds a typed member function pointer to a FunctionKind trampoline.
  *
  * Given a pointer-to-member for a virtual method declared by @c FN (zero-arg
@@ -612,6 +647,8 @@ struct FnRawBind
 
 #define _VELK_STATE_PROP(Type, Name, Default) Type Name = Default;
 #define _VELK_STATE_RPROP(Type, Name, Default) Type Name = Default;
+#define _VELK_STATE_ARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
+#define _VELK_STATE_RARR(Type, Name, ...) ::velk::vector<Type> Name = {__VA_ARGS__};
 #define _VELK_STATE_EVT(Name)
 #define _VELK_STATE_FN(...)
 #define _VELK_STATE_FN_RAW(...)
@@ -625,6 +662,12 @@ struct FnRawBind
 #define _VELK_DEFAULTS_RPROP(Type, Name, Default)                 \
     static constexpr ::velk::PropertyKind _velk_propkind_##Name = \
         ::velk::detail::PropBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
+#define _VELK_DEFAULTS_ARR(Type, Name, ...)                             \
+    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name =   \
+        ::velk::detail::ArrBind<State, &State::Name>::kind;
+#define _VELK_DEFAULTS_RARR(Type, Name, ...)                            \
+    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name =   \
+        ::velk::detail::ArrBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
 #define _VELK_DEFAULTS_EVT(...)
 
 #define _VELK_DEFAULTS_FN_0(Name)                               \
@@ -657,6 +700,8 @@ struct FnRawBind
 
 #define _VELK_META_PROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
 #define _VELK_META_RPROP(Type, Name, ...) ::velk::PropertyDesc(#Name, &INFO, &_velk_propkind_##Name),
+#define _VELK_META_ARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
+#define _VELK_META_RARR(Type, Name, ...) ::velk::ArrayPropertyDesc(#Name, &INFO, &_velk_arrkind_##Name),
 #define _VELK_META_EVT(Name) ::velk::EventDesc(#Name, &INFO),
 #define _VELK_META_FN(RetType, Name, ...) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
 #define _VELK_META_FN_RAW(Name) ::velk::FunctionDesc(#Name, &INFO, &_velk_fnkind_##Name),
@@ -666,6 +711,8 @@ struct FnRawBind
 
 #define _VELK_TRAMPOLINE_PROP(...)
 #define _VELK_TRAMPOLINE_RPROP(...)
+#define _VELK_TRAMPOLINE_ARR(...)
+#define _VELK_TRAMPOLINE_RARR(...)
 #define _VELK_TRAMPOLINE_EVT(Name)
 
 #define _VELK_TRAMPOLINE_FN_0(RetType, Name) virtual RetType fn_##Name() = 0;
@@ -718,6 +765,18 @@ struct FnRawBind
         return ::velk::ConstProperty<Type>(                                                  \
             ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
     }
+#define _VELK_ACC_ARR(Type, Name, ...)                                                       \
+    ::velk::ArrayProperty<Type> Name() const                                                 \
+    {                                                                                        \
+        return ::velk::ArrayProperty<Type>(                                                  \
+            ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
+    }
+#define _VELK_ACC_RARR(Type, Name, ...)                                                      \
+    ::velk::ConstArrayProperty<Type> Name() const                                            \
+    {                                                                                        \
+        return ::velk::ConstArrayProperty<Type>(                                             \
+            ::velk::get_property(this->template get_interface<::velk::IMetadata>(), #Name)); \
+    }
 #define _VELK_ACC_EVT(Name)                                                                                \
     ::velk::Event Name() const                                                                             \
     {                                                                                                      \
@@ -749,6 +808,8 @@ struct FnRawBind
  * |----------|------------------------------------------|--------------------------------------|
  * | Property | @c (PROP, Type, Name, Default)           | A typed property with default value  |
  * | Read-only| @c (RPROP, Type, Name, Default)          | A read-only property with default    |
+ * | Array    | @c (ARR, ElemType, Name, ...)             | Array property (vector\<ElemType\>)  |
+ * | RO Array | @c (RARR, ElemType, Name, ...)            | Read-only array property             |
  * | Event    | @c (EVT, Name)                           | An observable event                  |
  * | Function | @c (FN, RetType, Name)                            | Zero-arg function with return type   |
  * | Function | @c (FN, RetType, Name, (T1, a1), (T2, a2), ...)   | Typed-arg function with metadata     |
@@ -767,6 +828,9 @@ struct FnRawBind
  *    For @c FN members the descriptor includes a pointer to the trampoline.
  * -# A non-virtual @c const accessor method on the interface:
  *    - @c PROP &rarr; <tt>Property\<Type\> Name() const</tt>
+ *    - @c RPROP &rarr; <tt>ConstProperty\<Type\> Name() const</tt>
+ *    - @c ARR  &rarr; <tt>ArrayProperty\<ElemType\> Name() const</tt>
+ *    - @c RARR &rarr; <tt>ConstArrayProperty\<ElemType\> Name() const</tt>
  *    - @c EVT  &rarr; <tt>Event Name() const</tt>
  *    - @c FN   &rarr; <tt>Function Name() const</tt>
  *

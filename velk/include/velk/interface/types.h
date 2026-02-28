@@ -28,6 +28,8 @@ inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
 inline constexpr Uid Event = Function;
 /** @brief Default future object implementation. */
 inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
+/** @brief Default array property object implementation. */
+inline constexpr Uid ArrayProperty{"f8e2a3b1-7c4d-49e6-8f1a-2b3c4d5e6f70"};
 } // namespace ClassId
 
 /** @brief A duration in microseconds. */

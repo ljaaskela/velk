@@ -16,7 +16,8 @@ enum class MemberKind : uint8_t
 {
     Property,
     Event,
-    Function
+    Function,
+    ArrayProperty
 };
 
 /** @brief Discriminator for the kind of notification to broadcast. */
@@ -39,6 +40,17 @@ struct PropertyKind
     /** @brief Creates an AnyRef pointing into the State struct at @p stateBase. */
     IAny::Ptr (*createRef)(void* stateBase) = nullptr;
     uint32_t flags{ObjectFlags::None}; ///< ObjectFlags to apply to the created PropertyImpl.
+};
+
+/** @brief Kind-specific data for ArrayProperty members.
+ *
+ * Extends PropertyKind with element type info. Element-level operations are
+ * provided by IArrayAny on the backing Any, not by function pointers here.
+ */
+struct ArrayPropertyKind
+{
+    PropertyKind base; ///< Base property kind (vector typeUid, getDefault, createRef, flags).
+    Uid elementUid;    ///< type_uid<T>() for the element type.
 };
 
 /** @brief Describes a single argument of a typed function. */
@@ -66,7 +78,18 @@ struct MemberDesc
     /// Typed ext member getter for MemberDesc.kind = MemberKind::Property
     constexpr const PropertyKind* propertyKind() const
     {
-        return kind == MemberKind::Property ? static_cast<const PropertyKind*>(ext) : nullptr;
+        if (kind == MemberKind::Property) {
+            return static_cast<const PropertyKind*>(ext);
+        }
+        if (kind == MemberKind::ArrayProperty) {
+            return &static_cast<const ArrayPropertyKind*>(ext)->base;
+        }
+        return nullptr;
+    }
+    /// Typed ext member getter for MemberDesc.kind = MemberKind::ArrayProperty
+    constexpr const ArrayPropertyKind* arrayPropertyKind() const
+    {
+        return kind == MemberKind::ArrayProperty ? static_cast<const ArrayPropertyKind*>(ext) : nullptr;
     }
     /// Typed ext member getter for MemberDesc.kind = MemberKind::Function or MemberDesc.kind =
     /// MemberKind::Event
@@ -88,6 +111,18 @@ constexpr MemberDesc PropertyDesc(string_view name, const InterfaceInfo* info = 
                                   const PropertyKind* pk = nullptr)
 {
     return {name, MemberKind::Property, info, pk};
+}
+
+/**
+ * @brief Creates an ArrayProperty MemberDesc.
+ * @param name Member name for runtime lookup.
+ * @param info Interface that declares this member (may be nullptr).
+ * @param ak ArrayPropertyKind with element ops and base PropertyKind (may be nullptr).
+ */
+constexpr MemberDesc ArrayPropertyDesc(string_view name, const InterfaceInfo* info = nullptr,
+                                       const ArrayPropertyKind* ak = nullptr)
+{
+    return {name, MemberKind::ArrayProperty, info, ak};
 }
 
 /**

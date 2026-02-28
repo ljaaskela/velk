@@ -1,11 +1,13 @@
 #ifndef VELK_PAGE_ALLOCATOR_H
 #define VELK_PAGE_ALLOCATOR_H
 
+#include <velk/api/velk.h>
 #include <velk/interface/hive/intf_hive.h>
 
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
+#include <shared_mutex>
 
 #ifdef _WIN32
 #include <intrin.h>
@@ -71,6 +73,59 @@ inline unsigned bitscan_forward64(uint64_t mask)
 inline size_t bitmask_words(size_t capacity)
 {
     return (capacity + 63) / 64;
+}
+
+/** @brief Sets the active bit for slot @p bit in bitmask word @p word. */
+inline void set_slot_active(uint64_t* active_bits, size_t word, size_t bit)
+{
+    active_bits[word] |= uint64_t(1) << (bit & 63);
+}
+
+/** @brief Clears the active bit for slot @p bit in bitmask word @p word. */
+inline void clear_slot_active(uint64_t* active_bits, size_t word, size_t bit)
+{
+    active_bits[word] &= ~(uint64_t(1) << (bit & 63));
+}
+
+/** @brief Tests whether slot @p bit in bitmask word @p word is active. */
+inline bool is_slot_active(const uint64_t* active_bits, size_t word, size_t bit)
+{
+    return (active_bits[word] & (uint64_t(1) << (bit & 63))) != 0;
+}
+
+/**
+ * @brief RAII guard that tracks which hive mutex is currently held for iteration
+ * on this thread. Enables detection of illegal mutation from within a for_each
+ * visitor, which would otherwise silently deadlock.
+ */
+struct IterationGuard
+{
+    explicit IterationGuard(const std::shared_mutex* m) noexcept : mutex(m), prev(current())
+    {
+        current() = mutex;
+    }
+    ~IterationGuard() noexcept { current() = prev; }
+    IterationGuard(const IterationGuard&) = delete;
+    IterationGuard& operator=(const IterationGuard&) = delete;
+
+    /** @brief Returns true if the given mutex is currently held for iteration on this thread. */
+    static bool is_iterating(const std::shared_mutex* m) noexcept { return current() == m; }
+
+private:
+    static const std::shared_mutex*& current() noexcept
+    {
+        thread_local const std::shared_mutex* s_current = nullptr;
+        return s_current;
+    }
+    const std::shared_mutex* mutex{};
+    const std::shared_mutex* prev{};
+};
+
+inline void check_iteration_guard(const std::shared_mutex& m, string_view operation)
+{
+    if (IterationGuard::is_iterating(&m)) {
+        VELK_LOG(E, "ObjectHive::%s() called from inside for_each (will deadlock)", operation);
+    }
 }
 
 /** @brief Returns the page capacity for a given page index. */

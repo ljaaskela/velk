@@ -498,6 +498,9 @@ void demo_sizes()
     // Any types
     cout << "Any types:" << endl;
     cout << "  AnyValue<float>          " << sizeof(ext::AnyValue<float>) << endl;
+    cout << "  AnyRef<float>            " << sizeof(ext::AnyRef<float>) << endl;
+    cout << "  ArrayAnyRef<float>       " << sizeof(ext::ArrayAnyRef<float>) << endl;
+    cout << "  ArrayAnyValue<float>     " << sizeof(ext::ArrayAnyValue<float>) << endl;
     cout << "  MyDataAny                " << sizeof(MyDataAny) << endl;
 
     // MyWidget (Object with states)

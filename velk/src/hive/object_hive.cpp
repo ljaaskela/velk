@@ -76,7 +76,7 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
         // Clear active bit and transition slot to Free.
         size_t word = slot_index / 64;
         size_t bit = slot_index % 64;
-        page->active_bits[word] &= ~(uint64_t(1) << bit);
+        clear_slot_active(page->active_bits, word, bit);
 
         page->state[slot_index] = SlotState::Free;
         push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
@@ -120,28 +120,14 @@ static void hive_destroy_orphan(external_control_block* ecb)
 
 ObjectHive::~ObjectHive()
 {
+    // Release the hive's strong ref on all active objects.
+    clear();
+
+    // Handle orphan pages: pages with zombies or outstanding weak HCBs
+    // must outlive the hive.
     for (auto& page_ptr : pages_) {
         auto& page = *page_ptr;
-        size_t num_words = bitmask_words(page.capacity);
 
-        // First pass: release the hive's strong ref on all Active objects.
-        // Use the bitmask for fast scanning.
-        for (size_t w = 0; w < num_words; ++w) {
-            uint64_t bits = page.active_bits[w];
-            while (bits) {
-                unsigned bit = bitscan_forward64(bits);
-                size_t i = w * 64 + bit;
-                bits &= bits - 1; // clear lowest set bit
-
-                // Clear active bit
-                page.active_bits[w] &= ~(uint64_t(1) << bit);
-                page.state[i] = SlotState::Zombie;
-                auto* obj = static_cast<IObject*>(slot_ptr(page, i));
-                obj->unref(); // Release hive's strong ref
-            }
-        }
-
-        // Second pass: check if any zombies or outstanding weak HCBs remain.
         bool has_zombies = false;
         for (size_t i = 0; i < page.capacity; ++i) {
             if (page.state[i] == SlotState::Zombie) {
@@ -304,6 +290,8 @@ IObject::Ptr ObjectHive::add()
         return {};
     }
 
+    check_iteration_guard(mutex_, "add");
+
     std::lock_guard<std::shared_mutex> lock(mutex_);
 
     // Check cached page hint first, then scan.
@@ -334,7 +322,7 @@ IObject::Ptr ObjectHive::add()
     // Set active bit.
     size_t word = slot_idx / 64;
     size_t bit = slot_idx % 64;
-    target->active_bits[word] |= uint64_t(1) << bit;
+    set_slot_active(target->active_bits, word, bit);
 
     // Initialize the embedded HiveControlBlock (no heap allocation).
     auto* hcb = &target->hcbs[slot_idx];
@@ -365,6 +353,8 @@ IObject::Ptr ObjectHive::add()
 
 ReturnValue ObjectHive::remove(IObject& object)
 {
+    check_iteration_guard(mutex_, "remove");
+
     {
         std::lock_guard<std::shared_mutex> lock(mutex_);
 
@@ -376,7 +366,7 @@ ReturnValue ObjectHive::remove(IObject& object)
         // Clear active bit before transitioning to Zombie.
         size_t word = slot_idx / 64;
         size_t bit = slot_idx % 64;
-        pages_[page_idx]->active_bits[word] &= ~(uint64_t(1) << bit);
+        clear_slot_active(pages_[page_idx]->active_bits, word, bit);
 
         // Transition Active -> Zombie. The object stays alive until external refs drop.
         // When the last strong ref drops, unref() calls hive_destroy which transitions
@@ -390,6 +380,41 @@ ReturnValue ObjectHive::remove(IObject& object)
     object.unref();
 
     return ReturnValue::Success;
+}
+
+void ObjectHive::clear()
+{
+    check_iteration_guard(mutex_, "clear");
+
+    // Collect all active objects under the lock, then unref outside it.
+    // unref() may trigger hive_destroy which re-acquires the lock to reclaim slots.
+    std::vector<IObject*> to_unref;
+
+    {
+        std::lock_guard<std::shared_mutex> lock(mutex_);
+
+        for (auto& page_ptr : pages_) {
+            auto& page = *page_ptr;
+            size_t num_words = bitmask_words(page.capacity);
+            for (size_t w = 0; w < num_words; ++w) {
+                uint64_t bits = page.active_bits[w];
+                while (bits) {
+                    unsigned bit = bitscan_forward64(bits);
+                    size_t i = w * 64 + bit;
+                    bits &= bits - 1;
+
+                    clear_slot_active(page.active_bits, w, bit);
+                    page.state[i] = SlotState::Zombie;
+                    to_unref.push_back(static_cast<IObject*>(slot_ptr(page, i)));
+                }
+            }
+        }
+        live_count_ = 0;
+    }
+
+    for (auto* obj : to_unref) {
+        obj->unref();
+    }
 }
 
 bool ObjectHive::contains(const IObject& object) const
@@ -423,7 +448,7 @@ void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
                 // Re-check the live bit: a visitor callback may have triggered
                 // hive_destroy (via unref) which clears the bit for a slot in
                 // this same word.
-                if (!(page.active_bits[w] & (uint64_t(1) << b))) {
+                if (!is_slot_active(page.active_bits, w, b)) {
                     continue;
                 }
                 // Prefetch next active slot.
@@ -453,12 +478,14 @@ void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
 void ObjectHive::for_each(void* context, VisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
     scan_active(0, [&](void* slot) { return visitor(context, *static_cast<IObject*>(slot)); });
 }
 
 void ObjectHive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
     scan_active(state_offset, [&](void* slot) {
         auto* obj = static_cast<IObject*>(slot);
         return visitor(context, *obj, reinterpret_cast<char*>(slot) + state_offset);

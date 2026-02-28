@@ -1,4 +1,6 @@
 add_library(velk SHARED
+    src/array_property.cpp
+    src/array_property.h
     src/property.cpp
     src/property.h
     src/function.cpp
@@ -30,6 +32,8 @@ add_library(velk SHARED
     include/velk/interface/intf_object.h
     include/velk/interface/intf_interface.h
     include/velk/interface/refcnt_ptr.h
+    include/velk/interface/intf_array_any.h
+    include/velk/interface/intf_array_property.h
     include/velk/interface/intf_function.h
     include/velk/interface/intf_event.h
     include/velk/interface/intf_future.h

@@ -91,6 +91,8 @@ template <class T>
 class vector : private vector_base
 {
 public:
+    using value_type = T; ///< The element type.
+
     /** @brief Default-constructs an empty vector. */
     vector() = default;
 

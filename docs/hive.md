@@ -429,7 +429,7 @@ All benchmarks use 512 elements with 10 members (5 floats + 5 ints). Measured on
 
 ### What you get
 
-**Object hive** (128 B per element): ref-counted lifetime with `shared_ptr`/`weak_ptr`, runtime interface dispatch, lazy metadata, zombie/orphan safety, thread-safe mutation, and `ObjectFlags::HiveManaged` tagging.
+**Object hive** (104 B per element): ref-counted lifetime with `shared_ptr`/`weak_ptr`, runtime interface dispatch, lazy metadata, zombie/orphan safety, thread-safe mutation, and `ObjectFlags::HiveManaged` tagging.
 
 **Raw hive** (element size only): O(1) allocation and deallocation, contiguous paged storage, bitmask iteration, thread-safe mutation. No ref-counting or interface dispatch overhead.
 
@@ -450,8 +450,8 @@ All benchmarks use 512 elements with 10 members (5 floats + 5 ints). Measured on
 | `std::vector<PlainData>`| ~570 | ~650 | ~650 | ~7,400 | 40 |
 | `std::vector<unique_ptr<T>>` | ~16,300 | ~700 | ~650 | ~16,200 <br>~23,100 [(2)](#note-2) | 40 + ptr |
 | `RawHive<PlainData>` | ~5,400 | ~2,200 | ~2,060 | ~2,000 | 40 |
-| `std::vector<IObject::Ptr>` | ~40,600 | ~2,400 | ~2,240 | ~30,700 | 128 |
-| `ObjectHive<>` | ~10,500 | ~3,700 <br>~2,400 [(1)](#note-1) | ~3,900 <br>~2,240 [(1)](#note-1) | ~5,800 | 128 |
+| `std::vector<IObject::Ptr>` | ~40,600 | ~2,400 | ~2,240 | ~30,700 | 104 |
+| `ObjectHive<>` | ~10,500 | ~3,700 <br>~2,400 [(1)](#note-1) | ~3,900 <br>~2,240 [(1)](#note-1) | ~5,800 | 104 |
 
 #### Note 1
 Velk object rows use `get_property_state<T>()` for direct state access. The object hive read/write columns show two values:

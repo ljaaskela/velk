@@ -133,6 +133,14 @@ public:
         }
     }
 
+    /** @brief Removes all objects from the hive. */
+    void clear()
+    {
+        if (hive_) {
+            hive_->clear();
+        }
+    }
+
     /** @brief Returns the underlying IObjectHive. */
     IObjectHive& raw() { return *hive_; }
     /** @brief Returns the underlying IObjectHive (const). */

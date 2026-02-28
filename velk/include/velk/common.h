@@ -5,6 +5,15 @@
 
 #include <array>
 
+// MSVC does not apply Empty Base Optimization to classes with multiple inheritance
+// unless __declspec(empty_bases) is specified. Apply to empty mixin bases so that
+// user code combining them (e.g. struct Foo : NoCopy, NoMove {}) does not pay 8 bytes.
+#ifdef _MSC_VER
+#define VELK_EMPTY_BASES __declspec(empty_bases)
+#else
+#define VELK_EMPTY_BASES
+#endif
+
 namespace velk {
 
 /** @brief Extracts a substring into a null-terminated std::array at compile time. */
@@ -68,8 +77,8 @@ constexpr Uid type_uid()
     return make_hash(get_name<T...>());
 }
 
-/** @brief Mixin (inherit to add behavior) that deletes copy constructor and copy assignment operator. */
-struct NoCopy
+/** @brief Mixin that deletes copy constructor and copy assignment operator. */
+struct VELK_EMPTY_BASES NoCopy
 {
     NoCopy() = default;
     ~NoCopy() = default;
@@ -77,8 +86,8 @@ struct NoCopy
     NoCopy& operator=(const NoCopy&) = delete;
 };
 
-/** @brief Mixin (inherit to add behavior) that deletes move constructor and move assignment operator. */
-struct NoMove
+/** @brief Mixin that deletes move constructor and move assignment operator. */
+struct VELK_EMPTY_BASES NoMove
 {
     NoMove() = default;
     ~NoMove() = default;
@@ -86,11 +95,15 @@ struct NoMove
     NoMove& operator=(NoMove&&) = delete;
 };
 
-/** @brief Mixin (inherit to add behavior) that prevents both copying and moving. */
-struct NoCopyMove : public NoCopy, public NoMove
+/** @brief Mixin that prevents both copying and moving. */
+struct VELK_EMPTY_BASES NoCopyMove
 {
     NoCopyMove() = default;
     ~NoCopyMove() = default;
+    NoCopyMove(const NoCopyMove&) = delete;
+    NoCopyMove& operator=(const NoCopyMove&) = delete;
+    NoCopyMove(NoCopyMove&&) = delete;
+    NoCopyMove& operator=(NoCopyMove&&) = delete;
 };
 
 } // namespace velk

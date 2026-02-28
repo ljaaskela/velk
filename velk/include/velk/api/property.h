@@ -4,10 +4,12 @@
 #include <velk/api/any.h>
 #include <velk/api/velk.h>
 #include <velk/common.h>
+#include <velk/interface/intf_array_property.h>
 #include <velk/interface/intf_function.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_velk.h>
 #include <velk/interface/types.h>
+#include <velk/vector.h>
 
 namespace velk {
 
@@ -112,6 +114,106 @@ public:
         }
         return ReturnValue::Fail;
     }
+};
+
+/**
+ * @brief Read-only typed array property wrapper with element access.
+ *
+ * Returned by RARR accessors. Provides read-only element access without copying the full vector.
+ * @tparam T The element type.
+ */
+template <class T>
+class ConstArrayProperty : public detail::PropertyStorage
+{
+public:
+    using Type = std::remove_const_t<T>;
+
+    /** @brief Wraps an existing IProperty pointer (must implement IArrayProperty). */
+    explicit ConstArrayProperty(IProperty::Ptr existing) : PropertyStorage(std::move(existing)) {}
+
+    /** @brief Returns the number of elements. */
+    size_t size() const { return arr().size(); }
+
+    /** @brief Returns true if the array is empty. */
+    bool empty() const { return arr().empty(); }
+
+    /** @brief Returns the element at @p index. Returns default-constructed T on failure. */
+    T at(size_t index) const { return arr().at(index); }
+
+    /** @brief Returns a full copy of the vector. */
+    vector<Type> get_value() const { return arr().get_value(); }
+
+protected:
+    ArrayAny<const Type> arr() const { return ArrayAny<const Type>(prop_ ? prop_->get_value() : nullptr); }
+};
+
+/**
+ * @brief Typed array property wrapper with element-level mutation.
+ *
+ * Returned by ARR accessors. Inherits read from ConstArrayProperty<T> and adds mutation.
+ * @tparam T The element type.
+ */
+template <class T>
+class ArrayProperty : public ConstArrayProperty<T>
+{
+    using Base = ConstArrayProperty<T>;
+    using Type = typename Base::Type;
+
+public:
+    /** @brief Wraps an existing IProperty pointer (must implement IArrayProperty). */
+    explicit ArrayProperty(IProperty::Ptr existing) : Base(std::move(existing)) {}
+
+    /** @brief Sets the element at @p index to @p value. */
+    ReturnValue set_at(size_t index, const Type& value)
+    {
+        if (auto* ap = get_array_prop()) {
+            ext::AnyValue<Type> av;
+            av.set_value(value);
+            return ap->set_at(index, av);
+        }
+        return ReturnValue::Fail;
+    }
+
+    /** @brief Appends @p value to the end of the array. */
+    ReturnValue push_back(const Type& value)
+    {
+        if (auto* ap = get_array_prop()) {
+            ext::AnyValue<Type> av;
+            av.set_value(value);
+            return ap->push_back(av);
+        }
+        return ReturnValue::Fail;
+    }
+
+    /** @brief Erases the element at @p index. */
+    ReturnValue erase_at(size_t index)
+    {
+        if (auto* ap = get_array_prop()) {
+            return ap->erase_at(index);
+        }
+        return ReturnValue::Fail;
+    }
+
+    /** @brief Removes all elements. */
+    void clear()
+    {
+        if (auto* ap = get_array_prop()) {
+            ap->clear_array();
+        }
+    }
+
+    /** @brief Sets the whole vector value. */
+    ReturnValue set_value(const vector<Type>& value, InvokeType type = Immediate)
+    {
+        if (this->prop_) {
+            Any<vector<Type>> av(value);
+            return this->prop_->set_value(av, type);
+        }
+        return ReturnValue::Fail;
+    }
+
+private:
+    IArrayProperty* get_array_prop() const { return interface_cast<IArrayProperty>(this->prop_); }
 };
 
 /**

@@ -21,6 +21,7 @@ add_subdirectory(
 
 add_executable(tests
     test_any.cpp
+    test_array_property.cpp
     test_property.cpp
     test_future.cpp
     test_function.cpp
