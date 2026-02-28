@@ -16,6 +16,7 @@ This document describes the general architecture and code division in Velk.
   - [STL replacement types](#stl-replacement-types)
   - [What makes these ABI-safe](#what-makes-these-abi-safe)
   - [shared_ptr dual mode](#shared_ptr-dual-mode)
+  - [STL types in public headers](#stl-types-in-public-headers)
   - [What is NOT replaced](#what-is-not-replaced)
 - [Key types](#key-types)
 
@@ -326,14 +327,21 @@ Velk's `shared_ptr<T>` operates in two modes depending on `T`:
 
 The mode is selected at compile time via `std::is_convertible_v<T*, IInterface*>`.
 
+### STL types in public headers
+
+The public headers (`interface/`, `ext/`, `api/`) use several STL types. These are safe because they either never cross the DLL boundary or are used in contexts where both sides compile the same header.
+
+| Type | Where | Why it's safe |
+|---|---|---|
+| `std::array` | Metadata arrays in `VELK_INTERFACE` and `ext::CollectedMetadata` | Compile-time only. Converted to `array_view<MemberDesc>` before reaching `ClassInfo` or `MetadataContainer`. The `std::array` itself never crosses the DLL boundary. |
+| `std::tuple` | `ext::Object::states_` stores per-interface `State` structs | Template instantiated in consumer code. Both the object and its accessors compile from the same headers, so the layout is identical. Never passed to the DLL as a tuple. Individual states are accessed via `array_view` or raw pointers (`get_property_state`). |
+| `std::atomic` | `control_block` ref counts, `ObjectData` flags | Layout is platform-defined (same size as the underlying integer). The control block is allocated inside the DLL and accessed through exported functions, so both sides agree on the layout. |
+
+The public headers also make heavy use of STL type traits (`std::is_base_of_v`, `std::enable_if_t`, `std::is_trivially_copyable_v`, `std::index_sequence`, etc.) for SFINAE, overload resolution, and compile-time branching. These have no runtime layout impact.
+
 ### What is NOT replaced
 
-Types that do not cross the DLL boundary can safely use STL types:
-
-- `std::unique_ptr`, `std::mutex`, `std::atomic` are used in internal implementations compiled into the DLL.
-- `std::tuple` — used in `ext::Object` for the states tuple, but only within user code that compiles against the same headers.
-
-`velk::string` and `velk::vector<T>` are available as ABI-stable replacements for `std::string` and `std::vector<T>` in public interface signatures. Internal DLL code may still use the STL variants when values do not cross the boundary.
+`std::unique_ptr`, `std::mutex`, and `std::vector` are used in internal DLL implementations (`src/`) where they do not cross the boundary. `velk::string` and `velk::vector<T>` are available as ABI-stable replacements for `std::string` and `std::vector<T>` in public interface signatures. Internal DLL code may still use the STL variants when values do not cross the boundary.
 
 ## Key types
 

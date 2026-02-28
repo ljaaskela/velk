@@ -5,6 +5,8 @@
 
 #include <velk/interface/types.h>
 
+#include <vector>
+
 namespace velk {
 
 /**

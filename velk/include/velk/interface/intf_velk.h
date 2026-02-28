@@ -9,9 +9,8 @@
 #include <velk/interface/intf_property.h>
 #include <velk/interface/intf_type_registry.h>
 #include <velk/interface/types.h>
+#include <velk/vector.h>
 #include <velk/velk_export.h>
-
-#include <vector>
 
 namespace velk {
 
@@ -42,8 +41,8 @@ struct DeferredArgs : public ::velk::NoCopyMove
     }
 
 private:
-    std::vector<IAny::Ptr> owned_;
-    mutable std::vector<const IAny*> ptrs_;
+    vector<IAny::Ptr> owned_;
+    mutable vector<const IAny*> ptrs_;
 };
 
 /** @brief Deferred task */
