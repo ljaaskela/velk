@@ -1,6 +1,7 @@
 #include "metadata_container.h"
 
 #include "array_property.h"
+#include "event.h"
 #include "function.h"
 #include "property.h"
 
@@ -81,7 +82,8 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
         break;
     }
     case MemberKind::Event:
-        [[fallthrough]];
+        created = ext::make_object<EventImpl>();
+        break;
     case MemberKind::Function:
         created = ext::make_object<FunctionImpl>();
         break;

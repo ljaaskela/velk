@@ -275,24 +275,25 @@ AnyValue<float> (32 bytes)          ArrayAnyValue<float> (48 bytes)
 │ data_ (float) + pad     8  │      │ data_ (vector<float>)  24  │
 └────────────────────────────┘      └────────────────────────────┘
 
-PropertyImpl (72 bytes)             FunctionImpl (96 bytes)
-┌────────────────────────────┐      ┌────────────────────────────┐
-│ MI base layout          16 │      │ MI base layout          16 │
-│   (2 vptrs)                │      │   (2 vptrs)                │
-│ flags + padding          8 │      │ flags + padding          8 │
-│ block*                   8 │      │ block*                   8 │
-│ data_ (shared_ptr)      16 │      │ target_context_          8 │
-│ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │
-│ external_ (bool) + pad   8 │      │ owned_context_           8 │
-│ (total verified: 72)       │      │ context_deleter_         8 │
-└────────────────────────────┘      │ handlers_ (vector)      24 │
-                                    │ deferred_begin_ + pad    8 │
-                                    │ (total verified: 96)       │
-                                    └────────────────────────────┘
+ClassId::Property (72 bytes)        ClassId::Function (64 bytes)        ClassId::Event (96 bytes)
+┌────────────────────────────┐      ┌────────────────────────────┐      ┌────────────────────────────┐
+│ MI base layout          16 │      │ MI base layout          16 │      │ MI base layout          16 │
+│   (2 vptrs)                │      │   (2 vptrs)                │      │   (2 vptrs)                │
+│ flags + padding          8 │      │ flags + padding          8 │      │ flags + padding          8 │
+│ block*                   8 │      │ block*                   8 │      │ block*                   8 │
+│ data_ (shared_ptr)      16 │      │ target_context_          8 │      │ target_context_          8 │
+│ onChanged_ (LazyEvent)  16 │      │ target_fn_               8 │      │ target_fn_               8 │
+│ external_ (bool) + pad   8 │      │ owned_context_           8 │      │ owned_context_           8 │
+│ (total verified: 72)       │      │ context_deleter_         8 │      │ context_deleter_         8 │
+└────────────────────────────┘      │ (total verified: 64)       │      │ handlers_ (vector)      24 │
+                                    └────────────────────────────┘      │ deferred_begin_ + pad    8 │
+                                                                        │ (total verified: 96)       │
+                                                                        └────────────────────────────┘
 ```
 
 Internal interface types use inheritance to reduce MI chains: `IPropertyInternal` inherits `IProperty`, `IFunctionInternal` inherits `IEvent` (which inherits `IFunction`), and `IFutureInternal` inherits `IFuture`. This means each impl class only needs one entry in its interface pack (the Internal variant), halving the MI vptr overhead compared to listing both the public and internal interfaces separately.
 
 - **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. **ArrayAnyValue** extends the same single chain (`IInterface` → `IObject` → `IAny` → `IArrayAny`), still one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop, it is always heap-allocated at construction.
-- **FunctionImpl** implements both `ClassId::Function` and `ClassId::Event`. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. The `handlers_` vector is partitioned: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
-- **PropertyImpl** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.
+- **`ClassId::Function`** is the lightweight invoke-only implementation. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. IEvent methods (`add_handler`, `remove_handler`) are stubs.
+- **`ClassId::Event`** extends the same invoke machinery with a partitioned handler list: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
+- **`ClassId::Property`** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `EventImpl` until a handler is actually registered or the event is invoked.

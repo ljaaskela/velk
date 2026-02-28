@@ -1,6 +1,7 @@
 #include "type_registry.h"
 
 #include "array_property.h"
+#include "event.h"
 #include "function.h"
 #include "future.h"
 #include "hive/hive_store.h"
@@ -21,6 +22,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<PropertyImpl>();
     ITypeRegistry::register_type<ArrayPropertyImpl>();
     ITypeRegistry::register_type<FunctionImpl>();
+    ITypeRegistry::register_type<EventImpl>();
     ITypeRegistry::register_type<FutureImpl>();
     ITypeRegistry::register_type<HiveStore>();
     ITypeRegistry::register_type<ObjectHive>();

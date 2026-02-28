@@ -33,45 +33,10 @@ IAny::Ptr FunctionImpl::invoke(FnArgs args, InvokeType type) const
         return nullptr;
     }
 
-    IAny::Ptr result;
     if (target_fn_) {
-        result = target_fn_(target_context_, args);
+        return target_fn_(target_context_, args);
     }
-    invoke_handlers(args);
-    return result;
-}
-
-array_view<IFunction::ConstPtr> FunctionImpl::immediate_handlers() const
-{
-    return {handlers_.data(), deferred_begin_};
-}
-
-array_view<IFunction::ConstPtr> FunctionImpl::deferred_handlers() const
-{
-    return {handlers_.data() + deferred_begin_, handlers_.size() - deferred_begin_};
-}
-
-void FunctionImpl::invoke_handlers(FnArgs args) const
-{
-    // Ignoring all return values as different handlers might return different results
-    for (const auto& h : immediate_handlers()) {
-        h->invoke(args);
-    }
-    auto deferred = deferred_handlers();
-    if (deferred.empty()) {
-        return;
-    }
-    // Clone args once, share ownership across all deferred tasks
-    auto clonedArgs = ::velk::make_shared<DeferredArgs>(args);
-
-    std::vector<DeferredTask> tasks;
-    tasks.reserve(deferred.size());
-    for (const auto& h : deferred) {
-        tasks.push_back({h, clonedArgs});
-    }
-
-    // Queue N tasks to instance for exececution at next instance().update().
-    instance().queue_deferred_tasks(array_view(tasks.data(), tasks.size()));
+    return nullptr;
 }
 
 void FunctionImpl::set_invoke_callback(IFunction::CallableFn* fn)
@@ -98,42 +63,19 @@ void FunctionImpl::set_owned_callback(void* context, IFunction::BoundFn* fn,
     target_fn_ = fn;
 }
 
-ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr& fn, InvokeType type) const
+ReturnValue FunctionImpl::add_handler(const IFunction::ConstPtr& /*fn*/, InvokeType /*type*/) const
 {
-    if (!fn) {
-        return ReturnValue::InvalidArgument;
-    }
-    for (const auto& h : handlers_) {
-        if (h == fn) {
-            return ReturnValue::NothingToDo;
-        }
-    }
-    if (type == Immediate) {
-        handlers_.insert(handlers_.begin() + deferred_begin_, fn);
-        ++deferred_begin_;
-    } else {
-        handlers_.push_back(fn);
-    }
-    return ReturnValue::Success;
+    return ReturnValue::NothingToDo;
 }
 
-ReturnValue FunctionImpl::remove_handler(const IFunction::ConstPtr& fn) const
+ReturnValue FunctionImpl::remove_handler(const IFunction::ConstPtr& /*fn*/) const
 {
-    for (size_t i = 0; i < handlers_.size(); ++i) {
-        if (handlers_[i] == fn) {
-            if (i < deferred_begin_) {
-                --deferred_begin_;
-            }
-            handlers_.erase(handlers_.begin() + i);
-            return ReturnValue::Success;
-        }
-    }
     return ReturnValue::NothingToDo;
 }
 
 bool FunctionImpl::has_handlers() const
 {
-    return !handlers_.empty();
+    return false;
 }
 
 } // namespace velk

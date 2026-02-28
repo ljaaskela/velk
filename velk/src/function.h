@@ -45,7 +45,7 @@ public:
 };
 
 /**
- * @brief Default IFunction/IEvent/IFunctionInternal implementation.
+ * @brief Lightweight IFunction/IFunctionInternal implementation.
  *
  * Supports three dispatch mechanisms for invoke():
  * 1. **Bound trampoline** (bind()): routes through a static trampoline to a
@@ -54,7 +54,8 @@ public:
  * 3. **Owned callback** (set_owned_callback()): heap-allocated callable with
  *    type-erased context and deleter. Used by Callback for capturing lambdas.
  *
- * As an IEvent, maintains a partitioned handler list (immediate then deferred).
+ * Does not support event handlers. Use EventImpl (ClassId::Event) for event
+ * functionality with add_handler/remove_handler support.
  */
 class FunctionImpl final : public ext::ObjectCore<FunctionImpl, IFunctionInternal>
 {
@@ -73,16 +74,13 @@ public: // IFunctionInternal
     void set_owned_callback(void* context, IFunction::BoundFn* fn,
                             IFunction::ContextDeleter* deleter) override;
 
-public: // IEvent
+public: // IEvent (stubs; use EventImpl for handler support)
     ReturnValue add_handler(const IFunction::ConstPtr& fn, InvokeType type = Immediate) const override;
     ReturnValue remove_handler(const IFunction::ConstPtr& fn) const override;
     bool has_handlers() const override;
 
 private:
     static IAny::Ptr callback_trampoline(void* ctx, FnArgs args);
-    void invoke_handlers(FnArgs args) const;
-    array_view<IFunction::ConstPtr> immediate_handlers() const;
-    array_view<IFunction::ConstPtr> deferred_handlers() const;
 
     void release_owned_context();
 
@@ -92,9 +90,6 @@ private:
         target_fn_{}; ///< Primary invoke target. Uses callback_trampoline when set via set_invoke_callback.
     void* owned_context_{};                        ///< Heap-allocated callable context (owned).
     IFunction::ContextDeleter* context_deleter_{}; ///< Deleter for owned_context_.
-    /// Partitioned handler list: [0, deferred_begin_) = immediate, [deferred_begin_, size()) = deferred.
-    mutable std::vector<IFunction::ConstPtr> handlers_;
-    mutable uint32_t deferred_begin_{}; ///< Index separating immediate handlers from deferred handlers.
 };
 
 } // namespace velk

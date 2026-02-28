@@ -24,8 +24,8 @@ namespace ClassId {
 inline constexpr Uid Property{"a66badbf-c750-4580-b035-b5446806d67e"};
 /** @brief Default function object implementation. */
 inline constexpr Uid Function{"d3c150cc-0b2b-4237-93c5-5a16e9619be8"};
-/** @brief Default event object implementation (same as Function). */
-inline constexpr Uid Event = Function;
+/** @brief Default event object implementation. */
+inline constexpr Uid Event{"e4a7b2c1-3d5f-48e9-a1c6-7b8d9e0f2a34"};
 /** @brief Default future object implementation. */
 inline constexpr Uid Future{"371dfa91-1cf7-441e-b688-20d7e0114745"};
 /** @brief Default array property object implementation. */

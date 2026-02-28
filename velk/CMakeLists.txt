@@ -3,6 +3,8 @@ add_library(velk SHARED
     src/array_property.h
     src/property.cpp
     src/property.h
+    src/event.cpp
+    src/event.h
     src/function.cpp
     src/function.h
     include/velk/velk_export.h
