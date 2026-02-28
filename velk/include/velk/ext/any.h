@@ -11,19 +11,52 @@
 #include <cstring>
 #include <type_traits>
 
+namespace velk::detail {
+
+template <class T>
+constexpr bool has_iany_in_chain()
+{
+    if constexpr (std::is_same_v<T, IAny>) {
+        return true;
+    } else if constexpr (std::is_same_v<T, IInterface>) {
+        return false;
+    } else {
+        return has_iany_in_chain<typename T::ParentInterface>();
+    }
+}
+
+} // namespace velk::detail
+
 namespace velk::ext {
+
+template <bool HasIAny, class FinalClass, class... Interfaces>
+struct AnyBaseParent;
+
+template <class FinalClass, class... Interfaces>
+struct AnyBaseParent<true, FinalClass, Interfaces...>
+{
+    using type = ObjectCore<FinalClass, Interfaces...>;
+};
+
+template <class FinalClass, class... Interfaces>
+struct AnyBaseParent<false, FinalClass, Interfaces...>
+{
+    using type = ObjectCore<FinalClass, IAny, Interfaces...>;
+};
 
 /**
  * @brief Base class for IAny implementations.
  *
- * Inherits ObjectCore with IAny. Since IAny already has IObject in its parent chain,
- * ObjectCore detects this and does not add a redundant IObject to the interface pack.
+ * Conditionally prepends IAny to the interface pack. If any interface in the pack
+ * already has IAny in its parent chain (e.g. IArrayAny), IAny is not added redundantly.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template <class FinalClass, class... Interfaces>
-class AnyBase : public ObjectCore<FinalClass, IAny, Interfaces...>
+class AnyBase : public AnyBaseParent<
+    (::velk::detail::has_iany_in_chain<Interfaces>() || ...),
+    FinalClass, Interfaces...>::type
 {
 public:
     /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */

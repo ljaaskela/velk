@@ -267,14 +267,14 @@ Measured ObjectCore sizes (MSVC x64):
 ### Base types
 
 ```
-AnyValue<float> (40 bytes)
-┌────────────────────────────┐
-│ vptr                    8  │
-│ (alignment padding)     8  │
-│ flags + padding         8  │
-│ block*                  8  │
-│ data_ (float) + pad     8  │
-└────────────────────────────┘
+AnyValue<float> (40 bytes)          ArrayAnyValue<float> (56 bytes)
+┌────────────────────────────┐      ┌────────────────────────────┐
+│ vptr                    8  │      │ vptr                    8  │
+│ (alignment padding)     8  │      │ (alignment padding)     8  │
+│ flags + padding         8  │      │ flags + padding         8  │
+│ block*                  8  │      │ block*                  8  │
+│ data_ (float) + pad     8  │      │ data_ (vector<float>)  24  │
+└────────────────────────────┘      └────────────────────────────┘
 
 PropertyImpl (96 bytes)             FunctionImpl (120 bytes)
 ┌────────────────────────────┐      ┌────────────────────────────┐
@@ -294,6 +294,6 @@ PropertyImpl (96 bytes)             FunctionImpl (120 bytes)
 
 Internal interface types use inheritance to reduce MI chains: `IPropertyInternal` inherits `IProperty`, `IFunctionInternal` inherits `IEvent` (which inherits `IFunction`), and `IFutureInternal` inherits `IFuture`. This means each impl class only needs one entry in its interface pack (the Internal variant), halving the MI vptr overhead compared to listing both the public and internal interfaces separately.
 
-- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop, it is always heap-allocated at construction.
+- **AnyValue** uses a single inheritance chain (`IInterface` → `IObject` → `IAny`), so only one vptr. **ArrayAnyValue** extends the same single chain (`IInterface` → `IObject` → `IAny` → `IArrayAny`), still one vptr. The `control_block*` in `ObjectData` supports `shared_ptr`/`weak_ptr` interop, it is always heap-allocated at construction.
 - **FunctionImpl** implements both `ClassId::Function` and `ClassId::Event`. The primary invoke target uses a unified context/function-pointer pair; plain callbacks go through a static trampoline. Owned callbacks (`set_owned_callback`) store heap-allocated context with a type-erased deleter. The `handlers_` vector is partitioned: `[0, deferred_begin_)` for immediate handlers, `[deferred_begin_, size())` for deferred. When no handlers are registered the vector is empty (zero heap allocation).
 - **PropertyImpl** holds a shared pointer to its backing `IAny` storage and a `LazyEvent` for change notifications. `LazyEvent` contains a single `shared_ptr<IEvent>` (16 bytes) that is null until first access, deferring the cost of creating the underlying `FunctionImpl` until a handler is actually registered or the event is invoked.

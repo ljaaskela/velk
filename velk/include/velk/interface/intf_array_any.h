@@ -11,7 +11,7 @@ namespace velk {
  * Implemented by ArrayAnyRef<T> to provide typed element operations without
  * requiring the caller to know the element type at compile time.
  */
-class IArrayAny : public Interface<IArrayAny>
+class IArrayAny : public Interface<IArrayAny, IAny>
 {
 public:
     /** @brief Returns the number of elements. */
