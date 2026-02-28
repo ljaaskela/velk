@@ -101,7 +101,7 @@ Both are extracted into the build directory automatically during CMake configura
 
 ### Define an interface
 
-Use `VELK_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods. Use `RPROP` for read-only properties that can be observed but not written through the public API.
+Use `VELK_INTERFACE` to declare properties, events, and functions. This generates both a static constexpr metadata array and typed accessor methods.
 
 ```cpp
 #include <interface/intf_metadata.h>
@@ -130,7 +130,7 @@ public:
 `Object` automatically collects metadata from all listed interfaces and provides the `IMetadata` implementation. Override `fn_<Name>` to provide function logic.
 
 ```cpp
-#include <ext/object.h>
+#include <velk/ext/object.h>
 
 class MyWidget : public ext::Object<MyWidget, IMyWidget>
 {
@@ -154,7 +154,7 @@ class ISerializable : public Interface<ISerializable>
 {
 public:
     VELK_INTERFACE(
-        (PROP, std::string, name, ""),
+        (PROP, velk::string, name, ""),
         (FN, void, serialize)
     )
 };

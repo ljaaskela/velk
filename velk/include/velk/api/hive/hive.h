@@ -12,9 +12,9 @@ namespace velk {
  * @tparam I The implicit interface type for hive objects.
  */
 template <class T, class I = IObject>
-ObjectHive<I> create_hive(IHiveStore& store)
+auto create_hive(IHiveStore& store)
 {
-    return ObjectHive<>(store.get_hive<T>());
+    return ObjectHive<I>(store.get_hive<T>());
 }
 
 /**
@@ -22,9 +22,9 @@ ObjectHive<I> create_hive(IHiveStore& store)
  * @tparam I The implicit interface type for hive objects.
  */
 template <class I = IObject>
-ObjectHive<I> create_hive(IHiveStore& store, Uid classUid)
+auto create_hive(IHiveStore& store, Uid classUid)
 {
-    return ObjectHive<>(store.get_hive(classUid));
+    return ObjectHive<I>(store.get_hive(classUid));
 }
 
 /**
@@ -32,7 +32,7 @@ ObjectHive<I> create_hive(IHiveStore& store, Uid classUid)
  * @tparam T The element type to store (must not have class_id()).
  */
 template <class T>
-RawHive<T> create_raw_hive(IHiveStore& store)
+auto create_raw_hive(IHiveStore& store)
 {
     return RawHive<T>(store.get_raw_hive<T>());
 }
