@@ -61,6 +61,7 @@ public:
     void init(Uid classUid);
 
     // IObjectHive overrides
+    HiveType get_hive_type() const override { return HiveType::ObjectHive; }
     Uid get_element_uid() const override;
     size_t size() const override;
     bool empty() const override;

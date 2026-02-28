@@ -41,6 +41,13 @@ struct HivePageCapacity
     size_t page_n{1024u};
 };
 
+/** @brief Specifies the type of a hive. */
+enum class HiveType : uint8_t
+{
+    ObjectHive = 0, ///< The hive stores IObject instances and implements IObjectHive.
+    RawHive = 1,    ///< The hive is contains non-refcounted (usually POD) types.
+};
+
 /**
  * @brief Common base interface for all hive types.
  *
@@ -50,6 +57,9 @@ struct HivePageCapacity
 class IHive : public Interface<IHive, IObject>
 {
 public:
+    /** @brief Returns the type of the hive. */
+    virtual HiveType get_hive_type() const = 0;
+
     /** @brief Returns the UID identifying the element type stored in this hive. */
     virtual Uid get_element_uid() const = 0;
 

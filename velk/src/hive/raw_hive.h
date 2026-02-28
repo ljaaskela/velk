@@ -51,6 +51,7 @@ public:
     void init(Uid elementUid, size_t elementSize, size_t elementAlign);
 
     // IHive overrides
+    HiveType get_hive_type() const override { return HiveType::RawHive; }
     Uid get_element_uid() const override;
     size_t size() const override;
     bool empty() const override;

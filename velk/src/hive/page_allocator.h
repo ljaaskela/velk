@@ -73,6 +73,24 @@ inline size_t bitmask_words(size_t capacity)
     return (capacity + 63) / 64;
 }
 
+/** @brief Sets the active bit for slot @p bit in bitmask word @p word. */
+inline void set_slot_active(uint64_t* active_bits, size_t word, size_t bit)
+{
+    active_bits[word] |= uint64_t(1) << (bit & 63);
+}
+
+/** @brief Clears the active bit for slot @p bit in bitmask word @p word. */
+inline void clear_slot_active(uint64_t* active_bits, size_t word, size_t bit)
+{
+    active_bits[word] &= ~(uint64_t(1) << (bit & 63));
+}
+
+/** @brief Tests whether slot @p bit in bitmask word @p word is active. */
+inline bool is_slot_active(const uint64_t* active_bits, size_t word, size_t bit)
+{
+    return (active_bits[word] & (uint64_t(1) << (bit & 63))) != 0;
+}
+
 /** @brief Returns the page capacity for a given page index. */
 inline size_t next_page_capacity(const HivePageCapacity& capacity, size_t page_count)
 {

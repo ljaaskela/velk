@@ -76,7 +76,7 @@ static void hive_destroy_impl(HiveControlBlock* hcb, bool orphan)
         // Clear active bit and transition slot to Free.
         size_t word = slot_index / 64;
         size_t bit = slot_index % 64;
-        page->active_bits[word] &= ~(uint64_t(1) << bit);
+        clear_slot_active(page->active_bits, word, bit);
 
         page->state[slot_index] = SlotState::Free;
         push_free_slot(page->slots, slot_index, slot_sz, page->free_head);
@@ -134,7 +134,7 @@ ObjectHive::~ObjectHive()
                 bits &= bits - 1; // clear lowest set bit
 
                 // Clear active bit
-                page.active_bits[w] &= ~(uint64_t(1) << bit);
+                clear_slot_active(page.active_bits, w, bit);
                 page.state[i] = SlotState::Zombie;
                 auto* obj = static_cast<IObject*>(slot_ptr(page, i));
                 obj->unref(); // Release hive's strong ref
@@ -334,7 +334,7 @@ IObject::Ptr ObjectHive::add()
     // Set active bit.
     size_t word = slot_idx / 64;
     size_t bit = slot_idx % 64;
-    target->active_bits[word] |= uint64_t(1) << bit;
+    set_slot_active(target->active_bits, word, bit);
 
     // Initialize the embedded HiveControlBlock (no heap allocation).
     auto* hcb = &target->hcbs[slot_idx];
@@ -376,7 +376,7 @@ ReturnValue ObjectHive::remove(IObject& object)
         // Clear active bit before transitioning to Zombie.
         size_t word = slot_idx / 64;
         size_t bit = slot_idx % 64;
-        pages_[page_idx]->active_bits[word] &= ~(uint64_t(1) << bit);
+        clear_slot_active(pages_[page_idx]->active_bits, word, bit);
 
         // Transition Active -> Zombie. The object stays alive until external refs drop.
         // When the last strong ref drops, unref() calls hive_destroy which transitions
@@ -423,7 +423,7 @@ void ObjectHive::scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const
                 // Re-check the live bit: a visitor callback may have triggered
                 // hive_destroy (via unref) which clears the bit for a slot in
                 // this same word.
-                if (!(page.active_bits[w] & (uint64_t(1) << b))) {
+                if (!is_slot_active(page.active_bits, w, b)) {
                     continue;
                 }
                 // Prefetch next active slot.

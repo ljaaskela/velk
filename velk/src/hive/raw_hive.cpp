@@ -107,7 +107,7 @@ void* RawHiveImpl::allocate()
 
     size_t word = slot_idx / 64;
     size_t bit = slot_idx % 64;
-    target->active_bits[word] |= uint64_t(1) << bit;
+    set_slot_active(target->active_bits, word, bit);
     ++target->live_count;
     ++live_count_;
 
@@ -131,7 +131,7 @@ void RawHiveImpl::deallocate(void* ptr)
 
             size_t word = slot_idx / 64;
             size_t bit = slot_idx % 64;
-            page.active_bits[word] &= ~(uint64_t(1) << bit);
+            clear_slot_active(page.active_bits, word, bit);
 
             push_free_slot(page.slots, slot_idx, slot_size_, page.free_head);
             --page.live_count;
@@ -157,7 +157,7 @@ bool RawHiveImpl::contains(const void* ptr) const
             size_t slot_idx = offset / slot_size_;
             size_t word = slot_idx / 64;
             size_t bit = slot_idx % 64;
-            return (page.active_bits[word] & (uint64_t(1) << bit)) != 0;
+            return is_slot_active(page.active_bits, word, bit);
         }
     }
     return false;
