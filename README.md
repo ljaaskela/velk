@@ -1,5 +1,8 @@
 # Velk
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://en.cppreference.com/w/cpp/17)
+
 [![Linux](https://img.shields.io/github/actions/workflow/status/ljaaskela/velk/linux.yml?label=Linux)](https://github.com/ljaaskela/velk/actions/workflows/linux.yml)
 [![Windows](https://img.shields.io/github/actions/workflow/status/ljaaskela/velk/windows.yml?label=Windows)](https://github.com/ljaaskela/velk/actions/workflows/windows.yml)
 [![macOS](https://img.shields.io/github/actions/workflow/status/ljaaskela/velk/macos.yml?label=macOS)](https://github.com/ljaaskela/velk/actions/workflows/macos.yml)
