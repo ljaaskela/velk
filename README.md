@@ -8,10 +8,42 @@
 [![macOS](https://img.shields.io/github/actions/workflow/status/ljaaskela/velk/macos.yml?label=macOS)](https://github.com/ljaaskela/velk/actions/workflows/macos.yml)
 [![CodeQL](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml/badge.svg)](https://github.com/ljaaskela/velk/actions/workflows/codeql.yml)
 
-Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, compile-time metadata with runtime introspection, and a plugin system for modular extension via shared libraries.
+---
 
-Velk is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces.
+Velk is a C++17 component object model library with interface-based polymorphism, typed properties with change notifications, events, compile-time metadata with runtime introspection, and a plugin system for modular extension via shared libraries. 
 
+Velk includes dense, cache-friendly object storage via hives, promise/future pairs with `.then()` chaining, and deferred execution for batching property writes and function calls.
+
+Velk is designed to be built as a shared library (DLL on Windows, .so on Linux). All runtime implementations live inside the shared library, while consumers only depend on public headers containing abstract interfaces and header-only templates. This means the internal implementation can evolve without recompiling consumer code, multiple modules can share a single type registry and object factory, and ABI compatibility is maintained through stable virtual interfaces. 
+
+```cpp
+// Define an interface
+class IWidget : public Interface<IWidget> {
+public:
+    VELK_INTERFACE(
+        (PROP, float, width, 100.f),
+        (EVT, on_clicked),
+        (FN, void, reset)
+    )
+};
+
+// Implement, register, create, use
+class Widget : public ext::Object<Widget, IWidget> {
+    void fn_reset() override { width().set_value(0.f); }
+};
+
+// Register type
+auto& instance = velk::instance();
+instance.type_registry().register_type<Widget>();
+
+// Instantiate and use
+auto w = instance.create<IWidget>(Widget::class_id());
+w->width().set_value(42.f);
+w->width().on_changed().add_handler([](){ /*...*/ });
+w->on_clicked().add_handler([]() { /*...*/ });
+velk::invoke_function(w->reset());
+```
+---
 ## Table of contents
 
 - [Features](#features)
@@ -33,26 +65,24 @@ Velk is designed to be built as a shared library (DLL on Windows, .so on Linux).
 
 | Feature | Description |
 |---|---|
-| **ABI stable** | Functionality through interfaces defining abstract contracts with properties, events, and functions |
-| **Extensible** | <p>Register inline or DLL-based plugins, declarative dependencies and multi-plugin bundles through [plugin registry](docs/plugins.md).<p>Register types, create instances by UID, query class info, directly from [type registry](#query-metadata-without-instance) or from [an object](#query-metadata-from-object). |
-| **Compile-time metadata** | Declare members with `VELK_INTERFACE`, introspect at compile time or runtime |
-| **Properties** | <p>`Property<T>` with get/set and automatic change notifications<p>Type-erased values through `Any<T>` wrappers over a generic `IAny` container<p>Direct state access to read/write property data with zero overhead, `memcpy`-able object state for trivially-copyable types |
-| **Events** | Observable events with multiple handlers, immediate or deferred |
-| **Functions** | <p>Overridable virtual functions with optional typed parameters and native return types, automatically wrapped into `IAny::Ptr`<p>Promise/Future pairs with typed results, `.then()` chaining, type transforms, and thread-safe resolution<p>Deferred function calls and event handlers for batch execution during `instance().update()` |
-| **Hive storage** | Dense, typed containers that store objects contiguously in [cache-friendly pages](docs/hive.md) with slot reuse, zombie lifecycle, and automatic page management |
-| **Performance-focused** | <p>Inline state structs, lazy member instantiation, single-indirect-call function dispatch, and cache-friendly metadata lookups<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
+| **ABI stable** | Interface-based contracts with properties, events, and functions. Consumers depend only on public headers; internals can change without recompilation |
+| **Zero dependencies** | Pure C++17 with platform headers only |
+| **Compile-time metadata** | <p>Declare [properties](docs/guide.md#properties), [events, and functions](docs/guide.md#functions-and-events) with [`VELK_INTERFACE`](docs/guide.md#declaring-interfaces), introspect at compile time or runtime<p>Typed properties with change notifications, multicast events, virtual functions with typed parameters and return values, [promise/future](docs/guide.md#futures-and-promises) chaining, and [deferred execution](docs/guide.md#deferred-invocation) |
+| **Extensible** | <p>[Plugin registry](docs/plugins.md) for inline or DLL-based plugins with declarative dependencies and multi-plugin bundles<p>[Type registry](#query-metadata-without-instance) for UID-based creation and runtime introspection |
+| **[Hive](docs/hive.md) storage** | Dense, cache-friendly containers with slot reuse, zombie lifecycle, and automatic page management |
+| **Performance-focused** | <p>Inline state structs, lazy instantiation, single-indirect-call dispatch, and direct state access with zero overhead<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
 
 ## Documentation
 
-| Document | Contents |
+| Document | Description |
 |---|---|
-| [Quick start](#quick-start) | Getting started |
-| [Architecture](docs/architecture.md) | Four-layer design, header reference tables, type hierarchy, key types |
-| [Guide](docs/guide.md) | Virtual function dispatch, typed lambdas, change notifications, custom Any types, direct state access, deferred invocation, futures and promises |
-| [Performance](docs/performance.md) | Operation costs, memory layout, object sizes |
-| [Hive](docs/hive.md) | Dense object storage, hive registry, zombie lifecycle, memory layout |
-| [Plugins](docs/plugins.md) | Writing plugins, DLL loading, dependencies, multi-plugin bundles |
-| [VELK_INTERFACE](docs/velk-interface.md) | Macro reference, function variants, argument metadata, manual metadata |
+| [Quick start](#quick-start) | Define an interface, implement it, create objects, and use typed accessors |
+| [Guide](docs/guide.md) | How to declare interfaces, work with properties, functions, events, and futures |
+| [Architecture](docs/architecture.md) | How the four layers fit together, type hierarchy, and ABI stability |
+| [Hive](docs/hive.md) | Storing objects in dense, cache-friendly containers |
+| [Plugins](docs/plugins.md) | Extending Velk with inline or DLL-based plugins |
+| [Performance](docs/performance.md) | Benchmark numbers, memory layout, and object sizes |
+| [Advanced](docs/advanced.md) | Writing metadata by hand, shared_ptr internals, control block pooling |
 
 ## Project structure
 
@@ -68,7 +98,7 @@ velk/
     hive.md               Dense object storage and hive registry
     performance.md        Performance and memory usage
     plugins.md            Plugin system: writing, loading, dependencies, bundles
-    velk-interface.md     VELK_INTERFACE macro reference
+    advanced.md           Manual metadata and accessors
   velk/
     include/              Public API (consumers depend only on these headers)
       interface/          Abstract interfaces (ABI contracts)

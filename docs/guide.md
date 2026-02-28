@@ -1,9 +1,15 @@
 # Guide
 
-This guide covers advanced topics beyond the basics shown in the [README](../README.md).
+This guide covers topics beyond the basics shown in the [README](../README.md). Start here after reading the quick start.
 
 ## Contents
 
+- [Declaring interfaces](#declaring-interfaces)
+  - [VELK_INTERFACE syntax](#velk_interface-syntax)
+  - [Practical example](#practical-example)
+  - [Array property members](#array-property-members)
+  - [Function member variants](#function-member-variants)
+  - [Argument metadata](#argument-metadata)
 - [Class UIDs](#class-uids)
 - [Functions and events](#functions-and-events)
   - [Virtual function dispatch](#virtual-function-dispatch)
@@ -26,6 +32,215 @@ This guide covers advanced topics beyond the basics shown in the [README](../REA
     - [Raw state pointer](#raw-state-pointer)
   - [Deferred property assignment](#deferred-property-assignment)
     - [Deferred write_state](#deferred-write_state)
+
+## Declaring interfaces
+
+Use `VELK_INTERFACE` inside an `Interface<T>` subclass to declare properties, events, and functions. The macro generates a static constexpr metadata array, typed accessor methods, and (for `FN` members) pure virtual methods with trampolines.
+
+### VELK_INTERFACE syntax
+
+```cpp
+VELK_INTERFACE(
+    (PROP, Type, Name, Default),              // Property<Type> Name() const
+    (RPROP, Type, Name, Default),             // ConstProperty<Type> Name() const (read-only)
+    (ARR, Type, Name),                        // ArrayProperty<Type> Name() const
+    (ARR, Type, Name, v1, v2, v3),            // ArrayProperty<Type> Name() const (default {v1,v2,v3})
+    (RARR, Type, Name, v1, v2),              // ConstArrayProperty<Type> Name() const (read-only)
+    (EVT, Name),                              // Event Name() const
+    (FN, RetType, Name),                      // virtual RetType fn_Name()          (zero-arg)
+    (FN, RetType, Name, (T1, a1), (T2, a2)),  // virtual RetType fn_Name(T1 a1, T2 a2) (typed)
+    (FN_RAW, Name)                            // virtual fn_Name(FnArgs)   (raw untyped)
+)
+```
+
+Each entry produces a `MemberDesc` in a `static constexpr std::array metadata` and a typed accessor method. Up to 32 members per interface. Up to 8 typed parameters per function. Members track which interface declared them via `InterfaceInfo`. Array properties use `MemberKind::ArrayProperty` and are backed by `ArrayPropertyImpl` at runtime.
+
+### Practical example
+
+```cpp
+class IMyWidget : public Interface<IMyWidget>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, float, width, 0.f),
+        (ARR, float, weights, 1.f, 2.f, 3.f),     // array with defaults
+        (RARR, int32_t, tags),                      // read-only array, empty default
+        (EVT, on_clicked),
+        (FN, void, reset),                          // zero-arg, void return
+        (FN, float, add, (int, x), (float, y))     // typed args, typed return
+    )
+};
+
+class ISerializable : public Interface<ISerializable>
+{
+public:
+    VELK_INTERFACE(
+        (PROP, std::string, name, ""),
+        (FN_RAW, serialize)                 // raw FnArgs
+    )
+};
+
+class MyWidget : public ext::Object<MyWidget, IMyWidget, ISerializable>
+{
+    void fn_reset() override {
+        // void return, trampoline returns nullptr to IFunction::invoke()
+    }
+
+    float fn_add(int x, float y) override {
+        // x and y are extracted from FnArgs automatically
+        // return value is wrapped into IAny::Ptr by the trampoline
+        return x + y;
+    }
+
+    IAny::Ptr fn_serialize(FnArgs args) override {
+        // manual arg unpacking via FunctionContext or Any<const T>
+        return nullptr;
+    }
+};
+```
+
+Invocation works the same for all variants, callers always go through `IFunction::invoke()`:
+
+```cpp
+auto widget = instance().create<IObject>(MyWidget::class_id());
+if (auto* iw = interface_cast<IMyWidget>(widget)) {
+    // Scalar property
+    iw->width().set_value(100.f);
+
+    // Array property: element-level access
+    iw->weights().push_back(4.f);
+    float w = iw->weights().at(0);      // 1.f
+    iw->weights().set_at(0, 10.f);
+    iw->weights().erase_at(2);
+
+    // Read-only array property
+    size_t n = iw->tags().size();
+    // iw->tags().push_back(42);         // won't compile: ConstArrayProperty
+
+    // Functions
+    invoke_function(iw->reset());                            // zero-arg
+    invoke_function(iw, "add", Any<int>(10), Any<float>(3.14f)); // typed
+}
+if (auto* is = interface_cast<ISerializable>(widget)) {
+    invoke_function(is, "serialize");                         // FN_RAW
+}
+```
+
+### Array property members
+
+`ARR` and `RARR` declare array properties backed by `velk::vector<T>` in the State struct. They provide element-level access (get, set, push, erase) without copying the full vector.
+
+| Syntax | Accessor return type | Mutability |
+|--------|---------------------|------------|
+| `(ARR, float, items)` | `ArrayProperty<float>` | Read-write |
+| `(ARR, float, items, 1.f, 2.f)` | `ArrayProperty<float>` | Read-write, default `{1.f, 2.f}` |
+| `(RARR, int, ids)` | `ConstArrayProperty<int>` | Read-only |
+| `(RARR, int, ids, 10, 20)` | `ConstArrayProperty<int>` | Read-only, default `{10, 20}` |
+
+Default values are variadic: any arguments after the name become the initializer list for the vector.
+
+#### API wrappers
+
+`ConstArrayProperty<T>` (returned by `RARR`) provides read-only access:
+
+```cpp
+size_t size() const;
+bool empty() const;
+T at(size_t index) const;           // single element, no full vector copy
+vector<T> get_value() const;        // full copy when needed
+```
+
+`ArrayProperty<T>` (returned by `ARR`) adds mutation:
+
+```cpp
+ReturnValue set_at(size_t index, const T& value);
+ReturnValue push_back(const T& value);
+ReturnValue erase_at(size_t index);
+void clear();
+ReturnValue set_value(const vector<T>& value, InvokeType type = Immediate);
+```
+
+#### ArrayAny\<T\>
+
+`ArrayAny<T>` (in `api/any.h`) is a typed wrapper for `IArrayAny`, similar to how `Any<T>` wraps `IAny`. It can be value-constructed (owning) or wrap an existing `IAny::Ptr`/`IAny::ConstPtr`. Use `const T` for read-only access:
+
+```cpp
+// Owning: default-constructed empty array
+ArrayAny<float> empty;
+
+// Owning: from initializer list
+ArrayAny<float> arr({3.14f, 2.71f});
+float val = arr.at(0);
+
+// Owning: from array_view
+float data[] = {1.f, 2.f, 3.f};
+ArrayAny<float> fromView(array_view<float>(data, 3));
+
+// Wrapping an existing IAny::Ptr
+ArrayAny<float> wrapped(some_any_ptr);
+wrapped.push_back(42.f);
+
+// Read-only: constructed from IAny::ConstPtr, mutation methods are disabled
+ArrayAny<const float> readonly_arr(some_const_any_ptr);
+float v = readonly_arr.at(0);         // OK
+// readonly_arr.push_back(1.f);       // compile error
+```
+
+#### Architecture
+
+Array properties use `IArrayAny` for element-level operations. When the macro generates `ArrBind<State, &State::member>`, it produces a `PropertyKind` whose `createRef` returns an `ArrayAnyRef<T>` (in `ext/any.h`). This ref implements both `IAny` (whole-vector get/set) and `IArrayAny` (element ops). `ArrayPropertyImpl` delegates element operations to `interface_cast<IArrayAny>(data_)` on its backing Any, and wraps them in `on_changed` notifications.
+
+### Function member variants
+
+`FN` and `FN_RAW` are the two tags for function members. `FN` supports zero-arg and typed-arg forms; `FN_RAW` preserves the untyped `FnArgs` signature.
+
+| Syntax | Virtual generated | Arg metadata | Use case |
+|--------|------------------|--------------|----------|
+| `(FN, void, reset)` | `void fn_reset()` | none | Zero-arg void functions |
+| `(FN, int, add, (int, x), (float, y))` | `int fn_add(int x, float y)` | `FnArgDesc` per param | Typed args with return value |
+| `(FN_RAW, process)` | `IAny::Ptr fn_process(FnArgs)` | none | Raw untyped args |
+
+All three variants generate:
+1. A pure virtual method (signature depends on variant)
+2. A `static constexpr FunctionKind` with a trampoline (via `detail::FnBind` or `detail::FnRawBind`) that routes `IFunction::invoke()` to the virtual
+3. A `MemberDesc` with the trampoline pointer in the metadata array
+4. An accessor `Function Name() const`
+
+For `FN` members, `RetType` specifies the native C++ return type of the virtual method. The trampoline wraps the result into `IAny::Ptr` automatically: `void` returns `nullptr`, other types are wrapped via `Any<R>::clone()`. `FN_RAW` always returns `IAny::Ptr`.
+
+For typed-arg functions, the trampoline automatically extracts each argument from `FnArgs` using `IAny::get_data()` with type deduction from the member function pointer. If fewer arguments are provided than expected, the trampoline returns `nullptr`. Extra arguments are ignored.
+
+### Argument metadata
+
+Typed-arg functions store a `static constexpr FnArgDesc[]` array alongside the trampoline in `FunctionKind`:
+
+```cpp
+struct FnArgDesc {
+    std::string_view name;   // parameter name (e.g. "x")
+    Uid typeUid;             // type_uid<T>() for the parameter type
+};
+
+struct FunctionKind {
+    FnTrampoline trampoline;
+    array_view<FnArgDesc> args;  // empty for zero-arg and FN_RAW
+};
+```
+
+Access via `MemberDesc::functionKind()->args`:
+
+```cpp
+if (auto* info = instance().type_registry().get_class_info(MyWidget::class_id())) {
+    for (auto& m : info->members) {
+        if (auto* fk = m.functionKind(); fk && !fk->args.empty()) {
+            for (auto& arg : fk->args) {
+                // arg.name, arg.typeUid
+            }
+        }
+    }
+}
+```
+
+For the full hand-written equivalent of what `VELK_INTERFACE` generates, see [Advanced topics](advanced.md).
 
 ## Class UIDs
 

@@ -109,7 +109,8 @@ Internal runtime implementations (compiled into the DLL).
 | `platform.h` | Platform-specific OS includes (`windows.h`, `dlfcn.h`, `pthread.h`) |
 | `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
 | `property.cpp/h` | `PropertyImpl` |
-| `function.cpp/h` | `FunctionImpl` (implements `IEvent`, which inherits `IFunction`) |
+| `function.cpp/h` | `FunctionImpl` implementing `IFunction` |
+| `event.cpp/h` | `EventImpl` implementing `IEvent` (inherits `IFunction`) |
 | `velk.cpp` | DLL entry point, exports `instance()` |
 
 ## Type hierarchy across layers
@@ -179,15 +180,14 @@ classDiagram
 
     IInterface <|-- IObject
     IObject <|-- IAny
-    IObject <|-- IPlugin
-
-    IInterface <|-- IPropertyState
+    IObject <|-- IPropertyState
     IPropertyState <|-- IMetadata
 
     IInterface <|-- IProperty
     IInterface <|-- IFunction
     IFunction <|-- IEvent
 
+    IInterface <|-- IPlugin
     IInterface <|-- IExternalAny
     IInterface <|-- ITypeRegistry
     IInterface <|-- IPluginRegistry
