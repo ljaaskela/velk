@@ -1,10 +1,14 @@
 #ifndef VELK_INTF_TYPE_REGISTRY_H
 #define VELK_INTF_TYPE_REGISTRY_H
 
-#include <velk/interface/intf_interface.h>
+#include <velk/interface/intf_any.h>
 #include <velk/interface/intf_object_factory.h>
+#include <velk/interface/types.h>
 
 namespace velk {
+
+/** @brief Interpolation callback: interpolates between two type-erased values. */
+using InterpolatorFn = ReturnValue (*)(const IAny& from, const IAny& to, float t, IAny& result);
 
 /**
  * @brief Interface for registering, unregistering, and querying object type factories.
@@ -23,6 +27,32 @@ public:
     virtual const ClassInfo* get_class_info(Uid classUid) const = 0;
     /** @brief Returns the factory for a registered type, or nullptr if not found. */
     virtual const IObjectFactory* find_factory(Uid classUid) const = 0;
+
+    /** @brief Registers an interpolator function for a given type UID. */
+    virtual ReturnValue register_interpolator(Uid typeUid, InterpolatorFn fn) = 0;
+    /** @brief Unregisters a previously registered interpolator for a given type UID. */
+    virtual ReturnValue unregister_interpolator(Uid typeUid) = 0;
+    /** @brief Finds the interpolator function for a given type UID, or nullptr if not registered. */
+    virtual InterpolatorFn find_interpolator(Uid typeUid) const = 0;
+
+    /**
+     * @brief Registers an interpolator function for type T.
+     * @tparam T The value type to associate the interpolator with.
+     */
+    template <class T>
+    ReturnValue register_interpolator(InterpolatorFn fn)
+    {
+        return register_interpolator(type_uid<T>(), fn);
+    }
+    /**
+     * @brief Unregisters a previously registered interpolator for type T.
+     * @tparam T The value type whose interpolator should be removed.
+     */
+    template <class T>
+    ReturnValue unregister_interpolator()
+    {
+        return unregister_interpolator(type_uid<T>());
+    }
 
     /**
      * @brief Registers a type using its static get_factory() method.

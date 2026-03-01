@@ -11,7 +11,7 @@ add_library(velk_animator SHARED
     include/velk/plugins/animator/animator.h
     include/velk/plugins/animator/plugin.h
     include/velk/plugins/animator/easing.h
-    include/velk/plugins/animator/lerp_traits.h
+    include/velk/plugins/animator/interpolator_traits.h
     include/velk/plugins/animator/api/animation.h
     include/velk/plugins/animator/api/animator.h
 )

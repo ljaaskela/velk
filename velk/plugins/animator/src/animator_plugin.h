@@ -5,6 +5,7 @@
 #include "animator.h"
 
 #include <velk/ext/plugin.h>
+#include <velk/plugins/animator/interpolator_traits.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
 
 namespace velk {
@@ -27,16 +28,28 @@ public:
         if (failed(rv)) {
             return rv;
         }
+        auto& types = velk.type_registry();
+        types.register_interpolator<float>(&detail::typed_interpolator<float>);
+        types.register_interpolator<double>(&detail::typed_interpolator<double>);
+        types.register_interpolator<uint8_t>(&detail::typed_interpolator<uint8_t>);
+        types.register_interpolator<uint16_t>(&detail::typed_interpolator<uint16_t>);
+        types.register_interpolator<uint32_t>(&detail::typed_interpolator<uint32_t>);
+        types.register_interpolator<uint64_t>(&detail::typed_interpolator<uint64_t>);
+        types.register_interpolator<int8_t>(&detail::typed_interpolator<int8_t>);
+        types.register_interpolator<int16_t>(&detail::typed_interpolator<int16_t>);
+        types.register_interpolator<int32_t>(&detail::typed_interpolator<int32_t>);
+        types.register_interpolator<int64_t>(&detail::typed_interpolator<int64_t>);
+
         animator_ = velk.create<IAnimator>(ClassId::Animator);
         return ReturnValue::Success;
     }
 
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 
-    void update(const UpdateInfo& info) override
+    void pre_update(const IPlugin::PreUpdateInfo& info) override
     {
         if (auto* a = interface_cast<IAnimator>(animator_)) {
-            a->tick(info);
+            a->tick(info.info);
         }
     }
 

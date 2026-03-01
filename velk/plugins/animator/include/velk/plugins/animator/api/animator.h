@@ -9,22 +9,13 @@
 #include <velk/plugins/animator/api/animation.h>
 #include <velk/plugins/animator/interface/intf_animator.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
-#include <velk/plugins/animator/lerp_traits.h>
+#include <velk/plugins/animator/interpolator_traits.h>
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
 namespace velk {
 
 namespace detail {
-
-/** @brief Typed lerp callback bridging Property<T> to IAnimation's type-erased lerp. */
-template <class T>
-void typed_lerp(const void* from, const void* to, float t, void* result)
-{
-    const auto& a = *static_cast<const T*>(from);
-    const auto& b = *static_cast<const T*>(to);
-    *static_cast<T*>(result) = lerp_trait<T>::lerp(a, b, t);
-}
 
 IAnimation::Ptr animation(const IProperty::Ptr& target, Uid classId)
 {
@@ -61,7 +52,7 @@ Animation tween(IAnimator& animator, Property<T> target, T from, T to, Duration 
     Any<T> toAny(to);
     auto anim = detail::tween(target, fromAny, toAny, duration, ease);
     if (anim) {
-        anim->set_lerp(&detail::typed_lerp<T>);
+        anim->set_interpolator(&detail::typed_interpolator<T>);
         animator.add(anim);
         return Animation(anim);
     }
@@ -83,7 +74,7 @@ Animation track(IAnimator& animator, Property<T> target,
 {
     auto anim = detail::animation(target, ClassId::Animation);
     if (anim) {
-        anim->set_lerp(&detail::typed_lerp<T>);
+        anim->set_interpolator(&detail::typed_interpolator<T>);
         Animation h(anim);
         h.set_keyframes(keyframes);
         animator.add(anim);

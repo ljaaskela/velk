@@ -128,6 +128,9 @@ void VelkInstance::flush_deferred_properties(std::vector<DeferredPropertySet>& p
 
 void VelkInstance::update(Duration time) const
 {
+    // Pre-update: let plugins produce work (tasks, deferred property updates).
+    auto info = plugin_registry_.pre_update_plugins(time);
+
     // Swap the queues under lock, then invoke outside the lock.
     // Tasks queued during invocation (by deferred handlers) will be picked up at the next update().
     std::vector<DeferredTask> tasks;
@@ -150,8 +153,8 @@ void VelkInstance::update(Duration time) const
         flush_deferred_properties(propSets);
     }
 
-    // Update plugins that have asked for updates
-    plugin_registry_.notify_plugins(time);
+    // Post-update: Let plugins observe resolved state.
+    plugin_registry_.post_update_plugins({info, tasks.size(), propSets.size()});
 }
 
 IFuture::Ptr VelkInstance::create_future() const

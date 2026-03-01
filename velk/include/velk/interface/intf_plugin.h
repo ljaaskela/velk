@@ -81,8 +81,23 @@ public:
     virtual ReturnValue initialize(IVelk& velk, PluginConfig& config) = 0;
     /** @brief Called when the plugin is unloaded. Unregister types and clean up here. */
     virtual ReturnValue shutdown(IVelk& velk) = 0;
-    /** @brief Called during instance().update() when enableUpdate is set in PluginConfig. */
-    virtual void update(const UpdateInfo& info) = 0;
+    /** @brief Information passed to each pre-update cycle. */
+    struct PreUpdateInfo
+    {
+        const UpdateInfo& info; ///< UpdateInfo from instance().update().
+    };
+
+    /** @brief Information passed to each post-update cycle. */
+    struct PostUpdateInfo
+    {
+        const UpdateInfo& info;     ///< UpdateInfo from instance().update().
+        size_t tasksRun{};          ///< Number of tasks that were run after pre_update().
+        size_t propertiesChanged{}; ///< Number of deferred property changes after pre_update().
+    };
+    /** @brief Called at the start of instance().update(), before deferred tasks and properties are flushed. */
+    virtual void pre_update(const PreUpdateInfo& info) = 0;
+    /** @brief Called at the end of instance().update(), after deferred tasks and properties are flushed. */
+    virtual void post_update(const PostUpdateInfo& info) = 0;
     /** @brief Returns the static plugin descriptor. */
     virtual const PluginInfo& get_plugin_info() const = 0;
 

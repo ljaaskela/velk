@@ -8,9 +8,6 @@
 
 namespace velk {
 
-/** @brief Lerp callback: given (from, to, t, result) pointers, performs typed interpolation. */
-using LerpFn = void (*)(const void* from, const void* to, float t, void* result);
-
 /** @brief A type-erased keyframe: time, value, and easing function. */
 struct KeyframeEntry
 {
@@ -42,8 +39,8 @@ public:
     virtual void cancel() = 0;
     /** @brief Sets the target property to animate. */
     virtual void set_target(const IProperty::Ptr& target) = 0;
-    /** @brief Sets the typed lerp callback. Size and type are resolved from the target property. */
-    virtual void set_lerp(LerpFn fn) = 0;
+    /** @brief Sets an explicit interpolator for this animation, overriding registry lookup. */
+    virtual void set_interpolator(InterpolatorFn fn) = 0;
     /** @brief Replaces all keyframes. Shares ownership of each entry's value. */
     virtual void set_keyframes(array_view<KeyframeEntry> keyframes) = 0;
 };

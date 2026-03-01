@@ -35,8 +35,10 @@ public:
     size_t plugin_count() const override;
     /** @brief Shuts down all plugins in reverse order. Called from ~VelkInstance. */
     void shutdown_all();
-    /** @brief Notifies opted-in plugins with timing information. */
-    void notify_plugins(Duration time) const;
+    /** @brief Calls pre_update on opted-in plugins. Returns the computed UpdateInfo for reuse. */
+    UpdateInfo pre_update_plugins(Duration time) const;
+    /** @brief Calls post_update on opted-in plugins with the same UpdateInfo from pre_update. */
+    void post_update_plugins(const IPlugin::PostUpdateInfo& info) const;
 
 private:
     /** @brief Plugin registry entry. */

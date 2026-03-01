@@ -9,6 +9,7 @@ using namespace velk;
 namespace {
 constexpr Duration sec(float s) { return Duration::from_seconds(s); }
 UpdateInfo dt(float s) { return {{}, {}, Duration::from_seconds(s)}; }
+void flush() { instance().update({}); }
 } // namespace
 
 // ============================================================================
@@ -86,26 +87,26 @@ TEST(Easing, QuadMidpoint)
 }
 
 // ============================================================================
-// Lerp trait tests
+// Interpolator trait tests
 // ============================================================================
 
-TEST(LerpTrait, FloatDefault)
+TEST(InterpolatorTrait, FloatDefault)
 {
-    EXPECT_FLOAT_EQ(0.f, lerp_trait<float>::lerp(0.f, 100.f, 0.f));
-    EXPECT_FLOAT_EQ(50.f, lerp_trait<float>::lerp(0.f, 100.f, 0.5f));
-    EXPECT_FLOAT_EQ(100.f, lerp_trait<float>::lerp(0.f, 100.f, 1.f));
+    EXPECT_FLOAT_EQ(0.f, interpolator_trait<float>::interpolate(0.f, 100.f, 0.f));
+    EXPECT_FLOAT_EQ(50.f, interpolator_trait<float>::interpolate(0.f, 100.f, 0.5f));
+    EXPECT_FLOAT_EQ(100.f, interpolator_trait<float>::interpolate(0.f, 100.f, 1.f));
 }
 
-TEST(LerpTrait, IntDefault)
+TEST(InterpolatorTrait, IntDefault)
 {
-    EXPECT_EQ(0, lerp_trait<int>::lerp(0, 100, 0.f));
-    EXPECT_EQ(50, lerp_trait<int>::lerp(0, 100, 0.5f));
-    EXPECT_EQ(100, lerp_trait<int>::lerp(0, 100, 1.f));
+    EXPECT_EQ(0, interpolator_trait<int>::interpolate(0, 100, 0.f));
+    EXPECT_EQ(50, interpolator_trait<int>::interpolate(0, 100, 0.5f));
+    EXPECT_EQ(100, interpolator_trait<int>::interpolate(0, 100, 1.f));
 }
 
-TEST(LerpTrait, DoubleDefault)
+TEST(InterpolatorTrait, DoubleDefault)
 {
-    EXPECT_DOUBLE_EQ(25.0, lerp_trait<double>::lerp(0.0, 100.0, 0.25f));
+    EXPECT_DOUBLE_EQ(25.0, interpolator_trait<double>::interpolate(0.0, 100.0, 0.25f));
 }
 
 struct Vec2
@@ -116,20 +117,20 @@ struct Vec2
 
 namespace velk {
 template <>
-struct lerp_trait<Vec2>
+struct interpolator_trait<Vec2>
 {
-    static Vec2 lerp(const Vec2& a, const Vec2& b, float t)
+    static Vec2 interpolate(const Vec2& a, const Vec2& b, float t)
     {
         return {a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t};
     }
 };
 } // namespace velk
 
-TEST(LerpTrait, CustomSpecialization)
+TEST(InterpolatorTrait, CustomSpecialization)
 {
     Vec2 a{0.f, 0.f};
     Vec2 b{10.f, 20.f};
-    auto mid = lerp_trait<Vec2>::lerp(a, b, 0.5f);
+    auto mid = interpolator_trait<Vec2>::interpolate(a, b, 0.5f);
     EXPECT_FLOAT_EQ(5.f, mid.x);
     EXPECT_FLOAT_EQ(10.f, mid.y);
 }
@@ -217,9 +218,11 @@ TEST_F(AnimatorTest, TweenAndTick)
     EXPECT_FALSE(h.is_finished());
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_TRUE(h.is_finished());
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
 }
@@ -239,6 +242,7 @@ TEST_F(AnimatorTest, TweenTo)
     auto h = tween_to(*animator_, prop_, 100.f, sec(1.f));
 
     animator_->tick(dt(1.f));
+    flush();
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
     EXPECT_TRUE(h.is_finished());
 }
@@ -248,6 +252,7 @@ TEST_F(AnimatorTest, TweenWithEasing)
     auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f), easing::in_quad);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(25.f, prop_.get_value(), 0.1f);
 }
 
@@ -280,11 +285,13 @@ TEST_F(AnimatorTest, MultipleAnimations)
     EXPECT_EQ(2u, animator_->active_count());
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_EQ(1u, animator_->active_count());
     EXPECT_FLOAT_EQ(50.f, prop2.get_value());
     EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_EQ(0u, animator_->active_count());
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
 }
@@ -318,18 +325,23 @@ TEST_F(TrackTest, WalksKeyframes)
     };
     auto h = track(*animator_, prop_, kfs);
 
+    flush();
     EXPECT_FLOAT_EQ(0.f, prop_.get_value());
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(75.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_FLOAT_EQ(50.f, prop_.get_value());
     EXPECT_TRUE(h.is_finished());
 }
@@ -344,6 +356,7 @@ TEST_F(TrackTest, PerSegmentEasing)
                    });
 
     animator_->tick(dt(0.5f));
+    flush();
     EXPECT_NEAR(25.f, prop_.get_value(), 0.1f);
 }
 
@@ -357,6 +370,7 @@ TEST_F(TrackTest, FinishesAtLastKeyframe)
                    });
 
     animator_->tick(dt(5.f));
+    flush();
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
     EXPECT_TRUE(h.is_finished());
 }
@@ -370,6 +384,7 @@ TEST_F(TrackTest, SingleKeyframeFinishesImmediately)
                    });
 
     animator_->tick(dt(0.1f));
+    flush();
     EXPECT_FLOAT_EQ(42.f, prop_.get_value());
     EXPECT_TRUE(h.is_finished());
 }

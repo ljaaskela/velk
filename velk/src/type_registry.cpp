@@ -125,6 +125,44 @@ void TypeRegistry::sweep_owner(Uid uid)
 {
     types_.erase(std::remove_if(types_.begin(), types_.end(), [&](const Entry& e) { return e.owner == uid; }),
                  types_.end());
+    interpolators_.erase(
+        std::remove_if(interpolators_.begin(), interpolators_.end(),
+                        [&](const InterpolatorEntry& e) { return e.owner == uid; }),
+        interpolators_.end());
+}
+
+ReturnValue TypeRegistry::register_interpolator(Uid typeUid, InterpolatorFn fn)
+{
+    InterpolatorEntry entry{typeUid, fn, current_owner_};
+    auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), entry);
+    if (it != interpolators_.end() && it->typeUid == typeUid) {
+        it->fn = fn;
+        it->owner = current_owner_;
+    } else {
+        interpolators_.insert(it, entry);
+    }
+    return ReturnValue::Success;
+}
+
+ReturnValue TypeRegistry::unregister_interpolator(Uid typeUid)
+{
+    InterpolatorEntry key{typeUid, nullptr, {}};
+    auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
+    if (it != interpolators_.end() && it->typeUid == typeUid) {
+        interpolators_.erase(it);
+        return ReturnValue::Success;
+    }
+    return ReturnValue::NothingToDo;
+}
+
+InterpolatorFn TypeRegistry::find_interpolator(Uid typeUid) const
+{
+    InterpolatorEntry key{typeUid, nullptr, {}};
+    auto it = std::lower_bound(interpolators_.begin(), interpolators_.end(), key);
+    if (it != interpolators_.end() && it->typeUid == typeUid) {
+        return it->fn;
+    }
+    return nullptr;
 }
 
 } // namespace velk

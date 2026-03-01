@@ -115,10 +115,10 @@ public:
 
     ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
 
-    void update(const UpdateInfo& info) override
+    void pre_update(const IPlugin::PreUpdateInfo& info) override
     {
         updateCount++;
-        lastInfo = info;
+        lastInfo = info.info;
     }
 
     int updateCount = 0;

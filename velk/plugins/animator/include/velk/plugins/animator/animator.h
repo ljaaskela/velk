@@ -5,6 +5,6 @@
 #include <velk/plugins/animator/api/animator.h>
 #include <velk/plugins/animator/plugin.h>
 #include <velk/plugins/animator/easing.h>
-#include <velk/plugins/animator/lerp_traits.h>
+#include <velk/plugins/animator/interpolator_traits.h>
 
 #endif // VELK_PLUGINS_ANIMATOR_H

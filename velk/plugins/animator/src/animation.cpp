@@ -1,37 +1,11 @@
 #include "animation.h"
 
-#include <velk/api/traits.h>
+#include <velk/api/state.h>
+#include <velk/api/velk.h>
 
 #include <algorithm>
-#include <vector>
 
 namespace velk {
-
-namespace {
-
-template <class T>
-void linear_lerp(const void* from, const void* to, float t, void* result)
-{
-    const auto& a = *static_cast<const T*>(from);
-    const auto& b = *static_cast<const T*>(to);
-    *static_cast<T*>(result) = static_cast<T>(a + (b - a) * t);
-}
-
-LerpFn resolve_lerp(Uid typeUid)
-{
-    if (typeUid == type_uid<float>()) {
-        return &linear_lerp<float>;
-    }
-    if (typeUid == type_uid<double>()) {
-        return &linear_lerp<double>;
-    }
-    if (typeUid == type_uid<int>()) {
-        return &linear_lerp<int>;
-    }
-    return nullptr;
-}
-
-} // namespace
 
 IAnimation::State* AnimationImpl::state()
 {
@@ -53,110 +27,129 @@ void AnimationImpl::set_target(const IProperty::Ptr& target)
     target_ = target;
 }
 
-void AnimationImpl::set_lerp(LerpFn fn)
+void AnimationImpl::set_interpolator(InterpolatorFn fn)
 {
-    lerp_ = fn;
+    interpolator_ = fn;
 }
 
 void AnimationImpl::cancel()
 {
     if (auto* s = state()) {
-        s->finished = true;
+        finish(*s);
     }
+}
+
+bool AnimationImpl::ensure_init(IAnimation::State& state)
+{
+    if (sorted_) {
+        return false;
+    }
+    std::sort(keyframes_.begin(), keyframes_.end(), [](const KeyframeEntry& a, const KeyframeEntry& b) {
+        return a.time.us < b.time.us;
+    });
+    auto dur = keyframes_.back().time;
+    bool ret = state.duration.us != dur.us;
+    if (ret) {
+        state.duration = dur;
+    }
+
+    // Resolve type info and interpolator from target property
+    if (target_) {
+        auto val = target_->get_value();
+        if (val) {
+            auto types = val->get_compatible_types();
+            if (!types.empty()) {
+                typeUid_ = types[0];
+                if (!interpolator_) {
+                    interpolator_ = instance().type_registry().find_interpolator(typeUid_);
+                }
+            }
+            result_ = val->clone();
+        }
+    }
+
+    // Set initial value
+    if (target_ && keyframes_.front().value) {
+        target_->set_value(*keyframes_.front().value, Deferred);
+    }
+    sorted_ = true;
+    return ret;
+}
+
+bool AnimationImpl::finish(IAnimation::State& state)
+{
+    if (!state.finished) {
+        state.finished = true;
+        notify_state(state);
+    }
+    return true;
+}
+
+void AnimationImpl::notify_state(IAnimation::State& state)
+{
+    notify(MemberKind::Property, IAnimation::UID, Notification::Changed);
 }
 
 bool AnimationImpl::tick(const UpdateInfo& info)
 {
     auto dt = info.dt;
+    auto st = state();
 
-    auto* s = state();
-    if (!s) {
+    if (!st || st->finished) {
         return true;
     }
-
-    if (s->finished) {
-        return true;
-    }
+    auto& s = *st;
 
     if (keyframes_.size() < 2) {
         if (!keyframes_.empty() && target_) {
-            target_->set_value(*keyframes_.front().value);
+            // Set value as Deferred so that all change handlers run simultaenously once pre_update handled
+            // for all plugins
+            target_->set_value(*keyframes_.front().value, Deferred);
         }
-        s->finished = true;
-        return true;
+        return finish(s);
     }
 
-    if (!sorted_) {
-        std::sort(keyframes_.begin(), keyframes_.end(), [](const KeyframeEntry& a, const KeyframeEntry& b) {
-            return a.time.us < b.time.us;
-        });
-        s->duration = keyframes_.back().time;
+    bool notify = ensure_init(s);
 
-        // Resolve type info from target property
-        if (target_) {
-            auto val = target_->get_value();
-            if (val) {
-                auto types = val->get_compatible_types();
-                if (!types.empty()) {
-                    typeUid_ = types[0];
-                    valueSize_ = val->get_data_size(typeUid_);
-                    if (!lerp_) {
-                        lerp_ = resolve_lerp(typeUid_);
-                    }
-                }
-            }
-        }
-
-        // Set initial value
-        if (target_ && keyframes_.front().value) {
-            target_->set_value(*keyframes_.front().value);
-        }
-        sorted_ = true;
+    if (dt.us) {
+        s.elapsed.us += dt.us;
+        notify = true; // state.elapsed changed
     }
 
-    s->elapsed.us += dt.us;
-
-    if (s->elapsed.us >= s->duration.us) {
+    if (s.elapsed.us >= s.duration.us) {
         if (target_ && keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value);
+            target_->set_value(*keyframes_.back().value, Deferred);
         }
-        s->finished = true;
-        return true;
+        return finish(s);
     }
 
     // Find the segment: first keyframe with time > elapsed
     size_t i = 1;
-    while (i < keyframes_.size() && keyframes_[i].time.us <= s->elapsed.us) {
+    while (i < keyframes_.size() && keyframes_[i].time.us <= s.elapsed.us) {
         ++i;
     }
 
     if (i >= keyframes_.size()) {
         if (target_ && keyframes_.back().value) {
-            target_->set_value(*keyframes_.back().value);
+            target_->set_value(*keyframes_.back().value, Deferred);
         }
-        s->finished = true;
-        return true;
+        return finish(s);
     }
 
-    if (target_ && lerp_ && keyframes_[i - 1].value && keyframes_[i].value) {
+    if (target_ && interpolator_ && result_ && keyframes_[i - 1].value && keyframes_[i].value) {
         auto& kf0 = keyframes_[i - 1];
         auto& kf1 = keyframes_[i];
         int64_t seg_duration = kf1.time.us - kf0.time.us;
-        float seg_t = (seg_duration > 0) ? static_cast<float>(s->elapsed.us - kf0.time.us) / static_cast<float>(seg_duration) : 1.f;
+        float seg_t = (seg_duration > 0)
+                          ? static_cast<float>(s.elapsed.us - kf0.time.us) / static_cast<float>(seg_duration)
+                          : 1.f;
         float eased_t = kf1.easing(seg_t);
+        interpolator_(*kf0.value, *kf1.value, eased_t, *result_);
+        target_->set_value(*result_, Deferred);
+    }
 
-        std::vector<uint8_t> result(valueSize_);
-        std::vector<uint8_t> fromBuf(valueSize_);
-        std::vector<uint8_t> toBuf(valueSize_);
-
-        kf0.value->get_data(fromBuf.data(), valueSize_, typeUid_);
-        kf1.value->get_data(toBuf.data(), valueSize_, typeUid_);
-
-        lerp_(fromBuf.data(), toBuf.data(), eased_t, result.data());
-
-        if (auto* internal = interface_cast<IPropertyInternal>(target_)) {
-            internal->set_data(result.data(), valueSize_, typeUid_);
-        }
+    if (notify) {
+        notify_state(s);
     }
 
     return false;

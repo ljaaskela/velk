@@ -252,7 +252,7 @@ void PluginRegistry::shutdown_all()
     }
 }
 
-void PluginRegistry::notify_plugins(Duration time) const
+UpdateInfo PluginRegistry::pre_update_plugins(Duration time) const
 {
     bool is_explicit = time.us != 0;
     int64_t current_us = is_explicit ? time.us : now_us();
@@ -269,16 +269,26 @@ void PluginRegistry::notify_plugins(Duration time) const
         t.elapsed.us = current_us;
     }
 
-    if (!update_plugins_.empty()) {
-        UpdateInfo info;
-        info.time = {current_us - t.time.us};
-        info.elapsed = {current_us - t.elapsed.us};
-        info.dt = {t.dt.us ? current_us - t.dt.us : 0};
-        t.dt.us = current_us;
+    UpdateInfo info;
+    info.time = {current_us - t.time.us};
+    info.elapsed = {current_us - t.elapsed.us};
+    info.dt = {t.dt.us ? current_us - t.dt.us : 0};
+    t.dt.us = current_us;
 
-        for (auto* plugin : update_plugins_) {
-            plugin->update(info);
-        }
+    // Snapshot: plugins may load/unload other plugins during callbacks.
+    auto plugins = update_plugins_;
+    for (auto* plugin : plugins) {
+        plugin->pre_update({info});
+    }
+
+    return info;
+}
+
+void PluginRegistry::post_update_plugins(const IPlugin::PostUpdateInfo& info) const
+{
+    auto plugins = update_plugins_;
+    for (auto* plugin : plugins) {
+        plugin->post_update(info);
     }
 }
 
