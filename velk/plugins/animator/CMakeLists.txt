@@ -5,9 +5,12 @@ add_library(velk_animator SHARED
     src/animation.cpp
     src/animator.h
     src/animator.cpp
+    src/transition.h
+    src/transition.cpp
     src/animator_plugin.h
     src/animator_plugin.cpp
     include/velk/plugins/animator/interface/intf_animated_any.h
+    include/velk/plugins/animator/interface/intf_transition.h
     include/velk/plugins/animator/interface/intf_animation.h
     include/velk/plugins/animator/interface/intf_animator.h
     include/velk/plugins/animator/interface/intf_animator_plugin.h
@@ -18,6 +21,7 @@ add_library(velk_animator SHARED
     include/velk/plugins/animator/transition.h
     include/velk/plugins/animator/api/animation.h
     include/velk/plugins/animator/api/animator.h
+    include/velk/plugins/animator/api/transition.h
 )
 
 target_link_libraries(velk_animator PRIVATE velk)

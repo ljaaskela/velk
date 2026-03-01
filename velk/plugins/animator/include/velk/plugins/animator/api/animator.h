@@ -7,6 +7,7 @@
 #include <velk/api/velk.h>
 #include <velk/array_view.h>
 #include <velk/plugins/animator/api/animation.h>
+#include <velk/plugins/animator/api/transition.h>
 #include <velk/plugins/animator/interface/intf_animator.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
 #include <velk/plugins/animator/plugin.h>
@@ -38,6 +39,19 @@ IAnimation::Ptr tween(const IProperty::Ptr& target, const IAny& from, const IAny
         anim->set_keyframes({kfs, 2});
     }
     return anim;
+}
+
+ITransition::Ptr transition(const IProperty::Ptr& target, Duration duration,
+                            easing::EasingFn ease = easing::linear)
+{
+    auto obj = instance().create<IObject>(ClassId::Transition);
+    auto tr = interface_pointer_cast<ITransition>(obj);
+    if (tr) {
+        tr->set_easing(ease);
+        tr->duration().set_value(duration);
+        tr->set_target(target); // triggers install + register with plugin
+    }
+    return tr;
 }
 
 } // namespace detail
@@ -94,25 +108,15 @@ inline IAnimator& default_animator()
     return ap->get_default_animator();
 }
 
-/** @brief Installs an implicit transition on a property so set_value animates. */
+/** @brief Creates and installs an implicit transition on a property. Drop the handle to remove. */
 template <class T>
-void set_transition(Property<T> prop, Duration duration,
-                    easing::EasingFn ease = easing::linear)
+Transition transition(Property<T> target, Duration duration,
+                      easing::EasingFn ease = easing::linear)
 {
-    auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
-    if (ap) {
-        ap->set_transition(prop.get_property_interface(), duration, ease);
-    }
-}
-
-/** @brief Removes an implicit transition from a property. */
-template <class T>
-void clear_transition(Property<T> prop)
-{
-    auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
-    if (ap) {
-        ap->clear_transition(prop.get_property_interface());
-    }
+    // Ensure the plugin is loaded (registers TransitionImpl type)
+    get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    auto tr = detail::transition(target.get_property_interface(), duration, ease);
+    return tr ? Transition(tr) : Transition{};
 }
 
 } // namespace velk

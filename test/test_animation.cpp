@@ -540,7 +540,7 @@ TEST(DefaultAnimator, TicksViaUpdate)
 }
 
 // ============================================================================
-// Implicit animation (set_transition / clear_transition) tests
+// Implicit animation (transition) tests
 // ============================================================================
 
 class ImplicitAnimationTest : public ::testing::Test
@@ -564,9 +564,9 @@ protected:
     Property<float> prop_ = create_property<float>(0.f);
 };
 
-TEST_F(ImplicitAnimationTest, SetTransitionAnimatesOnSetValue)
+TEST_F(ImplicitAnimationTest, TransitionAnimatesOnSetValue)
 {
-    set_transition(prop_, sec(1.f));
+    auto tr = transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Value should not jump immediately
@@ -580,12 +580,12 @@ TEST_F(ImplicitAnimationTest, SetTransitionAnimatesOnSetValue)
     advance(0.5f);
     EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
 
-    clear_transition(prop_);
+    tr.remove();
 }
 
 TEST_F(ImplicitAnimationTest, RetargetMidAnimation)
 {
-    set_transition(prop_, sec(1.f));
+    auto tr = transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Advance halfway
@@ -603,12 +603,12 @@ TEST_F(ImplicitAnimationTest, RetargetMidAnimation)
     advance(1.f);
     EXPECT_NEAR(200.f, prop_.get_value(), 0.1f);
 
-    clear_transition(prop_);
+    tr.remove();
 }
 
-TEST_F(ImplicitAnimationTest, ClearTransitionRestoresImmediate)
+TEST_F(ImplicitAnimationTest, RemoveTransitionRestoresImmediate)
 {
-    set_transition(prop_, sec(1.f));
+    auto tr = transition(prop_, sec(1.f));
     prop_.set_value(50.f);
 
     // Value animating, not yet at 50
@@ -617,7 +617,7 @@ TEST_F(ImplicitAnimationTest, ClearTransitionRestoresImmediate)
     // Advance to finish
     advance(1.f);
 
-    clear_transition(prop_);
+    tr.remove();
 
     // Now set_value should be immediate
     prop_.set_value(200.f);
@@ -626,7 +626,7 @@ TEST_F(ImplicitAnimationTest, ClearTransitionRestoresImmediate)
 
 TEST_F(ImplicitAnimationTest, OnChangedFiresDuringTick)
 {
-    set_transition(prop_, sec(1.f));
+    auto tr = transition(prop_, sec(1.f));
 
     int changeCount = 0;
     Callback handler([&](FnArgs) -> ReturnValue {
@@ -644,12 +644,12 @@ TEST_F(ImplicitAnimationTest, OnChangedFiresDuringTick)
     advance(0.5f);
 
     prop_.remove_on_changed(handler);
-    clear_transition(prop_);
+    tr.remove();
 }
 
 TEST_F(ImplicitAnimationTest, EasingApplied)
 {
-    set_transition(prop_, sec(1.f), easing::in_quad);
+    auto tr = transition(prop_, sec(1.f), easing::in_quad);
     prop_.set_value(100.f);
 
     advance(0.5f);
@@ -659,12 +659,12 @@ TEST_F(ImplicitAnimationTest, EasingApplied)
     advance(0.5f);
     EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
 
-    clear_transition(prop_);
+    tr.remove();
 }
 
 TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
 {
-    set_transition(prop_, sec(1.f));
+    auto tr = transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Deferred write should bypass animation
@@ -675,7 +675,7 @@ TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
     // The tick at dt=0 wrote the initial from->target at t=0, then flush overwrote with 42.
     EXPECT_FLOAT_EQ(42.f, prop_.get_value());
 
-    clear_transition(prop_);
+    tr.remove();
 }
 
 #endif // TEST_ANIMATOR_DLL_PATH

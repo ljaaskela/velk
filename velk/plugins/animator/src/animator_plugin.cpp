@@ -18,6 +18,10 @@ ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
     if (failed(rv)) {
         return rv;
     }
+    rv = register_type<TransitionImpl>(velk);
+    if (failed(rv)) {
+        return rv;
+    }
     auto& types = velk.type_registry();
     types.register_interpolator<float>(&detail::typed_interpolator<float>);
     types.register_interpolator<double>(&detail::typed_interpolator<double>);
@@ -45,85 +49,26 @@ void AnimatorPlugin::pre_update(const IPlugin::PreUpdateInfo& info)
     if (auto* a = interface_cast<IAnimator>(animator_)) {
         a->tick(info.info);
     }
-    tick_animated_anys(info.info);
+    tick_transitions(info.info);
 }
 
-void AnimatorPlugin::set_transition(const IProperty::Ptr& prop, Duration duration,
-                                    easing::EasingFn easing)
+void AnimatorPlugin::register_transition(const ITransition::WeakPtr& transition)
 {
-    if (!prop || !velk_) {
-        return;
-    }
-    auto* pi = interface_cast<IPropertyInternal>(prop);
-    if (!pi) {
-        return;
-    }
-
-    // Check if this property already has a transition
-    for (auto& entry : transitions_) {
-        if (entry.prop.get() == prop.get()) {
-            entry.animated->set_config({duration, easing});
-            return;
-        }
-    }
-
-    // Look up interpolator from the property's compatible type
-    InterpolatorFn interpolator = nullptr;
-    if (auto existing = pi->get_any()) {
-        auto types = existing->get_compatible_types();
-        if (types.size() > 0) {
-            interpolator = velk_->type_registry().find_interpolator(types[0]);
-        }
-    }
-
-    // Create AnimatedAny through the type registry (one object, two views)
-    auto animated = velk_->create<IAnimatedAny>(ClassId::AnimatedAny);
-
-    // Swap into property, getting the original back
-    IAny::Ptr previous;
-    pi->set_any(interface_pointer_cast<IAny>(animated), &previous);
-
-    // Initialize with the original any
-    TransitionConfig config{duration, easing};
-    animated->init(std::move(previous), config, interpolator, prop);
-
-    // Register for ticking
-    transitions_.push_back({prop, std::move(animated)});
+    transitions_.push_back(transition);
 }
 
-void AnimatorPlugin::clear_transition(const IProperty::Ptr& prop)
+void AnimatorPlugin::tick_transitions(const UpdateInfo& info)
 {
-    if (!prop) {
-        return;
-    }
-    auto* pi = interface_cast<IPropertyInternal>(prop);
-    if (!pi) {
-        return;
-    }
-
+    size_t write = 0;
     for (size_t i = 0; i < transitions_.size(); ++i) {
-        if (transitions_[i].prop.get() != prop.get()) {
+        auto tr = transitions_[i].lock();
+        if (!tr) {
             continue;
         }
-
-        // Take the entry before erasing
-        auto animated = std::move(transitions_[i].animated);
-        transitions_.erase(&transitions_[i]);
-
-        // Restore the original any
-        auto original = animated->take_original();
-        if (original) {
-            pi->set_any(original);
-        }
-        return;
+        tr->tick(info.dt);
+        transitions_[write++] = transitions_[i];
     }
-}
-
-void AnimatorPlugin::tick_animated_anys(const UpdateInfo& info)
-{
-    for (auto& entry : transitions_) {
-        entry.animated->tick(info.dt);
-    }
+    transitions_.resize(write);
 }
 
 } // namespace velk

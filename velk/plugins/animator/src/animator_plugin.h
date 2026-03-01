@@ -3,10 +3,10 @@
 
 #include "animation.h"
 #include "animator.h"
+#include "transition.h"
 
 #include <velk/ext/plugin.h>
 #include <velk/plugins/animator/interpolator_traits.h>
-#include <velk/plugins/animator/interface/intf_animated_any.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
 
 namespace velk {
@@ -23,23 +23,14 @@ public:
     void pre_update(const IPlugin::PreUpdateInfo& info) override;
 
     IAnimator& get_default_animator() const override { return *animator_; }
-
-    void set_transition(const IProperty::Ptr& prop, Duration duration,
-                        easing::EasingFn easing) override;
-    void clear_transition(const IProperty::Ptr& prop) override;
+    void register_transition(const ITransition::WeakPtr& transition) override;
 
 private:
-    struct TransitionEntry
-    {
-        IProperty::Ptr prop;
-        IAnimatedAny::Ptr animated;
-    };
-
-    void tick_animated_anys(const UpdateInfo& info);
+    void tick_transitions(const UpdateInfo& info);
 
     IAnimator::Ptr animator_;
     IVelk* velk_ = nullptr;
-    vector<TransitionEntry> transitions_;
+    vector<ITransition::WeakPtr> transitions_;
 };
 
 } // namespace velk
