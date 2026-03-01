@@ -15,8 +15,10 @@ public:
 
     void tick(const UpdateInfo& info) override;
     void add(const IAnimation::Ptr& animation) override;
+    void remove(const IAnimation::Ptr& animation) override;
     void cancel_all() override;
     size_t active_count() const override;
+    size_t count() const override;
 
 private:
     vector<IAnimation::Ptr> animations_;

@@ -24,14 +24,63 @@ public:
     Animation() = default;
     explicit Animation(IAnimation::Ptr anim) : anim_(std::move(anim)) {}
 
-    /** @brief Returns true if the animation has completed or was cancelled. */
-    bool is_finished() const { return !anim_ || anim_->finished().get_value(); }
+    /** @brief Returns true if the animation has run to completion, or is null. */
+    bool is_finished() const { return !anim_ || anim_->state().get_value() == PlayState::Finished; }
 
-    /** @brief Cancels the animation. */
-    void cancel()
+    /** @brief Returns true if the animation is currently playing. */
+    bool is_playing() const { return anim_ && anim_->state().get_value() == PlayState::Playing; }
+
+    /** @brief Returns true if the animation is paused. */
+    bool is_paused() const { return anim_ && anim_->state().get_value() == PlayState::Paused; }
+
+    /** @brief Returns true if the animation is idle (not yet started, or reset via stop()). */
+    bool is_idle() const { return !anim_ || anim_->state().get_value() == PlayState::Idle; }
+
+    /** @brief Starts or resumes playback. */
+    void play()
     {
         if (anim_) {
-            anim_->cancel();
+            anim_->play();
+        }
+    }
+
+    /** @brief Pauses playback, preserving position. */
+    void pause()
+    {
+        if (anim_) {
+            anim_->pause();
+        }
+    }
+
+    /** @brief Stops the animation and resets to the beginning (Idle). */
+    void stop()
+    {
+        if (anim_) {
+            anim_->stop();
+        }
+    }
+
+    /** @brief Jumps to the end, applies the final value (Finished). */
+    void finish()
+    {
+        if (anim_) {
+            anim_->finish();
+        }
+    }
+
+    /** @brief Resets to beginning and starts playback. */
+    void restart()
+    {
+        if (anim_) {
+            anim_->restart();
+        }
+    }
+
+    /** @brief Seeks to a normalized position (0..1). */
+    void seek(float progress)
+    {
+        if (anim_) {
+            anim_->seek(progress);
         }
     }
 
@@ -40,6 +89,9 @@ public:
 
     /** @brief Returns the elapsed time, or zero if invalid. */
     Duration get_elapsed() const { return anim_ ? anim_->elapsed().get_value() : Duration{}; }
+
+    /** @brief Returns the normalized progress (0..1), or 0 if invalid. */
+    float get_progress() const { return anim_ ? anim_->progress().get_value() : 0.f; }
 
     /** @brief Returns the underlying IAnimation pointer. */
     IAnimation::Ptr get_animation_interface() { return anim_; }

@@ -184,7 +184,8 @@ TEST_F(AnimatorPluginTest, AnimationProperties)
     // Default state via VELK_INTERFACE accessors
     EXPECT_EQ(0, anim->duration().get_value().us);
     EXPECT_EQ(0, anim->elapsed().get_value().us);
-    EXPECT_FALSE(anim->finished().get_value());
+    EXPECT_FLOAT_EQ(0.f, anim->progress().get_value());
+    EXPECT_EQ(PlayState::Idle, anim->state().get_value());
 
     // Write duration via accessor
     anim->duration().set_value(sec(2.f));
@@ -215,6 +216,7 @@ TEST_F(AnimatorTest, TweenAndTick)
 {
     auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     EXPECT_EQ(1u, animator_->active_count());
+    EXPECT_TRUE(h.is_playing());
     EXPECT_FALSE(h.is_finished());
 
     animator_->tick(dt(0.5f));
@@ -227,12 +229,14 @@ TEST_F(AnimatorTest, TweenAndTick)
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
 }
 
-TEST_F(AnimatorTest, RemovesFinishedAnimations)
+TEST_F(AnimatorTest, FinishedAnimationStaysInAnimator)
 {
     tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    EXPECT_EQ(1u, animator_->count());
     EXPECT_EQ(1u, animator_->active_count());
 
     animator_->tick(dt(2.f));
+    EXPECT_EQ(1u, animator_->count());
     EXPECT_EQ(0u, animator_->active_count());
 }
 
@@ -260,20 +264,48 @@ TEST_F(AnimatorTest, CancelAll)
 {
     tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     tween(*animator_, prop_, 0.f, 200.f, sec(2.f));
-    EXPECT_EQ(2u, animator_->active_count());
+    EXPECT_EQ(2u, animator_->count());
 
     animator_->cancel_all();
+    EXPECT_EQ(0u, animator_->count());
     EXPECT_EQ(0u, animator_->active_count());
 }
 
-TEST_F(AnimatorTest, CancelViaAnimation)
+TEST_F(AnimatorTest, StopResetsToIdle)
 {
     auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
-    h.cancel();
-    EXPECT_TRUE(h.is_finished());
+    animator_->tick(dt(0.5f));
+    flush();
+
+    h.stop();
+    EXPECT_TRUE(h.is_idle());
+    EXPECT_FLOAT_EQ(0.f, h.get_progress());
 
     animator_->tick(dt(0.1f));
     EXPECT_EQ(0u, animator_->active_count());
+    EXPECT_EQ(1u, animator_->count());
+}
+
+TEST_F(AnimatorTest, FinishJumpsToEnd)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    animator_->tick(dt(0.25f));
+    flush();
+
+    h.finish();
+    flush();
+    EXPECT_TRUE(h.is_finished());
+    EXPECT_FLOAT_EQ(1.f, h.get_progress());
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+}
+
+TEST_F(AnimatorTest, RemoveAnimation)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    EXPECT_EQ(1u, animator_->count());
+
+    animator_->remove(h.get_animation_interface());
+    EXPECT_EQ(0u, animator_->count());
 }
 
 TEST_F(AnimatorTest, MultipleAnimations)
@@ -287,13 +319,92 @@ TEST_F(AnimatorTest, MultipleAnimations)
     animator_->tick(dt(0.5f));
     flush();
     EXPECT_EQ(1u, animator_->active_count());
+    EXPECT_EQ(2u, animator_->count());
     EXPECT_FLOAT_EQ(50.f, prop2.get_value());
     EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
 
     animator_->tick(dt(0.5f));
     flush();
     EXPECT_EQ(0u, animator_->active_count());
+    EXPECT_EQ(2u, animator_->count());
     EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+}
+
+// ============================================================================
+// Playback control tests
+// ============================================================================
+
+TEST_F(AnimatorTest, PauseAndResume)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    animator_->tick(dt(0.25f));
+    flush();
+    EXPECT_NEAR(25.f, prop_.get_value(), 0.1f);
+
+    h.pause();
+    EXPECT_TRUE(h.is_paused());
+
+    animator_->tick(dt(0.5f));
+    flush();
+    EXPECT_NEAR(25.f, prop_.get_value(), 0.1f);
+
+    h.play();
+    EXPECT_TRUE(h.is_playing());
+
+    animator_->tick(dt(0.75f));
+    flush();
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+    EXPECT_TRUE(h.is_finished());
+}
+
+TEST_F(AnimatorTest, Restart)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    animator_->tick(dt(1.f));
+    flush();
+    EXPECT_TRUE(h.is_finished());
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+
+    prop_.set_value(0.f);
+    h.restart();
+    EXPECT_TRUE(h.is_playing());
+
+    animator_->tick(dt(0.5f));
+    flush();
+    EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
+}
+
+TEST_F(AnimatorTest, SeekWhilePaused)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    h.pause();
+
+    h.seek(0.5f);
+    flush();
+    EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
+    EXPECT_TRUE(h.is_paused());
+}
+
+TEST_F(AnimatorTest, SeekWhileIdle)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    h.stop();
+
+    h.seek(0.5f);
+    flush();
+    EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
+}
+
+TEST_F(AnimatorTest, ProgressProperty)
+{
+    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    EXPECT_FLOAT_EQ(0.f, h.get_progress());
+
+    animator_->tick(dt(0.5f));
+    EXPECT_NEAR(0.5f, h.get_progress(), 0.01f);
+
+    animator_->tick(dt(0.5f));
+    EXPECT_FLOAT_EQ(1.f, h.get_progress());
 }
 
 // ============================================================================
@@ -393,17 +504,17 @@ TEST_F(TrackTest, SingleKeyframeFinishesImmediately)
 // Animation wrapper tests
 // ============================================================================
 
-TEST(AnimationWrapper, DefaultIsFinished)
+TEST(AnimationWrapper, DefaultIsIdle)
 {
     Animation h;
-    EXPECT_TRUE(h.is_finished());
+    EXPECT_TRUE(h.is_idle());
 }
 
-TEST(AnimationWrapper, CancelOnDefault)
+TEST(AnimationWrapper, StopOnDefault)
 {
     Animation h;
-    h.cancel();
-    EXPECT_TRUE(h.is_finished());
+    h.stop();
+    EXPECT_TRUE(h.is_idle());
 }
 
 // ============================================================================

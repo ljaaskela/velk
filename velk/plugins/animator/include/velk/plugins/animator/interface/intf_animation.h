@@ -6,7 +6,18 @@
 #include <velk/interface/intf_velk.h>
 #include <velk/plugins/animator/easing.h>
 
+#include <cstdint>
+
 namespace velk {
+
+/** @brief Playback state for an animation. */
+enum class PlayState : uint8_t
+{
+    Idle = 0,     ///< Created but not yet played, or reset via stop().
+    Playing = 1,  ///< Actively advancing.
+    Paused = 2,   ///< Frozen mid-playback, can resume.
+    Finished = 3  ///< Reached the end naturally or via finish().
+};
 
 /** @brief A type-erased keyframe: time, value, and easing function. */
 struct KeyframeEntry
@@ -20,27 +31,37 @@ struct KeyframeEntry
  * @brief Interface for a running animation.
  *
  * Properties (via VELK_INTERFACE):
- *   - duration (Duration): Total duration.
- *   - elapsed  (Duration): Elapsed time.
- *   - finished (bool):     Whether the animation has completed.
+ *   - duration  (Duration):  Total duration.
+ *   - elapsed   (Duration):  Elapsed time.
+ *   - progress  (float):     Normalized progress (0..1).
+ *   - state     (PlayState): Current playback state.
  */
 class IAnimation : public Interface<IAnimation>
 {
 public:
     VELK_INTERFACE(
-        (PROP, Duration, duration, {}),
-        (PROP, Duration, elapsed,  {}),
-        (PROP, bool,     finished, false)
+        (PROP, Duration,  duration, {}),
+        (PROP, Duration,  elapsed,  {}),
+        (PROP, float,     progress, 0.f),
+        (PROP, PlayState, state,    PlayState::Idle)
     )
 
-    /** @brief Advances the animation. Returns true when finished. */
+    /** @brief Advances the animation. Called by the animator; not for external use. */
     virtual bool tick(const UpdateInfo& info) = 0;
-    /** @brief Cancels the animation immediately. */
-    virtual void cancel() = 0;
+    /** @brief Starts or resumes playback. */
+    virtual void play() = 0;
+    /** @brief Pauses playback, preserving position. */
+    virtual void pause() = 0;
+    /** @brief Stops playback and resets to the beginning (Idle). */
+    virtual void stop() = 0;
+    /** @brief Jumps to the end, applies the final value, and transitions to Finished. */
+    virtual void finish() = 0;
+    /** @brief Resets to beginning and starts playback. */
+    virtual void restart() = 0;
+    /** @brief Seeks to a normalized position (0..1) and applies the interpolated value. */
+    virtual void seek(float progress) = 0;
     /** @brief Sets the target property to animate. */
     virtual void set_target(const IProperty::Ptr& target) = 0;
-    /** @brief Sets an explicit interpolator for this animation, overriding registry lookup. */
-    virtual void set_interpolator(InterpolatorFn fn) = 0;
     /** @brief Replaces all keyframes. Shares ownership of each entry's value. */
     virtual void set_keyframes(array_view<KeyframeEntry> keyframes) = 0;
 };

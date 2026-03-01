@@ -9,7 +9,6 @@
 #include <velk/plugins/animator/api/animation.h>
 #include <velk/plugins/animator/interface/intf_animator.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
-#include <velk/plugins/animator/interpolator_traits.h>
 #include <velk/plugins/animator/plugin.h>
 #include <velk/vector.h>
 
@@ -52,8 +51,8 @@ Animation tween(IAnimator& animator, Property<T> target, T from, T to, Duration 
     Any<T> toAny(to);
     auto anim = detail::tween(target, fromAny, toAny, duration, ease);
     if (anim) {
-        anim->set_interpolator(&detail::typed_interpolator<T>);
         animator.add(anim);
+        anim->play();
         return Animation(anim);
     }
     return {};
@@ -74,10 +73,10 @@ Animation track(IAnimator& animator, Property<T> target,
 {
     auto anim = detail::animation(target, ClassId::Animation);
     if (anim) {
-        anim->set_interpolator(&detail::typed_interpolator<T>);
         Animation h(anim);
         h.set_keyframes(keyframes);
         animator.add(anim);
+        anim->play();
         return h;
     }
     return {};
