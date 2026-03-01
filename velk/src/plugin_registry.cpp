@@ -260,21 +260,21 @@ void PluginRegistry::notify_plugins(Duration time) const
 
     // Reset tracking when switching between explicit and auto time domains.
     if (is_explicit != last_update_was_explicit_) {
-        t.timeSinceFirstUpdate = {};
-        t.timeSinceLastUpdate = {};
+        t.elapsed = {};
+        t.dt = {};
     }
     last_update_was_explicit_ = is_explicit;
 
-    if (!t.timeSinceFirstUpdate.us) {
-        t.timeSinceFirstUpdate.us = current_us;
+    if (!t.elapsed.us) {
+        t.elapsed.us = current_us;
     }
 
     if (!update_plugins_.empty()) {
         UpdateInfo info;
-        info.timeSinceInit = {current_us - t.timeSinceInit.us};
-        info.timeSinceFirstUpdate = {current_us - t.timeSinceFirstUpdate.us};
-        info.timeSinceLastUpdate = {t.timeSinceLastUpdate.us ? current_us - t.timeSinceLastUpdate.us : 0};
-        t.timeSinceLastUpdate.us = current_us;
+        info.time = {current_us - t.time.us};
+        info.elapsed = {current_us - t.elapsed.us};
+        info.dt = {t.dt.us ? current_us - t.dt.us : 0};
+        t.dt.us = current_us;
 
         for (auto* plugin : update_plugins_) {
             plugin->update(info);

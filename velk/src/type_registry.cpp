@@ -39,6 +39,7 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<int32_t>>();
     ITypeRegistry::register_type<ext::AnyValue<int64_t>>();
     ITypeRegistry::register_type<ext::AnyValue<string>>();
+    ITypeRegistry::register_type<ext::AnyValue<Duration>>();
 
     ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();
     ITypeRegistry::register_type<ext::ArrayAnyValue<double>>();

@@ -21,6 +21,7 @@ add_subdirectory(
 
 add_executable(tests
     test_any.cpp
+    test_animation.cpp
     test_array_property.cpp
     test_property.cpp
     test_future.cpp
@@ -37,11 +38,13 @@ add_executable(tests
 )
 
 target_link_libraries(tests PRIVATE velk GTest::gtest_main)
+target_include_directories(tests PRIVATE $<TARGET_PROPERTY:velk_animator,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Pass the test plugin DLL path as a compile definition so tests can find it.
 add_subdirectory(test_plugin_dll)
 target_compile_definitions(tests PRIVATE
     TEST_PLUGIN_DLL_PATH="$<TARGET_FILE:test_plugin_dll>"
+    TEST_ANIMATOR_DLL_PATH="$<TARGET_FILE:velk_animator>"
 )
 
 include(GoogleTest)

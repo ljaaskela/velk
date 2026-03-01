@@ -450,17 +450,17 @@ TEST_F(PluginTest, UpdateProvidesTimeInfo)
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
 
     // Supply explicit time values (microseconds)
-    velk_.update({1'000'000});                           // t = 1s
-    EXPECT_EQ(0, raw->lastInfo.timeSinceFirstUpdate.us); // First update is the baseline
-    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us);  // First update has no previous
+    velk_.update({1'000'000});                    // t = 1s
+    EXPECT_EQ(0, raw->lastInfo.elapsed.us);       // First update is the baseline
+    EXPECT_EQ(0, raw->lastInfo.dt.us);            // First update has no previous
 
     velk_.update({1'500'000}); // t = 1.5s
-    EXPECT_EQ(500'000, raw->lastInfo.timeSinceFirstUpdate.us);
-    EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
+    EXPECT_EQ(500'000, raw->lastInfo.elapsed.us);
+    EXPECT_EQ(500'000, raw->lastInfo.dt.us);
 
     velk_.update({2'000'000}); // t = 2s
-    EXPECT_EQ(1'000'000, raw->lastInfo.timeSinceFirstUpdate.us);
-    EXPECT_EQ(500'000, raw->lastInfo.timeSinceLastUpdate.us);
+    EXPECT_EQ(1'000'000, raw->lastInfo.elapsed.us);
+    EXPECT_EQ(500'000, raw->lastInfo.dt.us);
 }
 
 TEST_F(PluginTest, UpdateAutoTime)
@@ -471,17 +471,17 @@ TEST_F(PluginTest, UpdateAutoTime)
 
     ASSERT_EQ(ReturnValue::Success, reg.load_plugin(up));
 
-    // First call sets the baseline for timeSinceFirstUpdate
+    // First call sets the baseline for elapsed
     velk_.update();
-    EXPECT_GT(raw->lastInfo.timeSinceInit.us, 0);        // Always > 0 (since construction)
-    EXPECT_EQ(0, raw->lastInfo.timeSinceFirstUpdate.us); // First update is the baseline
-    EXPECT_EQ(0, raw->lastInfo.timeSinceLastUpdate.us);
+    EXPECT_GT(raw->lastInfo.time.us, 0);    // Always > 0 (since construction)
+    EXPECT_EQ(0, raw->lastInfo.elapsed.us); // First update is the baseline
+    EXPECT_EQ(0, raw->lastInfo.dt.us);
 
     // Second call
     velk_.update();
-    EXPECT_GT(raw->lastInfo.timeSinceInit.us, 0);
-    EXPECT_GE(raw->lastInfo.timeSinceFirstUpdate.us, 0);
-    EXPECT_GE(raw->lastInfo.timeSinceLastUpdate.us, 0);
+    EXPECT_GT(raw->lastInfo.time.us, 0);
+    EXPECT_GE(raw->lastInfo.elapsed.us, 0);
+    EXPECT_GE(raw->lastInfo.dt.us, 0);
 }
 
 #ifdef TEST_PLUGIN_DLL_PATH

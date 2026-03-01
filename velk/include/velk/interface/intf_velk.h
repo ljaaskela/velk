@@ -64,9 +64,9 @@ struct DeferredPropertySet
 /** @brief Information passed to each update cycle. */
 struct UpdateInfo
 {
-    Duration timeSinceInit;        ///< Time elapsed since the instance was created.
-    Duration timeSinceFirstUpdate; ///< Time elapsed since the first update() call.
-    Duration timeSinceLastUpdate;  ///< Time elapsed since the previous update() call.
+    Duration time;    ///< Time since the instance was created.
+    Duration elapsed; ///< Time since the first update() call.
+    Duration dt;      ///< Time since the previous update() call.
 };
 
 /**
