@@ -30,7 +30,7 @@ protected: // IProperty
     IEvent::Ptr on_changed() const override { return onChanged_; }
 
 protected: // IPropertyInternal
-    bool set_any(const IAny::Ptr& value) override;
+    bool set_any(const IAny::Ptr& value, IAny::Ptr* previous = nullptr) override;
     IAny::ConstPtr get_any() const override;
     ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Immediate) override;
     ReturnValue set_value_silent(const IAny& from) override;

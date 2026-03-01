@@ -34,10 +34,21 @@ const IAny::ConstPtr PropertyImpl::get_value() const
 {
     return data_;
 }
-bool PropertyImpl::set_any(const IAny::Ptr& value)
+bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
+    if (previous) {
+        *previous = {};
+    }
     if (data_ && value) {
-        return false;
+        // Disconnect old external wiring if present
+        if (external_) {
+            if (auto ext = interface_cast<IExternalAny>(data_)) {
+                ext->on_data_changed()->remove_handler(on_changed());
+            }
+        }
+        if (previous) {
+            *previous = data_;
+        }
     }
     data_ = value;
     auto external = interface_cast<IExternalAny>(data_);

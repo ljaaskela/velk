@@ -37,10 +37,10 @@ public:
     /**
      * @brief Sets the internal any object for a property instance.
      * @param any The any object to set.
-     * @note  This function can be called only once to initialize the property.
-     *        Internal any object cannot be changed after initialization.
+     * @param previous If non-null and data_ was already set, receives the old any object.
+     * @return true if successful.
      */
-    virtual bool set_any(const IAny::Ptr& any) = 0;
+    virtual bool set_any(const IAny::Ptr& any, IAny::Ptr* previous = nullptr) = 0;
     /**
      * @brief Returns the internal any object.
      * @note  Any changes through the direct any accessor will not lead to

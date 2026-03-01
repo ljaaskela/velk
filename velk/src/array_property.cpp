@@ -37,10 +37,15 @@ const IAny::ConstPtr ArrayPropertyImpl::get_value() const
 
 // IPropertyInternal
 
-bool ArrayPropertyImpl::set_any(const IAny::Ptr& value)
+bool ArrayPropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
+    if (previous) {
+        *previous = {};
+    }
     if (data_ && value) {
-        return false;
+        if (previous) {
+            *previous = data_;
+        }
     }
     data_ = value;
     return succeeded(invoke_event(on_changed(), data_.get()));

@@ -10,6 +10,8 @@ namespace ClassId {
 inline constexpr Uid Animation{"786c599c-2d55-4fb4-935e-a73d190af351"};
 /** @brief Animator that manages and ticks a set of animations. */
 inline constexpr Uid Animator{"3995b907-755d-4c3f-8595-323b25b3fb03"};
+/** @brief IAny wrapper that intercepts writes to animate value changes. */
+inline constexpr Uid AnimatedAny{"b7e3a1f0-42d8-4c95-9e6b-8f1d2a3c4b50"};
 } // namespace ClassId
 
 namespace PluginId {

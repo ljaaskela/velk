@@ -6,6 +6,7 @@
 
 #include <velk/ext/plugin.h>
 #include <velk/plugins/animator/interpolator_traits.h>
+#include <velk/plugins/animator/interface/intf_animated_any.h>
 #include <velk/plugins/animator/interface/intf_animator_plugin.h>
 
 namespace velk {
@@ -17,46 +18,28 @@ public:
     VELK_PLUGIN_NAME("animator");
     VELK_PLUGIN_VERSION(0, 1, 0);
 
-    ReturnValue initialize(IVelk& velk, PluginConfig& config) override
-    {
-        config.enableUpdate = true;
-        auto rv = register_type<AnimationImpl>(velk);
-        if (failed(rv)) {
-            return rv;
-        }
-        rv = register_type<AnimatorImpl>(velk);
-        if (failed(rv)) {
-            return rv;
-        }
-        auto& types = velk.type_registry();
-        types.register_interpolator<float>(&detail::typed_interpolator<float>);
-        types.register_interpolator<double>(&detail::typed_interpolator<double>);
-        types.register_interpolator<uint8_t>(&detail::typed_interpolator<uint8_t>);
-        types.register_interpolator<uint16_t>(&detail::typed_interpolator<uint16_t>);
-        types.register_interpolator<uint32_t>(&detail::typed_interpolator<uint32_t>);
-        types.register_interpolator<uint64_t>(&detail::typed_interpolator<uint64_t>);
-        types.register_interpolator<int8_t>(&detail::typed_interpolator<int8_t>);
-        types.register_interpolator<int16_t>(&detail::typed_interpolator<int16_t>);
-        types.register_interpolator<int32_t>(&detail::typed_interpolator<int32_t>);
-        types.register_interpolator<int64_t>(&detail::typed_interpolator<int64_t>);
-
-        animator_ = velk.create<IAnimator>(ClassId::Animator);
-        return ReturnValue::Success;
-    }
-
-    ReturnValue shutdown(IVelk&) override { return ReturnValue::Success; }
-
-    void pre_update(const IPlugin::PreUpdateInfo& info) override
-    {
-        if (auto* a = interface_cast<IAnimator>(animator_)) {
-            a->tick(info.info);
-        }
-    }
+    ReturnValue initialize(IVelk& velk, PluginConfig& config) override;
+    ReturnValue shutdown(IVelk&) override;
+    void pre_update(const IPlugin::PreUpdateInfo& info) override;
 
     IAnimator& get_default_animator() const override { return *animator_; }
 
+    void set_transition(const IProperty::Ptr& prop, Duration duration,
+                        easing::EasingFn easing) override;
+    void clear_transition(const IProperty::Ptr& prop) override;
+
 private:
+    struct TransitionEntry
+    {
+        IProperty::Ptr prop;
+        IAnimatedAny::Ptr animated;
+    };
+
+    void tick_animated_anys(const UpdateInfo& info);
+
     IAnimator::Ptr animator_;
+    IVelk* velk_ = nullptr;
+    vector<TransitionEntry> transitions_;
 };
 
 } // namespace velk

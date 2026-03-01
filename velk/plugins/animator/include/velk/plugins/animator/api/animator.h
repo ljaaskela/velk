@@ -94,6 +94,27 @@ inline IAnimator& default_animator()
     return ap->get_default_animator();
 }
 
+/** @brief Installs an implicit transition on a property so set_value animates. */
+template <class T>
+void set_transition(Property<T> prop, Duration duration,
+                    easing::EasingFn ease = easing::linear)
+{
+    auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    if (ap) {
+        ap->set_transition(prop.get_property_interface(), duration, ease);
+    }
+}
+
+/** @brief Removes an implicit transition from a property. */
+template <class T>
+void clear_transition(Property<T> prop)
+{
+    auto* ap = get_or_load_plugin<IAnimatorPlugin>(PluginId::AnimatorPlugin);
+    if (ap) {
+        ap->clear_transition(prop.get_property_interface());
+    }
+}
+
 } // namespace velk
 
 #endif // VELK_ANIMATOR_ANIMATOR_H

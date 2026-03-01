@@ -1,3 +1,4 @@
+#include <velk/api/callback.h>
 #include <velk/api/property.h>
 #include <velk/api/velk.h>
 #include <velk/plugins/animator/animator.h>
@@ -536,6 +537,145 @@ TEST(DefaultAnimator, TicksViaUpdate)
     EXPECT_GT(prop.get_value(), 0.f);
 
     da.cancel_all();
+}
+
+// ============================================================================
+// Implicit animation (set_transition / clear_transition) tests
+// ============================================================================
+
+class ImplicitAnimationTest : public ::testing::Test
+{
+protected:
+    void SetUp() override
+    {
+        instance().plugin_registry().load_plugin_from_path(TEST_ANIMATOR_DLL_PATH);
+        // Seed the clock with an initial update
+        time_ = sec(1.f);
+        instance().update(time_);
+    }
+
+    void advance(float seconds)
+    {
+        time_.us += sec(seconds).us;
+        instance().update(time_);
+    }
+
+    Duration time_{};
+    Property<float> prop_ = create_property<float>(0.f);
+};
+
+TEST_F(ImplicitAnimationTest, SetTransitionAnimatesOnSetValue)
+{
+    set_transition(prop_, sec(1.f));
+    prop_.set_value(100.f);
+
+    // Value should not jump immediately
+    EXPECT_NEAR(0.f, prop_.get_value(), 0.1f);
+
+    // After half duration
+    advance(0.5f);
+    EXPECT_NEAR(50.f, prop_.get_value(), 1.f);
+
+    // After full duration
+    advance(0.5f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+
+    clear_transition(prop_);
+}
+
+TEST_F(ImplicitAnimationTest, RetargetMidAnimation)
+{
+    set_transition(prop_, sec(1.f));
+    prop_.set_value(100.f);
+
+    // Advance halfway
+    advance(0.5f);
+    float mid = prop_.get_value();
+    EXPECT_NEAR(50.f, mid, 1.f);
+
+    // Retarget to 200
+    prop_.set_value(200.f);
+
+    // Value should still be near mid (retarget starts from current)
+    EXPECT_NEAR(mid, prop_.get_value(), 1.f);
+
+    // After full new duration, should reach 200
+    advance(1.f);
+    EXPECT_NEAR(200.f, prop_.get_value(), 0.1f);
+
+    clear_transition(prop_);
+}
+
+TEST_F(ImplicitAnimationTest, ClearTransitionRestoresImmediate)
+{
+    set_transition(prop_, sec(1.f));
+    prop_.set_value(50.f);
+
+    // Value animating, not yet at 50
+    EXPECT_NEAR(0.f, prop_.get_value(), 0.1f);
+
+    // Advance to finish
+    advance(1.f);
+
+    clear_transition(prop_);
+
+    // Now set_value should be immediate
+    prop_.set_value(200.f);
+    EXPECT_FLOAT_EQ(200.f, prop_.get_value());
+}
+
+TEST_F(ImplicitAnimationTest, OnChangedFiresDuringTick)
+{
+    set_transition(prop_, sec(1.f));
+
+    int changeCount = 0;
+    Callback handler([&](FnArgs) -> ReturnValue {
+        changeCount++;
+        return ReturnValue::Success;
+    });
+    prop_.add_on_changed(handler);
+
+    prop_.set_value(100.f);
+    EXPECT_EQ(0, changeCount); // set_data returns NothingToDo, no fire
+
+    advance(0.5f);
+    EXPECT_GE(changeCount, 1); // on_changed fired during tick
+
+    advance(0.5f);
+
+    prop_.remove_on_changed(handler);
+    clear_transition(prop_);
+}
+
+TEST_F(ImplicitAnimationTest, EasingApplied)
+{
+    set_transition(prop_, sec(1.f), easing::in_quad);
+    prop_.set_value(100.f);
+
+    advance(0.5f);
+    // in_quad at t=0.5 => 0.25, so value should be ~25
+    EXPECT_NEAR(25.f, prop_.get_value(), 1.f);
+
+    advance(0.5f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+
+    clear_transition(prop_);
+}
+
+TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
+{
+    set_transition(prop_, sec(1.f));
+    prop_.set_value(100.f);
+
+    // Deferred write should bypass animation
+    prop_.set_value(42.f, Deferred);
+    advance(0.f); // flush deferred (dt=0)
+
+    // The deferred flush writes 42 via copy_from -> passthrough (no animation).
+    // The tick at dt=0 wrote the initial from->target at t=0, then flush overwrote with 42.
+    EXPECT_FLOAT_EQ(42.f, prop_.get_value());
+
+    clear_transition(prop_);
 }
 
 #endif // TEST_ANIMATOR_DLL_PATH
