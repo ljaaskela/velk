@@ -42,6 +42,16 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<Duration>>();
 
     ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();
+    // Diagnostic: log the registered UID for ArrayAnyValue<float>
+    {
+        constexpr auto name = get_name<vector<float>>();
+        fprintf(stderr,
+                "ArrayAnyValue<float> registered uid: %s, type_uid<vector<float>>: %s, name: [%.*s]\n",
+                to_string(ext::ArrayAnyValue<float>::class_id()).c_str(),
+                to_string(type_uid<vector<float>>()).c_str(),
+                static_cast<int>(name.size()),
+                name.data());
+    }
     ITypeRegistry::register_type<ext::ArrayAnyValue<double>>();
     ITypeRegistry::register_type<ext::ArrayAnyValue<uint8_t>>();
     ITypeRegistry::register_type<ext::ArrayAnyValue<uint16_t>>();
