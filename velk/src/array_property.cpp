@@ -37,10 +37,15 @@ const IAny::ConstPtr ArrayPropertyImpl::get_value() const
 
 // IPropertyInternal
 
-bool ArrayPropertyImpl::set_any(const IAny::Ptr& value)
+bool ArrayPropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
+    if (previous) {
+        *previous = {};
+    }
     if (data_ && value) {
-        return false;
+        if (previous) {
+            *previous = data_;
+        }
     }
     data_ = value;
     return succeeded(invoke_event(on_changed(), data_.get()));
@@ -83,6 +88,44 @@ ReturnValue ArrayPropertyImpl::set_value_silent(const IAny& from)
         return ReturnValue::Fail;
     }
     return data_->copy_from(from);
+}
+
+bool ArrayPropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
+{
+    if (!extension) {
+        return false;
+    }
+    extension->set_inner(data_);
+    set_any(interface_pointer_cast<IAny>(extension));
+    return true;
+}
+
+bool ArrayPropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
+{
+    if (!extension || !data_) {
+        return false;
+    }
+
+    auto ext_as_any = interface_pointer_cast<IAny>(extension);
+
+    if (data_ == ext_as_any) {
+        auto inner = extension->take_inner();
+        set_any(inner);
+        return true;
+    }
+
+    auto* prev = interface_cast<IAnyExtension>(data_);
+    while (prev) {
+        auto inner = prev->take_inner();
+        if (inner == ext_as_any) {
+            prev->set_inner(extension->take_inner());
+            return true;
+        }
+        auto* next = interface_cast<IAnyExtension>(inner);
+        prev->set_inner(std::move(inner));
+        prev = next;
+    }
+    return false;
 }
 
 // IArrayProperty (delegates to IArrayAny on data_)

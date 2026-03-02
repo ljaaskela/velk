@@ -377,6 +377,6 @@ The public headers also make heavy use of STL type traits (`std::is_base_of_v`, 
 | `PluginConfig` | Per-plugin configuration set during `initialize`: `retainTypesOnUnload`, `enableUpdate` |
 | `PluginDependency` | Plugin dependency entry: UID and optional minimum version |
 | `Duration` | Type-safe microsecond duration (`{int64_t us}`) used in `UpdateInfo` and `IVelk::update()` |
-| `UpdateInfo` | Time information passed to plugin `update()`: `timeSinceInit`, `timeSinceFirstUpdate`, and `timeSinceLastUpdate` (all `Duration`) |
+| `UpdateInfo` | Time information passed to plugin `update()`: `time`, `elapsed`, and `dt` (all `Duration`) |
 | `MemberDesc` | Describes a property, event, or function member |
 | `ClassInfo` | UID, name, `array_view<InterfaceInfo>` of implemented interfaces, and `array_view<MemberDesc>` for a registered class |

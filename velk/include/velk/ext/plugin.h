@@ -84,8 +84,10 @@ public:
     /** @brief Returns the static plugin descriptor. */
     const PluginInfo& get_plugin_info() const override { return plugin_info(); }
 
-    /** @brief Default no-op update handler. Override to receive update notifications. */
-    void update(const UpdateInfo&) override {}
+    /** @brief Default no-op pre-update handler. Override to receive pre-update notifications. */
+    void pre_update(const IPlugin::PreUpdateInfo&) override {}
+    /** @brief Default no-op post-update handler. Override to receive post-update notifications. */
+    void post_update(const IPlugin::PostUpdateInfo&) override {}
 };
 
 } // namespace velk::ext

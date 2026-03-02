@@ -2,9 +2,174 @@
 
 ## Contents
 
+- [Any types and property value chains](#any-types-and-property-value-chains)
+  - [IAny and the ext/ hierarchy](#iany-and-the-ext-hierarchy)
+  - [How properties use IAny](#how-properties-use-iany)
+  - [IAnyExtension: stacking values on a property](#ianyextension-stacking-values-on-a-property)
+  - [Writing an extension](#writing-an-extension)
+  - [Installing and removing extensions](#installing-and-removing-extensions)
+  - [Chaining multiple extensions](#chaining-multiple-extensions)
+  - [Inspecting the chain](#inspecting-the-chain)
 - [Manual metadata and accessors](#manual-metadata-and-accessors)
 - [shared_ptr and control blocks](#shared_ptr-and-control-blocks)
   - [Control block pooling](#control-block-pooling)
+
+## Any types and property value chains
+
+### IAny and the ext/ hierarchy
+
+`IAny` (in `intf_any.h`) defines the interface for type-erased value containers. It declares `get_data`, `set_data`, `copy_from`, `clone`, and type compatibility queries. Every property stores its data through an `IAny` pointer, and all value transfer across the DLL boundary goes through this interface.
+
+The `ext/` layer provides a hierarchy of CRTP bases that implement `IAny`:
+
+| Class | Purpose |
+|---|---|
+| `ext::AnyBase<Final, Intf...>` | Internal base; adds ref-counting, `clone()` via factory. Rarely used directly. |
+| `ext::AnyMulti<Final, Types...>` | Multi-type compatible any (exposes multiple type UIDs). |
+| `ext::AnyCore<Final, T, Intf...>` | Single-type with virtual `get_value()`/`set_value()`. Extend for custom storage. |
+| `ext::AnyValue<T>` | Inline storage. The default choice for simple typed values. |
+| `ext::AnyRef<T>` | Points to external storage (e.g. a field in a State struct). Does not own the data. |
+| `ext::ArrayAnyRef<T>` | External `vector<T>` storage, also implements `IArrayAny` for element-level access. |
+| `ext::ArrayAnyValue<T>` | Owned `vector<T>` storage with `IArrayAny`. |
+
+`AnyValue<T>` and `AnyRef<T>` handle the most common cases. `AnyValue<T>` owns its data inline and is what `clone()` produces by default. `AnyRef<T>` points into a struct field, which is how `VELK_INTERFACE` properties work: the State struct lives in the object, and an `AnyRef<T>` provides the IAny interface over each field.
+
+For types that need custom storage or side effects (e.g. data that lives in a GPU buffer, or a value that fires a notification on write), extend `AnyCore<Final, T>` and override `get_value()`/`set_value()`. Adding `IExternalAny` to the interface list lets the property know that the data can change externally, so it wires up automatic `on_changed` notifications.
+
+### How properties use IAny
+
+A property (`PropertyImpl`) holds a single `IAny::Ptr` called `data_`. All reads and writes go through it:
+
+```
+Property::set_value(from)  -->  data_->copy_from(from)  -->  on_changed fires
+Property::get_value()      -->  returns data_
+```
+
+When a property is created by `MetadataContainer` for a `VELK_INTERFACE` member, `data_` is set to an `AnyRef<T>` pointing into the object's State struct. The property doesn't know or care what concrete IAny type backs it. This indirection is what makes extensions possible.
+
+### IAnyExtension: stacking values on a property
+
+`IAnyExtension` (in `intf_any_extension.h`) is an interface that inherits `IAny` and adds three methods for wrapping another `IAny`:
+
+```cpp
+class IAnyExtension : public Interface<IAnyExtension, IAny>
+{
+public:
+    virtual IAny::ConstPtr get_inner() const = 0;
+    virtual IAny::Ptr take_inner() = 0;
+    virtual void set_inner(IAny::Ptr inner) = 0;
+};
+```
+
+Because `IAnyExtension` inherits `IAny`, an extension can be placed directly into a property's `data_` slot. The extension wraps the previous `data_` as its inner, intercepting reads and writes while delegating to the original value when appropriate.
+
+Extensions form a chain. Each extension's inner points to the next, which may be another extension or the original plain `IAny`:
+
+```
+PropertyImpl::data_
+  --> ExtensionA (IAnyExtension)
+        inner_ --> ExtensionB (IAnyExtension)
+                     inner_ --> AnyRef<float> (plain IAny, the original value)
+```
+
+When no extensions are installed, `data_` points directly to the plain `IAny` and there is zero overhead.
+
+### Writing an extension
+
+Derive from `ext::AnyExtension<Final, Interfaces...>` (in `ext/any_extension.h`). This CRTP base provides:
+
+1. Default `IAnyExtension` implementation (`get_inner`, `take_inner`, `set_inner`) backed by a protected `inner_` member.
+2. Default passthrough implementations for all `IAny` methods that delegate to `inner_`.
+
+Override only the methods you want to intercept:
+
+```cpp
+class IValueClamp : public Interface<IValueClamp, IAnyExtension>
+{
+public:
+    virtual void set_bounds(float lo, float hi) = 0;
+};
+
+class ValueClamp final : public ext::AnyExtension<ValueClamp, IValueClamp>
+{
+public:
+    VELK_CLASS_UID("...");
+
+    void set_bounds(float lo, float hi) override { lo_ = lo; hi_ = hi; }
+
+    // Intercept writes to clamp the value
+    ReturnValue set_data(void const* from, size_t fromSize, Uid type) override
+    {
+        if (type == type_uid<float>() && fromSize == sizeof(float)) {
+            float v = *reinterpret_cast<const float*>(from);
+            v = std::clamp(v, lo_, hi_);
+            return inner_ ? inner_->set_data(&v, sizeof(v), type) : ReturnValue::Fail;
+        }
+        return inner_ ? inner_->set_data(from, fromSize, type) : ReturnValue::Fail;
+    }
+
+private:
+    float lo_ = 0.f;
+    float hi_ = 1.f;
+};
+```
+
+Methods you don't override pass through to `inner_` automatically: `get_data`, `get_compatible_types`, `get_data_size`, `copy_from`, `clone`. This means the extension is transparent for operations it doesn't care about.
+
+### Installing and removing extensions
+
+`IPropertyInternal` provides two methods for managing the extension chain:
+
+```cpp
+bool install_extension(const IAnyExtension::Ptr& extension);
+bool remove_extension(const IAnyExtension::Ptr& extension);
+```
+
+`install_extension` sets the extension's inner to the property's current `data_`, then replaces `data_` with the extension. `remove_extension` finds the extension in the chain and relinks around it.
+
+```cpp
+auto* pi = interface_cast<IPropertyInternal>(property);
+
+// Install
+auto clamp = instance().create<IValueClamp>(ValueClamp::class_id());
+clamp->set_bounds(0.f, 100.f);
+pi->install_extension(interface_pointer_cast<IAnyExtension>(clamp));
+
+// The property now clamps writes to [0, 100]
+property->set_value(Any<float>(200.f));
+// get_value() returns 100.f
+
+// Remove
+pi->remove_extension(interface_pointer_cast<IAnyExtension>(clamp));
+// The property is back to normal
+```
+
+The property holds a strong reference to the installed extension (it is part of the `data_` chain), so the extension stays alive as long as the property exists. If you drop your external handle you lose the ability to call `remove_extension` directly, but you can recover it later via `get_any_chain()`.
+
+### Chaining multiple extensions
+
+Multiple extensions can be stacked. Each `install_extension` call pushes the new extension to the head of the chain:
+
+```cpp
+pi->install_extension(clampExt);      // chain: clamp -> original
+pi->install_extension(animationExt);  // chain: animation -> clamp -> original
+```
+
+The property calls into the head of the chain. Each extension decides whether to delegate to its inner or handle the call itself. For example, a clamp extension might modify the value and delegate `set_data` to the next node, while an animation extension might capture the value as a target and return without delegating at all.
+
+`remove_extension` can remove any extension from any position in the chain, relinking the predecessor's inner to the removed extension's inner.
+
+### Inspecting the chain
+
+`get_any_chain` (in `intf_property.h`) walks the chain and returns all nodes:
+
+```cpp
+auto chain = get_any_chain(*property);
+// chain[0] = head (outermost extension or plain IAny)
+// chain[N] = tail (original plain IAny)
+```
+
+Use `interface_cast<IAnyExtension>` on individual nodes to distinguish extensions from the terminal plain `IAny`.
 
 ## Manual metadata and accessors
 

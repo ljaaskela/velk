@@ -82,7 +82,9 @@ velk::invoke_function(w->reset());
 | [Hive](docs/hive.md) | Storing objects in dense, cache-friendly containers |
 | [Plugins](docs/plugins.md) | Extending Velk with inline or DLL-based plugins |
 | [Performance](docs/performance.md) | Benchmark numbers, memory layout, and object sizes |
-| [Advanced](docs/advanced.md) | Writing metadata by hand, shared_ptr internals, control block pooling |
+| [Advanced](docs/advanced.md) | Any types and value chains, writing metadata by hand, shared_ptr internals |
+| **Built-in plugins** | |
+| [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
 
 ## Project structure
 
@@ -98,13 +100,16 @@ velk/
     hive.md               Dense object storage and hive registry
     performance.md        Performance and memory usage
     plugins.md            Plugin system: writing, loading, dependencies, bundles
-    advanced.md           Manual metadata and accessors
+    advanced.md           Any types, value chains, manual metadata, shared_ptr internals
+    plugins/
+      animator.md         Animator plugin: transitions, easing, interpolators
   velk/
     include/              Public API (consumers depend only on these headers)
       interface/          Abstract interfaces (ABI contracts)
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
     src/                  DLL internals (compiled into velk.dll)
+    plugins/              Built-in plugins (compiled into separate dlls)
   test/                   Unit tests (GoogleTest)
 ```
 
@@ -119,6 +124,7 @@ cmake --build build --config Release
 
 Output: 
 * `build/bin/Release/velk.dll` (shared library)
+* `build/bin/Release/velk_animator.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
 * `build/bin/Release/benchmarks.exe` (benchmarks)

@@ -25,6 +25,9 @@ public:
     ReturnValue unregister_type(const IObjectFactory& factory) override;
     const ClassInfo* get_class_info(Uid classUid) const override;
     const IObjectFactory* find_factory(Uid classUid) const override;
+    ReturnValue register_interpolator(Uid typeUid, InterpolatorFn fn) override;
+    ReturnValue unregister_interpolator(Uid typeUid) override;
+    InterpolatorFn find_interpolator(Uid typeUid) const override;
 
     /** @brief Creates an instance of a registered type by its UID. */
     IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const;
@@ -46,8 +49,18 @@ private:
     /** @brief Finds the factory for the given class UID, or nullptr if not registered. */
     const IObjectFactory* find(Uid uid) const;
 
-    std::vector<Entry> types_; ///< Sorted registry of class factories.
-    Uid current_owner_;        ///< Owner context for type registration.
+    /** @brief Registry entry mapping a type UID to its interpolator function. */
+    struct InterpolatorEntry
+    {
+        Uid typeUid;
+        InterpolatorFn fn;
+        Uid owner;
+        bool operator<(const InterpolatorEntry& o) const { return typeUid < o.typeUid; }
+    };
+
+    std::vector<Entry> types_;                       ///< Sorted registry of class factories.
+    std::vector<InterpolatorEntry> interpolators_;    ///< Sorted registry of interpolator functions.
+    Uid current_owner_;                               ///< Owner context for type registration.
     ILog& log_;
 };
 

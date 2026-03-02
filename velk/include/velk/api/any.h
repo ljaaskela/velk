@@ -47,11 +47,10 @@ public:
     operator const IAny&() const noexcept { return *(any_.get()); }
     /** @brief Returns true if the wrapper holds a valid IAny. */
     operator bool() const noexcept { return any_.operator bool(); }
-
-protected:
     /** @brief Returns the underlying const IAny pointer. */
     const IAny* get_any_interface() const noexcept { return any_.get(); }
 
+protected:
     refcnt_ptr<IAny> any_;
 };
 

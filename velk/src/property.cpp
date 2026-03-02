@@ -1,6 +1,7 @@
 #include "property.h"
 
 #include <velk/api/velk.h>
+#include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_external_any.h>
 #include <velk/interface/types.h>
 
@@ -34,10 +35,21 @@ const IAny::ConstPtr PropertyImpl::get_value() const
 {
     return data_;
 }
-bool PropertyImpl::set_any(const IAny::Ptr& value)
+bool PropertyImpl::set_any(const IAny::Ptr& value, IAny::Ptr* previous)
 {
+    if (previous) {
+        *previous = {};
+    }
     if (data_ && value) {
-        return false;
+        // Disconnect old external wiring if present
+        if (external_) {
+            if (auto ext = interface_cast<IExternalAny>(data_)) {
+                ext->on_data_changed()->remove_handler(on_changed());
+            }
+        }
+        if (previous) {
+            *previous = data_;
+        }
     }
     data_ = value;
     auto external = interface_cast<IExternalAny>(data_);
@@ -91,6 +103,47 @@ ReturnValue PropertyImpl::set_data(const void* data, size_t size, Uid type, Invo
         invoke_event(on_changed(), data_.get());
     }
     return ret;
+}
+
+bool PropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
+{
+    if (!extension) {
+        return false;
+    }
+    extension->set_inner(data_);
+    set_any(interface_pointer_cast<IAny>(extension));
+    return true;
+}
+
+bool PropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
+{
+    if (!extension || !data_) {
+        return false;
+    }
+
+    auto ext_as_any = interface_pointer_cast<IAny>(extension);
+
+    // Case 1: extension is at the head of the chain
+    if (data_ == ext_as_any) {
+        auto inner = extension->take_inner();
+        set_any(inner);
+        return true;
+    }
+
+    // Case 2: extension is deeper in the chain; walk to find its predecessor.
+    // Use take/restore to get non-const access to each link.
+    auto* prev = interface_cast<IAnyExtension>(data_);
+    while (prev) {
+        auto inner = prev->take_inner();
+        if (inner == ext_as_any) {
+            prev->set_inner(extension->take_inner());
+            return true;
+        }
+        auto* next = interface_cast<IAnyExtension>(inner);
+        prev->set_inner(std::move(inner));
+        prev = next;
+    }
+    return false;
 }
 
 } // namespace velk

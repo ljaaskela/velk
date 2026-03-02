@@ -22,6 +22,16 @@ public:
 
     /** @brief Returns the object's flags (bitwise combination of ObjectFlags). */
     virtual uint32_t get_object_flags() const = 0;
+
+    /**
+     * @brief Returns a shared_ptr to this object, cast to interface T.
+     * @tparam T The target interface type.
+     */
+    template <class T>
+    typename T::Ptr get_self() const
+    {
+        return interface_pointer_cast<T>(get_self());
+    }
 };
 
 /**

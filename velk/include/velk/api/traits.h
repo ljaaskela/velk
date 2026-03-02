@@ -116,6 +116,31 @@ template <class F>
 inline constexpr bool has_callable_traits_v<F, std::void_t<typename callable_traits<F>::return_type>> = true;
 /// @endcond
 
+// Non-deduced context
+
+/**
+ * @brief Identity metafunction that places @p T in a non-deduced context.
+ *
+ * @par Example
+ * @code
+ * // T is deduced from Property<T>; the array_view parameter only
+ * // needs to be implicitly convertible (e.g. from velk::vector<V>).
+ * template <class T>
+ * void animate(Property<T> target, non_deduced_t<array_view<T>> keys);
+ * @endcode
+ *
+ * @tparam T The type to wrap.
+ */
+template <class T>
+struct non_deduced
+{
+    using type = T;
+};
+
+/** @brief Alias for <tt>typename non_deduced<T>::type</tt>. */
+template <class T>
+using non_deduced_t = typename non_deduced<T>::type;
+
 // Parameter decay
 
 /**

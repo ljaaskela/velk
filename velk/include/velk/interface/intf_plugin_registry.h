@@ -46,6 +46,21 @@ public:
     {
         return find_plugin(T::class_id());
     }
+    /**
+     * @brief Returns a plugin instance with given plugin id.
+     *        Lazily loads the plugin if not already loaded.
+     * @param pluginId Id if the plugin.
+     * @return Plugin instance or nullptr if loading failed.
+     */
+    IPlugin* get_or_load_plugin(Uid pluginId)
+    {
+        auto* plugin = find_plugin(pluginId);
+        if (!plugin) {
+            load_plugin(pluginId);
+            plugin = find_plugin(pluginId);
+        }
+        return plugin;
+    }
 };
 
 } // namespace velk
