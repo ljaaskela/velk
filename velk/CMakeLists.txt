@@ -39,6 +39,7 @@ add_library(velk SHARED
     include/velk/interface/intf_function.h
     include/velk/interface/intf_event.h
     include/velk/interface/intf_future.h
+    include/velk/interface/intf_any_extension.h
     include/velk/interface/intf_property.h
     include/velk/interface/intf_object_factory.h
     include/velk/interface/intf_type_registry.h
@@ -59,6 +60,7 @@ add_library(velk SHARED
     include/velk/api/traits.h
     include/velk/api/velk.h
     include/velk/ext/any.h
+    include/velk/ext/any_extension.h
     include/velk/ext/core_object.h
     include/velk/ext/member_traits.h
     include/velk/ext/metadata.h

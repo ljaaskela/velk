@@ -54,9 +54,8 @@ struct AnyBaseParent<false, FinalClass, Interfaces...>
  * @tparam Interfaces Additional interfaces beyond IAny.
  */
 template <class FinalClass, class... Interfaces>
-class AnyBase : public AnyBaseParent<
-    (::velk::detail::has_iany_in_chain<Interfaces>() || ...),
-    FinalClass, Interfaces...>::type
+class AnyBase : public AnyBaseParent<(::velk::detail::has_iany_in_chain<Interfaces>() || ...), FinalClass,
+                                     Interfaces...>::type
 {
 public:
     /** @brief Creates a clone by instantiating a new FinalClass and copying data into it. */

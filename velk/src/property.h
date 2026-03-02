@@ -34,6 +34,8 @@ protected: // IPropertyInternal
     IAny::ConstPtr get_any() const override;
     ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Immediate) override;
     ReturnValue set_value_silent(const IAny& from) override;
+    bool install_extension(const IAnyExtension::Ptr& extension) override;
+    bool remove_extension(const IAnyExtension::Ptr& extension) override;
 
 private:
     IAny::Ptr data_;

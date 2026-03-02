@@ -6,22 +6,21 @@
 
 namespace velk {
 
-void AnimatedAny::init(IAny::Ptr original, const TransitionConfig& config,
-                       InterpolatorFn interpolator, const IProperty::Ptr& property)
+void AnimatedAny::init(const TransitionConfig& config, InterpolatorFn interpolator,
+                       const IProperty::Ptr& property)
 {
-    original_ = std::move(original);
     config_ = config;
     interpolator_ = interpolator;
     if (property) {
         property_ = IProperty::WeakPtr(property);
     }
 
-    // Create display as a clone of original (reads go through display)
-    display_ = original_->clone();
+    // Create display as a clone of inner (reads go through display)
+    display_ = inner_->clone();
     // Pre-allocate scratch buffers
-    from_ = original_->clone();
-    target_ = original_->clone();
-    result_ = original_->clone();
+    from_ = inner_->clone();
+    target_ = inner_->clone();
+    result_ = inner_->clone();
 }
 
 bool AnimatedAny::tick(Duration dt)
@@ -44,9 +43,9 @@ bool AnimatedAny::tick(Duration dt)
     // Interpolate from -> target -> result
     if (interpolator_ && from_ && target_ && result_) {
         if (succeeded(interpolator_(*from_, *target_, eased, *result_))) {
-            // Write interpolated value to display and original
+            // Write interpolated value to display and inner
             display_->copy_from(*result_);
-            original_->copy_from(*result_);
+            inner_->copy_from(*result_);
         }
     }
 
@@ -64,26 +63,7 @@ bool AnimatedAny::tick(Duration dt)
     return true;
 }
 
-IAny::Ptr AnimatedAny::take_original()
-{
-    // Copy current display value to original before returning
-    if (original_ && display_) {
-        original_->copy_from(*display_);
-    }
-    return std::move(original_);
-}
-
-// IAny
-
-array_view<Uid> AnimatedAny::get_compatible_types() const
-{
-    return display_ ? display_->get_compatible_types() : array_view<Uid>{};
-}
-
-size_t AnimatedAny::get_data_size(Uid type) const
-{
-    return display_ ? display_->get_data_size(type) : 0;
-}
+// IAny overrides
 
 ReturnValue AnimatedAny::get_data(void* to, size_t toSize, Uid type) const
 {
@@ -96,8 +76,8 @@ ReturnValue AnimatedAny::set_data(void const* from, size_t fromSize, Uid type)
         // No interpolator: fall through to direct write
         if (display_) {
             auto ret = display_->set_data(from, fromSize, type);
-            if (original_ && ret == ReturnValue::Success) {
-                original_->set_data(from, fromSize, type);
+            if (inner_ && ret == ReturnValue::Success) {
+                inner_->set_data(from, fromSize, type);
             }
             return ret;
         }
@@ -130,8 +110,8 @@ ReturnValue AnimatedAny::copy_from(const IAny& other)
     if (display_) {
         ret = display_->copy_from(other);
     }
-    if (original_ && succeeded(ret)) {
-        original_->copy_from(other);
+    if (inner_ && succeeded(ret)) {
+        inner_->copy_from(other);
     }
     return ret;
 }

@@ -4,6 +4,7 @@
 #include <velk/common.h>
 #include <velk/ext/core_object.h>
 #include <velk/ext/event.h>
+#include <velk/interface/intf_any_extension.h>
 #include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_array_property.h>
 #include <velk/interface/intf_property.h>
@@ -18,8 +19,7 @@ namespace velk {
  * delegating element-level operations to IArrayAny on its backing data_.
  * The data_ is expected to be an ArrayAnyRef<T> (which implements IArrayAny).
  */
-class ArrayPropertyImpl final
-    : public ext::ObjectCore<ArrayPropertyImpl, IPropertyInternal, IArrayProperty>
+class ArrayPropertyImpl final : public ext::ObjectCore<ArrayPropertyImpl, IPropertyInternal, IArrayProperty>
 {
 public:
     VELK_CLASS_UID(ClassId::ArrayProperty);
@@ -36,6 +36,8 @@ protected: // IPropertyInternal
     IAny::ConstPtr get_any() const override;
     ReturnValue set_data(const void* data, size_t size, Uid type, InvokeType invokeType = Immediate) override;
     ReturnValue set_value_silent(const IAny& from) override;
+    bool install_extension(const IAnyExtension::Ptr& extension) override;
+    bool remove_extension(const IAnyExtension::Ptr& extension) override;
 
 protected: // IArrayProperty
     size_t array_size() const override;

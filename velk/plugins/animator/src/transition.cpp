@@ -68,17 +68,14 @@ void TransitionImpl::install()
         }
     }
 
-    // Create AnimatedAny
+    // Create AnimatedAny and install as extension (sets inner automatically)
     animated_ = instance().create<IAnimatedAny>(ClassId::AnimatedAny);
+    pi->install_extension(interface_pointer_cast<IAnyExtension>(animated_));
 
-    // Swap into property, getting the original back
-    IAny::Ptr previous;
-    pi->set_any(interface_pointer_cast<IAny>(animated_), &previous);
-
-    // Initialize with the original any
+    // Initialize (inner is already set by install_extension)
     auto* s = state();
     TransitionConfig config{s ? s->duration : Duration{}, easing_};
-    animated_->init(std::move(previous), config, interpolator, target_);
+    animated_->init(config, interpolator, target_);
 
     installed_ = true;
 }
@@ -93,10 +90,7 @@ void TransitionImpl::uninstall()
         return;
     }
 
-    auto original = animated_->take_original();
-    if (original) {
-        pi->set_any(original);
-    }
+    pi->remove_extension(interface_pointer_cast<IAnyExtension>(animated_));
 
     animated_ = nullptr;
     installed_ = false;
