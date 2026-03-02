@@ -1,6 +1,9 @@
+#include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/property.h>
 #include <velk/api/velk.h>
+#include <velk/interface/intf_array_property.h>
+#include <velk/interface/intf_metadata.h>
 #include <velk/plugins/animator/animator.h>
 
 #include <gtest/gtest.h>
@@ -672,6 +675,60 @@ TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
     EXPECT_FLOAT_EQ(42.f, prop_.get_value());
 
     tr.remove();
+}
+
+// ============================================================================
+// Keyframe array property tests
+// ============================================================================
+
+TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
+{
+    auto obj = instance().create<IObject>(ClassId::Animation);
+    auto* anim = interface_cast<IAnimation>(obj);
+    ASSERT_NE(nullptr, anim);
+
+    auto prop = create_property<float>(0.f);
+    anim->set_target(prop.get_property_interface());
+
+    Any<float> v0(0.f), v1(50.f), v2(100.f);
+    KeyframeEntry kfs[] = {
+        {sec(0.f), v0.clone(), easing::linear},
+        {sec(0.5f), v1.clone(), easing::in_quad},
+        {sec(1.f), v2.clone(), easing::out_quad},
+    };
+    anim->set_keyframes({kfs, 3});
+
+    auto keyframes = anim->keyframes();
+    EXPECT_TRUE(keyframes);
+    EXPECT_EQ(3u, keyframes.size());
+
+    // Verify time values
+    EXPECT_EQ(sec(0.f).us, keyframes.at(0).time.us);
+    EXPECT_EQ(sec(0.5f).us, keyframes.at(1).time.us);
+    EXPECT_EQ(sec(1.f).us, keyframes.at(2).time.us);
+
+    // Verify easing functions
+    EXPECT_EQ(easing::linear, keyframes.at(0).easing);
+    EXPECT_EQ(easing::in_quad, keyframes.at(1).easing);
+    EXPECT_EQ(easing::out_quad, keyframes.at(2).easing);
+}
+
+TEST_F(AnimatorPluginTest, KeyframeArrayPropertyReadOnly)
+{
+    auto obj = instance().create<IObject>(ClassId::Animation);
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(nullptr, meta);
+
+    auto prop = meta->get_property("keyframes");
+    ASSERT_TRUE(prop);
+
+    // Verify it is read-only: mutation ops return ReadOnly
+    auto* ap = interface_cast<IArrayProperty>(prop);
+    ASSERT_NE(nullptr, ap);
+
+    Any<KeyframeEntry> val(KeyframeEntry{});
+    EXPECT_EQ(ap->push_back(val), ReturnValue::ReadOnly);
+    EXPECT_EQ(ap->erase_at(0), ReturnValue::ReadOnly);
 }
 
 #endif // TEST_ANIMATOR_DLL_PATH

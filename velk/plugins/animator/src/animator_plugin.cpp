@@ -1,6 +1,8 @@
 #include "animated_any.h"
 #include "animator_plugin.h"
 
+#include <velk/ext/any.h>
+
 namespace velk {
 
 ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
@@ -23,6 +25,7 @@ ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
         return rv;
     }
     auto& types = velk.type_registry();
+    types.register_type<ext::AnyValue<KeyframeEntry>>();
     types.register_interpolator<float>(&detail::typed_interpolator<float>);
     types.register_interpolator<double>(&detail::typed_interpolator<double>);
     types.register_interpolator<uint8_t>(&detail::typed_interpolator<uint8_t>);

@@ -25,6 +25,12 @@ struct KeyframeEntry
     Duration time;
     IAny::Ptr value;
     easing::EasingFn easing = easing::linear;
+
+    bool operator==(const KeyframeEntry& other) const
+    {
+        return time.us == other.time.us && easing == other.easing && value == other.value;
+    }
+    bool operator!=(const KeyframeEntry& other) const { return !(*this == other); }
 };
 
 /**
@@ -40,10 +46,11 @@ class IAnimation : public Interface<IAnimation>
 {
 public:
     VELK_INTERFACE(
-        (RPROP, Duration,  duration, {}),
-        (RPROP, Duration,  elapsed,  {}),
-        (RPROP, float,     progress, 0.f),
-        (RPROP, PlayState, state,    PlayState::Idle)
+        (RPROP, Duration,       duration,  {}),
+        (RPROP, Duration,       elapsed,   {}),
+        (RPROP, float,          progress,  0.f),
+        (RPROP, PlayState,      state,     PlayState::Idle),
+        (RARR,  KeyframeEntry,  keyframes)
     )
 
     /** @brief Advances the animation. Called by the animator; not for external use. */

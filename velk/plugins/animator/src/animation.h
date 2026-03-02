@@ -5,8 +5,6 @@
 #include <velk/plugins/animator/interface/intf_animation.h>
 #include <velk/plugins/animator/plugin.h>
 
-#include <vector>
-
 namespace velk {
 
 /**
@@ -39,7 +37,6 @@ private:
     void notify_state(IAnimation::State& state);
 
     IProperty::Ptr target_;
-    std::vector<KeyframeEntry> keyframes_;
     InterpolatorFn interpolator_ = nullptr; // resolved from type registry during init
     IAny::Ptr result_;  // cached result buffer, cloned once from first keyframe
     Uid typeUid_{};     // resolved from target on first tick

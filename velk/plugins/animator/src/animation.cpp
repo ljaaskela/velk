@@ -16,11 +16,12 @@ IAnimation::State* AnimationImpl::state()
 
 void AnimationImpl::set_keyframes(array_view<KeyframeEntry> keyframes)
 {
-    keyframes_.clear();
-    keyframes_.reserve(keyframes.size());
-    for (auto& kf : keyframes) {
-        keyframes_.push_back({kf.time, kf.value, kf.easing});
+    auto* s = state();
+    if (!s) {
+        return;
     }
+    s->keyframes.clear();
+    s->keyframes.insert(s->keyframes.begin(), keyframes.begin(), keyframes.end());
     sorted_ = false;
 }
 
@@ -72,8 +73,8 @@ void AnimationImpl::finish()
         return;
     }
     ensure_init(*s);
-    if (!keyframes_.empty() && target_) {
-        write_to_target(*keyframes_.back().value);
+    if (!s->keyframes.empty() && target_) {
+        write_to_target(*s->keyframes.back().value);
     }
     s->elapsed = s->duration;
     s->progress = 1.f;
@@ -117,11 +118,11 @@ void AnimationImpl::ensure_init(IAnimation::State& s)
     if (sorted_) {
         return;
     }
-    std::sort(keyframes_.begin(), keyframes_.end(), [](const KeyframeEntry& a, const KeyframeEntry& b) {
+    std::sort(s.keyframes.begin(), s.keyframes.end(), [](const KeyframeEntry& a, const KeyframeEntry& b) {
         return a.time.us < b.time.us;
     });
-    if (!keyframes_.empty()) {
-        s.duration = keyframes_.back().time;
+    if (!s.keyframes.empty()) {
+        s.duration = s.keyframes.back().time;
     }
 
     // Resolve type info and interpolator from target property
@@ -141,41 +142,41 @@ void AnimationImpl::ensure_init(IAnimation::State& s)
 
 void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
 {
-    if (keyframes_.size() < 2 || !target_) {
-        if (!keyframes_.empty() && target_) {
-            write_to_target(*keyframes_.front().value);
+    if (s.keyframes.size() < 2 || !target_) {
+        if (!s.keyframes.empty() && target_) {
+            write_to_target(*s.keyframes.front().value);
         }
         return;
     }
 
     if (global_t >= 1.f) {
-        if (keyframes_.back().value) {
-            write_to_target(*keyframes_.back().value);
+        if (s.keyframes.back().value) {
+            write_to_target(*s.keyframes.back().value);
         }
         return;
     }
     if (global_t <= 0.f) {
-        if (keyframes_.front().value) {
-            write_to_target(*keyframes_.front().value);
+        if (s.keyframes.front().value) {
+            write_to_target(*s.keyframes.front().value);
         }
         return;
     }
 
     // Find the segment: first keyframe with time > elapsed
     size_t i = 1;
-    while (i < keyframes_.size() && keyframes_[i].time.us <= s.elapsed.us) {
+    while (i < s.keyframes.size() && s.keyframes[i].time.us <= s.elapsed.us) {
         ++i;
     }
-    if (i >= keyframes_.size()) {
-        if (keyframes_.back().value) {
-            write_to_target(*keyframes_.back().value);
+    if (i >= s.keyframes.size()) {
+        if (s.keyframes.back().value) {
+            write_to_target(*s.keyframes.back().value);
         }
         return;
     }
 
-    if (interpolator_ && result_ && keyframes_[i - 1].value && keyframes_[i].value) {
-        auto& kf0 = keyframes_[i - 1];
-        auto& kf1 = keyframes_[i];
+    if (interpolator_ && result_ && s.keyframes[i - 1].value && s.keyframes[i].value) {
+        auto& kf0 = s.keyframes[i - 1];
+        auto& kf1 = s.keyframes[i];
         int64_t seg_duration = kf1.time.us - kf0.time.us;
         float seg_t = (seg_duration > 0)
                           ? static_cast<float>(s.elapsed.us - kf0.time.us) / static_cast<float>(seg_duration)
@@ -217,9 +218,9 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     }
     auto& s = *st;
 
-    if (keyframes_.size() < 2) {
-        if (!keyframes_.empty() && target_) {
-            write_to_target(*keyframes_.front().value);
+    if (s.keyframes.size() < 2) {
+        if (!s.keyframes.empty() && target_) {
+            write_to_target(*s.keyframes.front().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -230,8 +231,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     ensure_init(s);
 
     // Set initial value on first tick
-    if (s.elapsed.us == 0 && target_ && keyframes_.front().value) {
-        write_to_target(*keyframes_.front().value);
+    if (s.elapsed.us == 0 && target_ && s.keyframes.front().value) {
+        write_to_target(*s.keyframes.front().value);
     }
 
     if (dt.us) {
@@ -241,8 +242,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     if (s.elapsed.us >= s.duration.us) {
         s.elapsed = s.duration;
         s.progress = 1.f;
-        if (target_ && keyframes_.back().value) {
-            write_to_target(*keyframes_.back().value);
+        if (target_ && s.keyframes.back().value) {
+            write_to_target(*s.keyframes.back().value);
         }
         s.state = PlayState::Finished;
         notify_state(s);
@@ -255,13 +256,13 @@ bool AnimationImpl::tick(const UpdateInfo& info)
 
     // Find the segment: first keyframe with time > elapsed
     size_t i = 1;
-    while (i < keyframes_.size() && keyframes_[i].time.us <= s.elapsed.us) {
+    while (i < s.keyframes.size() && s.keyframes[i].time.us <= s.elapsed.us) {
         ++i;
     }
 
-    if (i >= keyframes_.size()) {
-        if (target_ && keyframes_.back().value) {
-            write_to_target(*keyframes_.back().value);
+    if (i >= s.keyframes.size()) {
+        if (target_ && s.keyframes.back().value) {
+            write_to_target(*s.keyframes.back().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -269,9 +270,9 @@ bool AnimationImpl::tick(const UpdateInfo& info)
         return false;
     }
 
-    if (target_ && interpolator_ && result_ && keyframes_[i - 1].value && keyframes_[i].value) {
-        auto& kf0 = keyframes_[i - 1];
-        auto& kf1 = keyframes_[i];
+    if (target_ && interpolator_ && result_ && s.keyframes[i - 1].value && s.keyframes[i].value) {
+        auto& kf0 = s.keyframes[i - 1];
+        auto& kf1 = s.keyframes[i];
         int64_t seg_duration = kf1.time.us - kf0.time.us;
         float seg_t = (seg_duration > 0)
                           ? static_cast<float>(s.elapsed.us - kf0.time.us) / static_cast<float>(seg_duration)

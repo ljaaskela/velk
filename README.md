@@ -109,6 +109,7 @@ velk/
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
     src/                  DLL internals (compiled into velk.dll)
+    plugins/              Built-in plugins (compiled into separate dlls)
   test/                   Unit tests (GoogleTest)
 ```
 
@@ -123,6 +124,7 @@ cmake --build build --config Release
 
 Output: 
 * `build/bin/Release/velk.dll` (shared library)
+* `build/bin/Release/velk_animator.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
 * `build/bin/Release/benchmarks.exe` (benchmarks)
