@@ -94,7 +94,8 @@ public:
         size_t tasksRun{};          ///< Number of tasks that were run after pre_update().
         size_t propertiesChanged{}; ///< Number of deferred property changes after pre_update().
     };
-    /** @brief Called at the start of instance().update(), before deferred tasks and properties are flushed. */
+    /** @brief Called at the start of instance().update(), before deferred tasks and properties are flushed.
+     */
     virtual void pre_update(const PreUpdateInfo& info) = 0;
     /** @brief Called at the end of instance().update(), after deferred tasks and properties are flushed. */
     virtual void post_update(const PostUpdateInfo& info) = 0;

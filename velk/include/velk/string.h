@@ -168,16 +168,10 @@ public:
     bool empty() const { return size() == 0; }
 
     /** @brief Returns the number of characters. */
-    size_t size() const
-    {
-        return is_heap() ? heap_.size_ : local_.size_;
-    }
+    size_t size() const { return is_heap() ? heap_.size_ : local_.size_; }
 
     /** @brief Returns the number of characters that can be held without reallocation. */
-    size_t capacity() const
-    {
-        return is_heap() ? (heap_.capacity_ & ~heap_flag) : sso_capacity;
-    }
+    size_t capacity() const { return is_heap() ? (heap_.capacity_ & ~heap_flag) : sso_capacity; }
 
     /**
      * @brief Reserves storage for at least @p new_cap characters.
@@ -208,8 +202,7 @@ public:
             local_.buf_[s] = '\0';
             local_.size_ = static_cast<unsigned char>(s);
             std::free(old_ptr);
-        }
-        else {
+        } else {
             size_t real_cap = heap_.capacity_ & ~heap_flag;
             if (real_cap == s) {
                 return;
@@ -227,8 +220,7 @@ public:
         if (is_heap()) {
             heap_.size_ = 0;
             heap_.ptr_[0] = '\0';
-        }
-        else {
+        } else {
             local_.size_ = 0;
             local_.buf_[0] = '\0';
         }
@@ -265,10 +257,7 @@ public:
     }
 
     /** @brief Appends a null-terminated C string. */
-    string& append(const char* str)
-    {
-        return append(string_view(str, std::strlen(str)));
-    }
+    string& append(const char* str) { return append(string_view(str, std::strlen(str))); }
 
     /** @brief Appends @p count copies of character @p ch. */
     string& append(size_t count, char ch)
@@ -286,7 +275,11 @@ public:
     /** @brief Appends a string_view. */
     string& operator+=(string_view sv) { return append(sv); }
     /** @brief Appends a single character. */
-    string& operator+=(char ch) { push_back(ch); return *this; }
+    string& operator+=(char ch)
+    {
+        push_back(ch);
+        return *this;
+    }
 
     /**
      * @brief Inserts @p sv before position @p pos.
@@ -365,19 +358,13 @@ public:
      * @brief Searches for the first occurrence of @p sv starting at @p pos.
      * @return Position of the match, or npos if not found.
      */
-    size_t find(string_view sv, size_t pos = 0) const
-    {
-        return view().find(sv, pos);
-    }
+    size_t find(string_view sv, size_t pos = 0) const { return view().find(sv, pos); }
 
     /**
      * @brief Searches for the last occurrence of @p sv at or before @p pos.
      * @return Position of the match, or npos if not found.
      */
-    size_t rfind(string_view sv, size_t pos = npos) const
-    {
-        return view().rfind(sv, pos);
-    }
+    size_t rfind(string_view sv, size_t pos = npos) const { return view().rfind(sv, pos); }
 
     /** @brief Implicit conversion to a read-only string_view. */
     operator string_view() const { return view(); }
@@ -475,8 +462,7 @@ private:
             std::memcpy(local_.buf_, src, len);
             local_.buf_[len] = '\0';
             local_.size_ = static_cast<unsigned char>(len);
-        }
-        else {
+        } else {
             char* buf = alloc_buffer(len + 1);
             std::memcpy(buf, src, len);
             buf[len] = '\0';
@@ -524,13 +510,16 @@ private:
         }
     }
 
-    union {
-        struct {
-            char*  ptr_;
+    union
+    {
+        struct
+        {
+            char* ptr_;
             size_t size_;
             size_t capacity_; ///< High bit set indicates heap mode.
         } heap_;
-        struct {
+        struct
+        {
             char buf_[sizeof(heap_) - 1]; ///< 23 bytes: up to 22 chars + null terminator.
             unsigned char size_;          ///< Inline string size (0..22, high bit always clear).
         } local_;

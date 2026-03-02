@@ -81,8 +81,9 @@ public:
 private:
     void ensure_meta() const
     {
-        ensure_metadata(FinalClass::get_factory().get_class_info(),
-                        static_cast<IInterface*>(const_cast<IMetadata*>(static_cast<const IMetadata*>(this))));
+        ensure_metadata(
+            FinalClass::get_factory().get_class_info(),
+            static_cast<IInterface*>(const_cast<IMetadata*>(static_cast<const IMetadata*>(this))));
     }
 
 public: // IMetadata overrides

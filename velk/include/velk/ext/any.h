@@ -25,6 +25,113 @@ constexpr bool has_iany_in_chain()
     }
 }
 
+/**
+ * @brief Non-template base providing IAny method implementations for trivially copyable types.
+ *
+ * Derived classes pass raw storage pointers and runtime type info (elem_size, type_uid).
+ * All methods are compiled once and shared across all trivial AnyCore instantiations.
+ */
+class any_core_base
+{
+public:
+    static ReturnValue get_data(const void* storage, void* to, size_t elem_size)
+    {
+        std::memcpy(to, storage, elem_size);
+        return ReturnValue::Success;
+    }
+
+    static ReturnValue set_value(void* storage, const void* new_val, size_t elem_size)
+    {
+        if (std::memcmp(storage, new_val, elem_size) != 0) {
+            std::memcpy(storage, new_val, elem_size);
+            return ReturnValue::Success;
+        }
+        return ReturnValue::NothingToDo;
+    }
+
+    static ReturnValue copy_from(void* storage, const IAny& other, size_t elem_size, Uid type_uid)
+    {
+        if (!is_compatible(other, type_uid)) {
+            return ReturnValue::Fail;
+        }
+        alignas(8) char buf[sizeof(double)];
+        if (elem_size <= sizeof(buf)) {
+            return succeeded(other.get_data(buf, elem_size, type_uid)) ? set_value(storage, buf, elem_size)
+                                                                       : ReturnValue::Fail;
+        }
+        void* heap_buf = std::malloc(elem_size);
+        ReturnValue ret = ReturnValue::Fail;
+        if (heap_buf && succeeded(other.get_data(heap_buf, elem_size, type_uid))) {
+            ret = set_value(storage, heap_buf, elem_size);
+        }
+        std::free(heap_buf);
+        return ret;
+    }
+};
+
+/**
+ * @brief Non-template base providing IArrayAny method implementations via type-erased operations.
+ *
+ * All methods are compiled once and shared across all trivial ArrayAnyCore instantiations
+ * via ICF (identical COMDAT folding).
+ */
+class array_any_core_base
+{
+public:
+    static ReturnValue get_at(const vector_base& vec, size_t index, IAny& out, size_t elem_size, Uid elem_uid)
+    {
+        if (index >= vec.size_) {
+            return ReturnValue::InvalidArgument;
+        }
+        return out.set_data(static_cast<const char*>(vec.data_) + index * elem_size, elem_size, elem_uid);
+    }
+
+    static ReturnValue set_at(vector_base& vec, size_t index, const IAny& value, size_t elem_size,
+                              Uid elem_uid)
+    {
+        if (index >= vec.size_) {
+            return ReturnValue::InvalidArgument;
+        }
+        return value.get_data(static_cast<char*>(vec.data_) + index * elem_size, elem_size, elem_uid);
+    }
+
+    static ReturnValue push_back(vector_base& vec, const IAny& value, size_t elem_size, Uid elem_uid)
+    {
+        size_t old_size = vec.size_;
+        resize(vec, old_size + 1, elem_size);
+        auto rv = value.get_data(static_cast<char*>(vec.data_) + old_size * elem_size, elem_size, elem_uid);
+        if (failed(rv)) {
+            vec.size_ = old_size;
+            return ReturnValue::InvalidArgument;
+        }
+        return ReturnValue::Success;
+    }
+
+    static ReturnValue set_from_buffer(vector_base& vec, const void* data, size_t count, Uid elementType,
+                                       size_t elem_size, Uid elem_uid)
+    {
+        if (elementType != elem_uid) {
+            return ReturnValue::InvalidArgument;
+        }
+        resize(vec, count, elem_size);
+        std::memcpy(vec.data_, data, count * elem_size);
+        return ReturnValue::Success;
+    }
+
+private:
+    static void resize(vector_base& vec, size_t count, size_t elem_size)
+    {
+        if (count > vec.capacity_) {
+            vec.grow_raw(count, elem_size);
+        }
+        if (count > vec.size_) {
+            std::memset(
+                static_cast<char*>(vec.data_) + vec.size_ * elem_size, 0, (count - vec.size_) * elem_size);
+        }
+        vec.size_ = count;
+    }
+};
+
 } // namespace velk::detail
 
 namespace velk::ext {
@@ -96,10 +203,23 @@ class AnyCore : public AnyBase<FinalClass, Interfaces...>
 {
 public:
     static constexpr Uid TYPE_UID = type_uid<T>();
-    /** @brief Sets the stored value. Returns Success if changed, NothingToDo if identical. */
-    virtual ReturnValue set_value(const T& value) = 0;
     /** @brief Returns a const reference to the stored value. */
     virtual const T& get_value() const = 0;
+
+    /** @brief Sets the stored value. Returns Success if changed, NothingToDo if identical. */
+    virtual ReturnValue set_value(const T& value)
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::any_core_base::set_value(const_cast<T*>(&get_value()), &value, sizeof(T));
+        } else {
+            auto& ref = const_cast<T&>(get_value());
+            if (ref != value) {
+                ref = value;
+                return ReturnValue::Success;
+            }
+            return ReturnValue::NothingToDo;
+        }
+    }
 
     /** @brief Returns the UID for type T. */
     static constexpr Uid class_id() { return TYPE_UID; }
@@ -111,112 +231,72 @@ public:
         return {&uid, 1};
     }
     size_t get_data_size(Uid type) const override { return type == TYPE_UID ? sizeof(T) : 0; }
+
     ReturnValue get_data(void* to, size_t toSize, Uid type) const override
     {
-        if (is_valid_args(to, toSize, type)) {
+        if (!is_valid_args(to, toSize, type)) {
+            return ReturnValue::Fail;
+        }
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::any_core_base::get_data(&get_value(), to, toSize);
+        } else {
             *reinterpret_cast<T*>(to) = get_value();
             return ReturnValue::Success;
         }
-        return ReturnValue::Fail;
     }
+
     ReturnValue set_data(void const* from, size_t fromSize, Uid type) override
     {
-        if (is_valid_args(from, fromSize, type)) {
-            return set_value(*reinterpret_cast<const T*>(from));
+        if (!is_valid_args(from, fromSize, type)) {
+            return ReturnValue::Fail;
         }
-        return ReturnValue::Fail;
+        return set_value(*reinterpret_cast<const T*>(from));
     }
+
     ReturnValue copy_from(const IAny& other) override
     {
-        if (is_compatible(other, TYPE_UID)) {
-            T value;
-            if (succeeded(other.get_data(&value, sizeof(T), TYPE_UID))) {
-                return set_value(value);
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if constexpr (sizeof(T) <= sizeof(double)) {
+                // Small trivial: use the non-template base with stack buffer
+                alignas(T) char buf[sizeof(T)];
+                if (!is_compatible(other, TYPE_UID)) {
+                    return ReturnValue::Fail;
+                }
+                return succeeded(other.get_data(buf, sizeof(T), TYPE_UID))
+                           ? set_value(*reinterpret_cast<const T*>(buf))
+                           : ReturnValue::Fail;
+            } else {
+                // Large trivial (e.g. vector<T>): delegate to base
+                return ::velk::detail::any_core_base::copy_from(
+                    const_cast<T*>(&get_value()), other, sizeof(T), TYPE_UID);
             }
+        } else {
+            if (!is_compatible(other, TYPE_UID)) {
+                return ReturnValue::Fail;
+            }
+            T value{};
+            return succeeded(other.get_data(&value, sizeof(T), TYPE_UID)) ? set_value(value)
+                                                                          : ReturnValue::Fail;
         }
-        return ReturnValue::Fail;
     }
 
 private:
-    static constexpr bool is_valid_args(void const* to, size_t toSize, Uid type)
+    static bool is_valid_args(const void* from, size_t fromSize, Uid type) noexcept
     {
-        return to && type == TYPE_UID && sizeof(T) == toSize;
+        return from && type == TYPE_UID && fromSize == sizeof(T);
     }
 };
 
 /**
  * @brief A basic Any implementation with a single supported data type which is stored in local storage.
- *
- * Overrides data operations to access storage directly, avoiding virtual get_value()/set_value() dispatch.
- * For trivially copyable types, uses memcpy/memcmp instead of typed operations.
  */
 template <class T>
 class AnyValue final : public AnyCore<AnyValue<T>, T>
 {
-    using Base = AnyCore<AnyValue<T>, T>;
-
 public:
-    ReturnValue set_value(const T& value) override
-    {
-        if constexpr (std::is_trivially_copyable_v<T>) {
-            if (std::memcmp(&data_, &value, sizeof(T)) != 0) {
-                std::memcpy(&data_, &value, sizeof(T));
-                return ReturnValue::Success;
-            }
-        } else {
-            if (data_ != value) {
-                data_ = value;
-                return ReturnValue::Success;
-            }
-        }
-        return ReturnValue::NothingToDo;
-    }
-
     const T& get_value() const override { return data_; }
 
-    size_t get_data_size(Uid type) const override { return type == Base::TYPE_UID ? sizeof(T) : 0; }
-
-    ReturnValue get_data(void* to, size_t toSize, Uid type) const override
-    {
-        if (!valid_args(to, toSize, type)) {
-            return ReturnValue::Fail;
-        }
-        if constexpr (std::is_trivially_copyable_v<T>) {
-            std::memcpy(to, &data_, sizeof(T));
-        } else {
-            *reinterpret_cast<T*>(to) = data_;
-        }
-        return ReturnValue::Success;
-    }
-
-    ReturnValue set_data(const void* from, size_t fromSize, Uid type) override
-    {
-        return valid_args(from, fromSize, type) ? set_value(*reinterpret_cast<const T*>(from))
-                                                : ReturnValue::Fail;
-    }
-
-    ReturnValue copy_from(const IAny& other) override
-    {
-        if (!is_compatible(other, Base::TYPE_UID)) {
-            return ReturnValue::Fail;
-        }
-        if constexpr (std::is_trivially_copyable_v<T>) {
-            char buf[sizeof(T)];
-            return succeeded(other.get_data(buf, sizeof(T), Base::TYPE_UID))
-                       ? set_value(*reinterpret_cast<const T*>(buf))
-                       : ReturnValue::Fail;
-        } else {
-            T value{};
-            return succeeded(other.get_data(&value, sizeof(T), Base::TYPE_UID)) ? set_value(value)
-                                                                                : ReturnValue::Fail;
-        }
-    }
-
 private:
-    static constexpr bool valid_args(const void* p, size_t size, Uid type)
-    {
-        return p && type == Base::TYPE_UID && size == sizeof(T);
-    }
     T data_{};
 };
 
@@ -237,22 +317,6 @@ public:
     /** @brief Retargets this any to a different memory location. */
     void set_target(T* ptr) { ptr_ = ptr; }
 
-    ReturnValue set_value(const T& value) override
-    {
-        if constexpr (std::is_trivially_copyable_v<T>) {
-            if (std::memcmp(ptr_, &value, sizeof(T)) != 0) {
-                std::memcpy(ptr_, &value, sizeof(T));
-                return ReturnValue::Success;
-            }
-        } else {
-            if (*ptr_ != value) {
-                *ptr_ = value;
-                return ReturnValue::Success;
-            }
-        }
-        return ReturnValue::NothingToDo;
-    }
-
     const T& get_value() const override { return *ptr_; }
 
     /** @brief Clones as an owned AnyValue<T> (snapshot of the referenced data). */
@@ -267,33 +331,176 @@ private:
 };
 
 /**
- * @brief An AnyRef for vector<T> that also implements IArrayAny for element-level access.
+ * @brief CRTP base for ArrayAnyRef/ArrayAnyValue, implementing all IAny and IArrayAny methods.
  *
- * Points to external vector<T> storage (e.g. in a State struct). Provides both
- * whole-vector IAny operations (get/set the entire vector) and element-level
- * operations (get_at, set_at, push_back, erase_at, clear_array) via IArrayAny.
+ * Derived classes provide vec() returning vector<T>& and constructors. This eliminates
+ * the code duplication between ref and value variants.
  *
+ * Bypasses AnyCore to avoid the virtual get_value/set_value indirection. IArrayAny methods
+ * delegate to non-template helpers via static constexpr elem_size_/elem_uid_.
+ *
+ * @tparam Derived The CRTP derived class (ArrayAnyRef<T> or ArrayAnyValue<T>).
  * @tparam T The element type of the vector.
  */
-template <class T>
-class ArrayAnyRef final : public AnyCore<ArrayAnyRef<T>, vector<T>, IArrayAny>
+template <class Derived, class T>
+class ArrayAnyCore : public AnyBase<Derived, IArrayAny>
 {
-    using Base = AnyCore<ArrayAnyRef<T>, vector<T>, IArrayAny>;
+protected:
     using vec_type = vector<T>;
+    static constexpr Uid VEC_UID = type_uid<vec_type>();
+    static constexpr size_t elem_size_ = sizeof(T);
+    static constexpr Uid elem_uid_ = type_uid<T>();
+
+    vec_type& vec() { return static_cast<Derived*>(this)->vec(); }
+    const vec_type& vec() const { return static_cast<const Derived*>(this)->vec(); }
 
 public:
-    explicit ArrayAnyRef(vec_type* ptr = nullptr) : ptr_(ptr) {}
+    static constexpr Uid class_id() { return VEC_UID; }
 
-    ReturnValue set_value(const vec_type& value) override
+    // IAny
+    array_view<Uid> get_compatible_types() const override
     {
-        if (*ptr_ != value) {
-            *ptr_ = value;
+        static constexpr Uid uid = VEC_UID;
+        return {&uid, 1};
+    }
+
+    size_t get_data_size(Uid type) const override { return type == VEC_UID ? sizeof(vec_type) : 0; }
+
+    ReturnValue get_data(void* to, size_t toSize, Uid type) const override
+    {
+        if (!is_valid_args(to, toSize, type)) {
+            return ReturnValue::Fail;
+        }
+        *static_cast<vec_type*>(to) = vec();
+        return ReturnValue::Success;
+    }
+
+    ReturnValue set_data(const void* from, size_t fromSize, Uid type) override
+    {
+        if (!is_valid_args(from, fromSize, type)) {
+            return ReturnValue::Fail;
+        }
+        const auto& v = *static_cast<const vec_type*>(from);
+        auto& vec = this->vec();
+        if (vec != v) {
+            vec = v;
             return ReturnValue::Success;
         }
         return ReturnValue::NothingToDo;
     }
 
-    const vec_type& get_value() const override { return *ptr_; }
+    ReturnValue copy_from(const IAny& other) override
+    {
+        if (!is_compatible(other, VEC_UID)) {
+            return ReturnValue::Fail;
+        }
+        vec_type tmp;
+        if (failed(other.get_data(&tmp, sizeof(vec_type), VEC_UID))) {
+            return ReturnValue::Fail;
+        }
+        auto& vec = this->vec();
+        if (vec != tmp) {
+            vec = static_cast<vec_type&&>(tmp);
+            return ReturnValue::Success;
+        }
+        return ReturnValue::NothingToDo;
+    }
+
+    // IArrayAny
+    size_t array_size() const override { return vec().size(); }
+
+    ReturnValue get_at(size_t index, IAny& out) const override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::array_any_core_base::get_at(
+                vec().base(), index, out, elem_size_, elem_uid_);
+        } else {
+            auto& vec = this->vec();
+            if (index >= vec.size()) {
+                return ReturnValue::InvalidArgument;
+            }
+            return out.set_data(&vec[index], sizeof(T), elem_uid_);
+        }
+    }
+
+    ReturnValue set_at(size_t index, const IAny& value) override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::array_any_core_base::set_at(
+                vec().base(), index, value, elem_size_, elem_uid_);
+        } else {
+            auto& vec = this->vec();
+            if (index >= vec.size()) {
+                return ReturnValue::InvalidArgument;
+            }
+            return value.get_data(&vec[index], sizeof(T), elem_uid_);
+        }
+    }
+
+    ReturnValue push_back(const IAny& value) override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::array_any_core_base::push_back(vec().base(), value, elem_size_, elem_uid_);
+        } else {
+            T elem{};
+            if (failed(value.get_data(&elem, sizeof(T), elem_uid_))) {
+                return ReturnValue::InvalidArgument;
+            }
+            vec().push_back(elem);
+            return ReturnValue::Success;
+        }
+    }
+
+    ReturnValue erase_at(size_t index) override
+    {
+        auto& vec = this->vec();
+        if (index >= vec.size()) {
+            return ReturnValue::InvalidArgument;
+        }
+        vec.erase(vec.begin() + index);
+        return ReturnValue::Success;
+    }
+
+    void clear_array() override { vec().clear(); }
+
+    ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            return ::velk::detail::array_any_core_base::set_from_buffer(
+                vec().base(), data, count, elementType, elem_size_, elem_uid_);
+        } else {
+            if (elementType != elem_uid_) {
+                return ReturnValue::InvalidArgument;
+            }
+            auto* elems = reinterpret_cast<const T*>(data);
+            vec() = vec_type(elems, elems + count);
+            return ReturnValue::Success;
+        }
+    }
+
+private:
+    static bool is_valid_args(const void* from, size_t fromSize, Uid type) noexcept
+    {
+        return from && type == VEC_UID && fromSize == sizeof(vec_type);
+    }
+};
+
+/**
+ * @brief An AnyRef for vector<T> that also implements IArrayAny for element-level access.
+ *
+ * Points to external vector<T> storage (e.g. in a State struct).
+ * Clones as an owned AnyValue<vector<T>>.
+ *
+ * @tparam T The element type of the vector.
+ */
+template <class T>
+class ArrayAnyRef final : public ArrayAnyCore<ArrayAnyRef<T>, T>
+{
+    using vec_type = vector<T>;
+    friend class ArrayAnyCore<ArrayAnyRef<T>, T>;
+
+public:
+    explicit ArrayAnyRef(vec_type* ptr = nullptr) : ptr_(ptr) {}
 
     IAny::Ptr clone() const override
     {
@@ -301,154 +508,34 @@ public:
         return c && succeeded(c->copy_from(*this)) ? c : nullptr;
     }
 
-    // IArrayAny
-    size_t array_size() const override { return ptr_->size(); }
-
-    ReturnValue get_at(size_t index, IAny& out) const override
-    {
-        if (index >= ptr_->size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        return out.set_data(&(*ptr_)[index], sizeof(T), type_uid<T>());
-    }
-
-    ReturnValue set_at(size_t index, const IAny& value) override
-    {
-        if (index >= ptr_->size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        T elem{};
-        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
-        if (failed(ret)) {
-            return ReturnValue::InvalidArgument;
-        }
-        (*ptr_)[index] = elem;
-        return ReturnValue::Success;
-    }
-
-    ReturnValue push_back(const IAny& value) override
-    {
-        T elem{};
-        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
-        if (failed(ret)) {
-            return ReturnValue::InvalidArgument;
-        }
-        ptr_->push_back(elem);
-        return ReturnValue::Success;
-    }
-
-    ReturnValue erase_at(size_t index) override
-    {
-        if (index >= ptr_->size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        ptr_->erase(ptr_->begin() + index);
-        return ReturnValue::Success;
-    }
-
-    void clear_array() override { ptr_->clear(); }
-
-    ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) override
-    {
-        if (elementType != type_uid<T>()) {
-            return ReturnValue::InvalidArgument;
-        }
-        auto* elems = reinterpret_cast<const T*>(data);
-        *ptr_ = vec_type(elems, elems + count);
-        return ReturnValue::Success;
-    }
-
 private:
+    vec_type& vec() { return *ptr_; }
+    const vec_type& vec() const { return *ptr_; }
+
     vec_type* ptr_{};
 };
 
 /**
  * @brief An owned Any for vector<T> that implements IArrayAny for element-level access.
  *
- * Stores the vector inline (like AnyValue<T>). Provides both whole-vector IAny
- * operations and element-level operations via IArrayAny.
+ * Stores the vector inline (like AnyValue<T>).
  *
  * @tparam T The element type of the vector.
  */
 template <class T>
-class ArrayAnyValue final : public AnyCore<ArrayAnyValue<T>, vector<T>, IArrayAny>
+class ArrayAnyValue final : public ArrayAnyCore<ArrayAnyValue<T>, T>
 {
-    using Base = AnyCore<ArrayAnyValue<T>, vector<T>, IArrayAny>;
     using vec_type = vector<T>;
+    friend class ArrayAnyCore<ArrayAnyValue<T>, T>;
 
 public:
     ArrayAnyValue() = default;
     explicit ArrayAnyValue(const vec_type& value) : data_(value) {}
 
-    ReturnValue set_value(const vec_type& value) override
-    {
-        if (data_ != value) {
-            data_ = value;
-            return ReturnValue::Success;
-        }
-        return ReturnValue::NothingToDo;
-    }
-
-    const vec_type& get_value() const override { return data_; }
-
-    // IArrayAny
-    size_t array_size() const override { return data_.size(); }
-
-    ReturnValue get_at(size_t index, IAny& out) const override
-    {
-        if (index >= data_.size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        return out.set_data(&data_[index], sizeof(T), type_uid<T>());
-    }
-
-    ReturnValue set_at(size_t index, const IAny& value) override
-    {
-        if (index >= data_.size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        T elem{};
-        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
-        if (failed(ret)) {
-            return ReturnValue::InvalidArgument;
-        }
-        data_[index] = elem;
-        return ReturnValue::Success;
-    }
-
-    ReturnValue push_back(const IAny& value) override
-    {
-        T elem{};
-        auto ret = value.get_data(&elem, sizeof(T), type_uid<T>());
-        if (failed(ret)) {
-            return ReturnValue::InvalidArgument;
-        }
-        data_.push_back(elem);
-        return ReturnValue::Success;
-    }
-
-    ReturnValue erase_at(size_t index) override
-    {
-        if (index >= data_.size()) {
-            return ReturnValue::InvalidArgument;
-        }
-        data_.erase(data_.begin() + index);
-        return ReturnValue::Success;
-    }
-
-    void clear_array() override { data_.clear(); }
-
-    ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) override
-    {
-        if (elementType != type_uid<T>()) {
-            return ReturnValue::InvalidArgument;
-        }
-        auto* elems = reinterpret_cast<const T*>(data);
-        data_ = vec_type(elems, elems + count);
-        return ReturnValue::Success;
-    }
-
 private:
+    vec_type& vec() { return data_; }
+    const vec_type& vec() const { return data_; }
+
     vec_type data_{};
 };
 

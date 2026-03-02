@@ -663,11 +663,11 @@ struct FnRawBind
 #define _VELK_DEFAULTS_RPROP(Type, Name, Default)                 \
     static constexpr ::velk::PropertyKind _velk_propkind_##Name = \
         ::velk::detail::PropBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
-#define _VELK_DEFAULTS_ARR(Type, Name, ...)                             \
-    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name =   \
+#define _VELK_DEFAULTS_ARR(Type, Name, ...)                           \
+    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name = \
         ::velk::detail::ArrBind<State, &State::Name>::kind;
-#define _VELK_DEFAULTS_RARR(Type, Name, ...)                            \
-    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name =   \
+#define _VELK_DEFAULTS_RARR(Type, Name, ...)                          \
+    static constexpr ::velk::ArrayPropertyKind _velk_arrkind_##Name = \
         ::velk::detail::ArrBind<State, &State::Name, ::velk::ObjectFlags::ReadOnly>::kind;
 #define _VELK_DEFAULTS_EVT(...)
 
