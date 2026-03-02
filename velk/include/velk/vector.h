@@ -277,11 +277,12 @@ public:
     /** @brief Destroys all elements. Capacity is unchanged. */
     void clear() { size_ = 0; }
 
-    /** @brief Appends a copy of @p value. */
+    /** @brief Appends a copy of @p value. Safe when @p value references this vector. */
     void push_back(const T& value)
     {
+        T tmp = value;
         ensure_capacity(size_ + 1);
-        typed_data()[size_] = value;
+        typed_data()[size_] = tmp;
         ++size_;
     }
 
@@ -289,9 +290,10 @@ public:
     template <class... Args>
     T& emplace_back(Args&&... args)
     {
+        T tmp(std::forward<Args>(args)...);
         ensure_capacity(size_ + 1);
         T* p = typed_data() + size_;
-        *p = T(std::forward<Args>(args)...);
+        *p = tmp;
         ++size_;
         return *p;
     }
