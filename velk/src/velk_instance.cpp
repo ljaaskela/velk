@@ -2,7 +2,7 @@
 
 #include "function.h"
 #include "hive/raw_hive.h"
-#include "metadata_container.h"
+#include "object_storage.h"
 
 #include <velk/interface/types.h>
 
@@ -12,7 +12,7 @@ static IRawHive::Ptr create_metadata_hive()
 {
     auto obj = ext::make_object<RawHiveImpl>();
     auto* hive = static_cast<RawHiveImpl*>(obj.get());
-    hive->init(type_uid<MetadataContainer>(), sizeof(MetadataContainer), alignof(MetadataContainer));
+    hive->init(type_uid<ObjectStorage>(), sizeof(ObjectStorage), alignof(ObjectStorage));
     return interface_pointer_cast<IRawHive>(obj);
 }
 
@@ -32,14 +32,14 @@ ILog& get_logger(const VelkInstance& instance)
     return static_cast<ILog&>(*const_cast<VelkInstance*>(&instance));
 }
 
-IMetadata* VelkInstance::create_metadata_container(const ClassInfo& info, IInterface* owner) const
+IObjectStorage* VelkInstance::create_metadata_container(const ClassInfo& info, IInterface* owner) const
 {
     return metadata_hive_.emplace(info.members, owner);
 }
 
-void VelkInstance::destroy_metadata_container(IMetadata* meta) const
+void VelkInstance::destroy_metadata_container(IObjectStorage* storage) const
 {
-    metadata_hive_.deallocate(static_cast<MetadataContainer*>(meta));
+    metadata_hive_.deallocate(static_cast<ObjectStorage*>(storage));
 }
 
 IInterface::Ptr VelkInstance::create(Uid uid, uint32_t flags) const

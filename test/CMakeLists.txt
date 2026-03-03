@@ -27,6 +27,8 @@ add_executable(tests
     test_future.cpp
     test_function.cpp
     test_object.cpp
+    test_container.cpp
+    test_node.cpp
     test_plugin.cpp
     test_hive.cpp
     test_log.cpp
