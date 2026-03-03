@@ -5,52 +5,74 @@
 #include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 #include <velk/ext/metadata.h>
+#include <velk/interface/intf_object_storage.h>
 
 #include <tuple>
 
 namespace velk::detail {
 
 /**
- * @brief Non-template base holding IMetadata pointer and delegation helpers.
+ * @brief Non-template base holding IObjectStorage pointer and delegation helpers.
  *
- * Avoids duplicating the metadata delegation logic in every Object<> instantiation.
- * The MetadataContainer is created lazily on first runtime metadata access.
+ * Avoids duplicating the storage delegation logic in every Object<> instantiation.
+ * The ObjectStorage is created lazily on first runtime metadata/attachment access.
  * ClassInfo and owner are passed in from the Object template rather than stored.
  */
-class ObjectMetadataBase
+class ObjectStorageBase
 {
 protected:
-    ~ObjectMetadataBase()
+    ~ObjectStorageBase()
     {
-        if (meta_) {
-            instance().destroy_metadata_container(meta_);
+        if (storage_) {
+            instance().destroy_metadata_container(storage_);
         }
     }
 
-    void ensure_metadata(const ClassInfo& info, IInterface* owner) const
+    void ensure_storage(const ClassInfo& info, IInterface* owner) const
     {
-        if (!meta_) {
-            meta_ = instance().create_metadata_container(info, owner);
+        if (!storage_) {
+            storage_ = instance().create_metadata_container(info, owner);
         }
     }
 
-    IProperty::Ptr meta_get_property(string_view name) const
+    IProperty::Ptr storage_get_property(string_view name, Resolve mode = Resolve::Create) const
     {
-        return meta_ ? meta_->get_property(name) : nullptr;
+        return storage_ ? storage_->get_property(name, mode) : nullptr;
     }
-    IEvent::Ptr meta_get_event(string_view name) const { return meta_ ? meta_->get_event(name) : nullptr; }
-    IFunction::Ptr meta_get_function(string_view name) const
+    IEvent::Ptr storage_get_event(string_view name, Resolve mode = Resolve::Create) const
     {
-        return meta_ ? meta_->get_function(name) : nullptr;
+        return storage_ ? storage_->get_event(name, mode) : nullptr;
     }
-    void meta_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
+    IFunction::Ptr storage_get_function(string_view name, Resolve mode = Resolve::Create) const
     {
-        if (meta_) {
-            meta_->notify(kind, interfaceUid, notification);
+        return storage_ ? storage_->get_function(name, mode) : nullptr;
+    }
+    void storage_notify(MemberKind kind, Uid interfaceUid, Notification notification) const
+    {
+        if (storage_) {
+            storage_->notify(kind, interfaceUid, notification);
         }
     }
 
-    mutable IMetadata* meta_{};
+    ReturnValue storage_add_attachment(const IInterface::Ptr& attachment) const
+    {
+        return storage_ ? storage_->add_attachment(attachment) : ReturnValue::Fail;
+    }
+    ReturnValue storage_remove_attachment(const IInterface::Ptr& attachment) const
+    {
+        return storage_ ? storage_->remove_attachment(attachment) : ReturnValue::Fail;
+    }
+    size_t storage_attachment_count() const { return storage_ ? storage_->attachment_count() : 0; }
+    IInterface::Ptr storage_get_attachment(size_t index) const
+    {
+        return storage_ ? storage_->get_attachment(index) : nullptr;
+    }
+    IInterface::Ptr storage_find_attachment(const AttachmentQuery& query, Resolve mode)
+    {
+        return storage_ ? storage_->find_attachment(query, mode) : nullptr;
+    }
+
+    mutable IObjectStorage* storage_{};
 };
 
 } // namespace velk::detail
@@ -58,17 +80,19 @@ protected:
 namespace velk::ext {
 
 /**
- * @brief CRTP base for Velk objects with metadata.
+ * @brief CRTP base for Velk objects with metadata and object storage.
  *
- * Extends ObjectCore with IMetadata support. Metadata is automatically collected
- * from all Interfaces that declare metadata through VELK_INTERFACE.
- * The MetadataContainer is created lazily on first runtime metadata access.
+ * Extends ObjectCore with IObjectStorage support. Metadata is automatically collected
+ * from all Interfaces that declare metadata through VELK_INTERFACE. Attachments can be
+ * added/removed at runtime via the IObjectStorage interface.
+ * The ObjectStorage is created lazily on first runtime metadata/attachment access.
  *
  * @tparam FinalClass The final derived class (CRTP parameter).
  * @tparam Interfaces Additional interfaces the object implements.
  */
 template <class FinalClass, class... Interfaces>
-class Object : public ObjectCore<FinalClass, IMetadata, Interfaces...>, protected detail::ObjectMetadataBase
+class Object : public ObjectCore<FinalClass, IObjectStorage, Interfaces...>,
+               protected detail::ObjectStorageBase
 {
 public:
     /** @brief Compile-time collected metadata from all Interfaces. */
@@ -79,35 +103,66 @@ public:
     ~Object() override = default;
 
 private:
-    void ensure_meta() const
+    void ensure_stor() const
     {
-        ensure_metadata(
+        ensure_storage(
             FinalClass::get_factory().get_class_info(),
-            static_cast<IInterface*>(const_cast<IMetadata*>(static_cast<const IMetadata*>(this))));
+            static_cast<IInterface*>(const_cast<IObjectStorage*>(static_cast<const IObjectStorage*>(this))));
     }
 
 public: // IMetadata overrides
     array_view<MemberDesc> get_static_metadata() const override { return class_metadata; }
-    IProperty::Ptr get_property(string_view name) const override
+    IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const override
     {
-        ensure_meta();
-        return meta_get_property(name);
+        if (mode == Resolve::Existing && !storage_) {
+            return {};
+        }
+        ensure_stor();
+        return storage_get_property(name, mode);
     }
-    IEvent::Ptr get_event(string_view name) const override
+    IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const override
     {
-        ensure_meta();
-        return meta_get_event(name);
+        if (mode == Resolve::Existing && !storage_) {
+            return {};
+        }
+        ensure_stor();
+        return storage_get_event(name, mode);
     }
-    IFunction::Ptr get_function(string_view name) const override
+    IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const override
     {
-        ensure_meta();
-        return meta_get_function(name);
+        if (mode == Resolve::Existing && !storage_) {
+            return {};
+        }
+        ensure_stor();
+        return storage_get_function(name, mode);
     }
     void notify(MemberKind kind, Uid interfaceUid, Notification notification) const override
     {
-        // No need to ensure_meta(). If container has not been initialized there won't be anything
+        // No need to ensure storage. If container has not been initialized there won't be anything
         // to notify either.
-        meta_notify(kind, interfaceUid, notification);
+        storage_notify(kind, interfaceUid, notification);
+    }
+
+public: // IObjectStorage overrides
+    ReturnValue add_attachment(const IInterface::Ptr& attachment) override
+    {
+        ensure_stor();
+        return storage_add_attachment(attachment);
+    }
+    ReturnValue remove_attachment(const IInterface::Ptr& attachment) override
+    {
+        ensure_stor();
+        return storage_remove_attachment(attachment);
+    }
+    size_t attachment_count() const override { return storage_attachment_count(); }
+    IInterface::Ptr get_attachment(size_t index) const override { return storage_get_attachment(index); }
+    IInterface::Ptr find_attachment(const AttachmentQuery& query, Resolve mode) override
+    {
+        if (mode == Resolve::Existing && !storage_) {
+            return {};
+        }
+        ensure_stor();
+        return storage_find_attachment(query, mode);
     }
 
 public: // IPropertyState override

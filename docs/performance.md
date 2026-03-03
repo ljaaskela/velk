@@ -35,7 +35,7 @@ Velk follows a "pay for what you use" principle. Every abstraction layer is desi
 
 ### Lazy metadata creation
 
-`MetadataContainer` is not allocated until the first runtime metadata access (e.g. `get_property()`, `get_event()`, `get_function()`). Until then, the object carries only a null pointer. Once the container exists, individual member instances (`PropertyImpl`, `FunctionImpl`, `EventImpl`) are created on demand by `find_or_create()`, which checks a cache of already-created instances before scanning the static metadata array. An object that never touches its metadata at runtime pays nothing beyond the object itself.
+`ObjectStorage` is not allocated until the first runtime metadata access (e.g. `get_property()`, `get_event()`, `get_function()`). Until then, the object carries only a null pointer. Once the container exists, individual member instances (`PropertyImpl`, `FunctionImpl`, `EventImpl`) are created on demand by `find_or_create()`, which checks a cache of already-created instances before scanning the static metadata array. An object that never touches its metadata at runtime pays nothing beyond the object itself.
 
 ### Lazy change events
 
@@ -67,7 +67,7 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 
 ### Hive slot reuse
 
-`Hive<T>` (the pool allocator used for `MetadataContainer` and other internal types) pre-allocates pages of fixed-size slots. Each page maintains an intrusive LIFO free-list threaded through the slot memory itself. Allocating a slot pops from the head; deallocating pushes back. After the initial page allocation, steady-state add/remove cycles never touch the heap. Active slots are tracked with a bitset for iteration.
+`Hive<T>` (the pool allocator used for `ObjectStorage` and other internal types) pre-allocates pages of fixed-size slots. Each page maintains an intrusive LIFO free-list threaded through the slot memory itself. Allocating a slot pops from the head; deallocating pushes back. After the initial page allocation, steady-state add/remove cycles never touch the heap. Active slots are tracked with a bitset for iteration.
 
 ## Operation costs
 
@@ -85,7 +85,7 @@ The library itself is compiled with RTTI and C++ exceptions disabled (`/GR- /EHs
 | **interface_cast** | Linear scan | ~4 ns | Walks the interface pack + parent chains; typically 2-4 interfaces, fully inlinable. When `T` is a base of the source type, resolves at compile time via `is_base_of` with no virtual dispatch |
 | **Metadata lookup (cold)** | Linear scan + alloc | ~553 ns | First `get_property()` call; allocates `PropertyImpl` and caches result |
 | **Metadata lookup (cached)** | Cache-first scan | ~32 ns | Subsequent call; scans cached instances first, no allocation |
-| **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `MetadataContainer` pool-allocated from `Hive<T>`; control block reused from pool |
+| **Object creation** | 1 heap alloc + pool emplace | ~55 ns | Factory lookup (`O(log N)`), then allocate object; `ObjectStorage` pool-allocated from `Hive<T>`; control block reused from pool |
 
 *Measured on AMD Ryzen 7 5800X (3.8 GHz), MSVC 19.29, Release build. Run `build/bin/Release/benchmarks.exe` to reproduce.*
 
@@ -126,7 +126,7 @@ Complexity is `O(N + P)` where N is the number of interfaces in the pack (typica
 
 ### Metadata lookup
 
-`MetadataContainer::find_or_create(name, kind)` checks the `instances_` cache first, a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
+`ObjectStorage::find_or_create(name, kind)` checks the `instances_` cache first, a linear scan of `O(M)` already-created members comparing by name and kind. On a cache hit this is the only work done, avoiding the full `members_` scan. On a cache miss, it scans the static `members_` array to find the member, allocates a new `PropertyImpl` or `FunctionImpl`, wires up the virtual dispatch trampoline, and caches the result.
 
 Subsequent accesses for the same member skip creation and only pay the cache lookup cost. Since applications typically access a subset of declared members, the cache-first scan is shorter than the full members array. Static metadata arrays (`MemberDesc`, `InterfaceInfo`) are `constexpr`, shared across all instances at zero per-object cost.
 
@@ -135,7 +135,7 @@ Subsequent accesses for the same member skip creation and only pay the cache loo
 1. **Factory lookup**: `O(log N)` binary search on sorted registered types vector
 2. **Allocate object**: One `new FinalClass` wrapped in `shared_ptr` with ref-counting deleter
 3. **Wire self-pointer**: Stores `IObject*` in `control_block::ptr` (for `shared_from_object()`; reconstructs `shared_ptr` on demand)
-4. **Allocate MetadataContainer**: Pool-allocated from a `Hive<MetadataContainer>` (placement-new into a pre-allocated page slot with mutex); stores a pointer to the static metadata array and the owning object
+4. **Allocate ObjectStorage**: Pool-allocated from a `Hive<ObjectStorage>` (placement-new into a pre-allocated page slot with mutex); stores a pointer to the static metadata array and the owning object
 5. **State initialization**: `State` structs are default-constructed inline (part of the object allocation, not separate)
 
 No member instances (`PropertyImpl`, `FunctionImpl`) are created until first access.
@@ -144,39 +144,39 @@ No member instances (`PropertyImpl`, `FunctionImpl`) are created until first acc
 
 ## Memory layout
 
-An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The metadata container is heap-allocated once per object and lazily creates member instances on first access.
+An `ext::Object<T, Interfaces...>` instance carries minimal per-object data. The ObjectStorage is heap-allocated once per object and lazily creates member instances on first access.
 
 ### Example: Minimal object with 1 member
 
-A minimal object implements a single interface with one property. `ext::Object` adds `IMetadata`, giving 2 interfaces in the dispatch pack (IMetadata, IToggle). IObject is not prepended because it is reachable via IMetadata's parent chain (IMetadata → IPropertyState → IObject). The MetadataContainer is allocated lazily on first runtime metadata access.
+A minimal object implements a single interface with one property. `ext::Object` adds `IObjectStorage`, giving 2 interfaces in the dispatch pack (IObjectStorage, IToggle). IObject is not prepended because it is reachable via IObjectStorage's parent chain (IObjectStorage → IMetadata → IPropertyState → IObject). The ObjectStorage is allocated lazily on first runtime metadata or attachment access.
 
 ```
-Toggle (48 bytes)                           MetadataContainer (72 bytes, heap, lazy)
+Toggle (48 bytes)                           ObjectStorage (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               16  │      │ base (InterfaceDispatch)   16  │
 │   (2 vptrs)                      │      │ members_ (array_view)      16  │
 │ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
-│ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
+│ storage_ (pointer)            8  │      │ attachment_end_ + padding   8  │
 │ IToggle::State                8  │      └────────────────────────────────┘
 │   (enabled: bool + padding)      │
 └──────────────────────────────────┘
 ```
 
-With no members accessed, the MetadataContainer is not allocated. The total footprint is **48 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **144 bytes**.
+With no members accessed, the ObjectStorage is not allocated. The total footprint is **48 bytes** (object only). On first runtime metadata access the container is lazily allocated (72 bytes). Accessing the one property then adds 24 bytes to the `instances_` vector, bringing the total to **144 bytes**.
 
 ### Example: MyWidget with 6 members
 
-MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IMetadata, totaling 3 interfaces in the dispatch pack (IMetadata, IMyWidget, ISerializable). IObject is not prepended because it is reachable via IMetadata's parent chain. The MetadataContainer is allocated lazily on first runtime metadata access.
+MyWidget implements IMyWidget (2 PROP + 1 EVT + 1 FN) and ISerializable (1 PROP + 1 FN). `ext::Object` adds IObjectStorage, totaling 3 interfaces in the dispatch pack (IObjectStorage, IMyWidget, ISerializable). IObject is not prepended because it is reachable via IObjectStorage's parent chain. The ObjectStorage is allocated lazily on first runtime metadata or attachment access.
 
 ```
-MyWidget (80 bytes)                         MetadataContainer (72 bytes, heap, lazy)
+MyWidget (80 bytes)                         ObjectStorage (72 bytes, heap, lazy)
 ┌──────────────────────────────────┐      ┌────────────────────────────────┐
 │ MI base layout               24  │      │ base (InterfaceDispatch)   16  │
 │   (3 vptrs)                      │      │ members_ (array_view)      16  │
 │ flags + padding               8  │      │ owner_ (pointer)            8  │
 │ block*                        8  │      │ instances_ (vector)        24  │
-│ meta_ (pointer)               8  │      │ dynamic_ (unique_ptr)       8  │
+│ storage_ (pointer)            8  │      │ attachment_end_ + padding   8  │
 │ IMyWidget::State              8  │      └────────────────────────────────┘
 │   (width, height: 2× float)      │
 │ ISerializable::State         24  │
@@ -190,7 +190,7 @@ The MI base layout contains one vtable pointer per interface chain, plus MSVC mu
 
 Member instances are created lazily, only when first accessed via `get_property()`, `get_event()`, or `get_function()`. Each accessed member adds a **24-byte** entry to the `instances_` vector: an 8-byte metadata index (`size_t`) plus a 16-byte `shared_ptr<IInterface>`.
 
-| Scenario | Object | MetadataContainer | Cached members | Total |
+| Scenario | Object | ObjectStorage | Cached members | Total |
 |---|---|---|---|---|
 | Toggle, no members accessed | 48 | 0 (lazy) | 0 | **48 bytes** |
 | Toggle, 1 member accessed | 48 | 72 | 1 × 24 = 24 | **144 bytes** |

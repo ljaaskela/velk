@@ -32,6 +32,11 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Raw state pointer](#raw-state-pointer)
   - [Deferred property assignment](#deferred-property-assignment)
     - [Deferred write_state](#deferred-write_state)
+- [Attachments](#attachments)
+  - [Adding and removing](#adding-and-removing)
+  - [Finding attachments](#finding-attachments)
+  - [Find or create](#find-or-create)
+  - [Container: adding hierarchy](#container-adding-hierarchy)
 
 ## Declaring interfaces
 
@@ -678,14 +683,14 @@ if (auto writer = write_state<IMyWidget>(iw)) {
 }  // ~StateWriter fires on_changed for all instantiated IMyWidget properties
 ```
 
-The accessors are also available directly on `IMetadata`:
+The same free functions work with any interface pointer:
 
 ```cpp
-auto* meta = interface_cast<IMetadata>(widget);
-if (auto reader = meta->read<IMyWidget>()) {
+auto* iw = interface_cast<IMyWidget>(widget);
+if (auto reader = read_state<IMyWidget>(iw)) {
     // ...
 }
-if (auto writer = meta->write<IMyWidget>()) {
+if (auto writer = write_state<IMyWidget>(iw)) {
     // ...
 }
 ```
@@ -791,3 +796,119 @@ write_state<IMyWidget>(iw, [](IMyWidget::State& s) {
 ```
 
 If the object is destroyed before `update()`, the queued callback is silently skipped.
+
+## Attachments
+
+Attachments are `IInterface::Ptr` instances stored alongside metadata in `IObjectStorage`. They let you inject capabilities into objects at runtime without modifying the class definition. Every `ext::Object` supports them out of the box.
+
+Use cases include adding hierarchy (via `IContainer`), decorating objects with extra interfaces, and associating arbitrary data with an object.
+
+### Adding and removing
+
+Reach the storage layer with `interface_cast<IObjectStorage>`, then use `add_attachment` and `remove_attachment`:
+
+```cpp
+auto obj = instance().create<IObject>(MyWidget::class_id());
+auto* storage = interface_cast<IObjectStorage>(obj);
+
+// Create something to attach
+auto child = instance().create<IObject>(MyWidget::class_id());
+
+// Add
+storage->add_attachment(child);
+storage->attachment_count();    // 1
+
+// Remove (by pointer identity)
+storage->remove_attachment(child);
+storage->attachment_count();    // 0
+```
+
+Individual attachments can also be retrieved by index with `get_attachment(size_t index)`, which returns `nullptr` if the index is out of range.
+
+### Finding attachments
+
+The typed `find_attachment<T>()` template searches attachments by interface UID and returns a typed shared pointer:
+
+```cpp
+auto found = storage->find_attachment<IMyWidget>();
+if (found) {
+    found->width().set_value(42.f);
+}
+```
+
+Under the hood this calls the virtual `find_attachment(AttachmentQuery)` with `Resolve::Existing`. `AttachmentQuery` has two fields:
+
+| Field | Meaning |
+|---|---|
+| `interfaceUid` | If set, the attachment must implement this interface |
+| `classUid` | If set, the attachment must have this class UID (also used to create on miss) |
+
+### Find or create
+
+`find_attachment<T>(classUid)` searches first, and if no match is found it creates a new instance via the type registry, attaches it, and returns it. The call is idempotent: a second call returns the same instance.
+
+```cpp
+// First call creates and attaches, second call returns the existing one
+auto container = storage->find_attachment<IContainer>(ClassId::Container);
+auto same      = storage->find_attachment<IContainer>(ClassId::Container);
+// container == same
+```
+
+Free functions in `api/attachment.h` provide the same behavior without needing to cast to `IObjectStorage` yourself:
+
+```cpp
+#include <velk/api/attachment.h>
+
+// From an IObjectStorage*
+auto c1 = find_or_create_attachment<IContainer>(storage, ClassId::Container);
+
+// From any IInterface* (casts to IObjectStorage internally)
+auto c2 = find_or_create_attachment<IContainer>(obj.get(), ClassId::Container);
+```
+
+### Container: adding hierarchy
+
+`IContainer` is a built-in interface for managing an ordered list of child objects. It is typically attached to an object via the attachment system using `ClassId::Container`.
+
+```cpp
+#include <velk/api/container.h>
+
+auto parent = instance().create<IObject>(MyWidget::class_id());
+
+// Ensure a container is attached (creates one if needed)
+auto container = ensure_container(parent.get());
+
+// Add children
+auto a = instance().create<IObject>(MyWidget::class_id());
+auto b = instance().create<IObject>(MyWidget::class_id());
+container->add(a);
+container->add(b);
+container->size();    // 2
+
+// Retrieve by index
+auto first = container->get_at(0);
+
+// Iterate all children
+for (size_t i = 0; i < container->size(); ++i) {
+    auto child = container->get_at(i);
+    // ...
+}
+
+// Later, find the existing container (returns nullptr if none)
+IContainer* found = get_container(parent.get());
+```
+
+`IContainer` provides the full vector-like API: `add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, and `clear`.
+
+For typed access, `Container<T>` (in `api/container.h`) wraps `IContainer` with null-safe operations and automatic `interface_cast` on children:
+
+```cpp
+Container<IMyWidget> c(ensure_container(parent.get()));
+c.add(widget_ptr);                            // accepts IMyWidget::Ptr
+IMyWidget::Ptr w = c.get_at(0);              // returns IMyWidget::Ptr
+c.for_each([](IMyWidget& w) {
+    w.width().set_value(100.f);
+});
+```
+
+`for_each` accepts `void(T&)` or `bool(T&)` callables. Returning `false` from a `bool` visitor stops iteration early. Children that do not implement `T` are skipped.

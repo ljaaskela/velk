@@ -14,7 +14,7 @@
 
 namespace velk {
 
-class IMetadata;
+class IObjectStorage;
 
 /** @brief Owns cloned function args and lazily builds the raw pointer array for FnArgs. */
 struct DeferredArgs : public ::velk::NoCopyMove
@@ -115,10 +115,10 @@ public:
      */
     virtual void update(Duration time = {}) const = 0;
 
-    /** @brief Creates a MetadataContainer for the given class info and owner. */
-    virtual IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
-    /** @brief Destroys a MetadataContainer previously created by create_metadata_container. */
-    virtual void destroy_metadata_container(IMetadata* meta) const = 0;
+    /** @brief Creates an ObjectStorage for the given class info and owner. */
+    virtual IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const = 0;
+    /** @brief Destroys an ObjectStorage previously created by create_metadata_container. */
+    virtual void destroy_metadata_container(IObjectStorage* storage) const = 0;
 
     /** @brief Creates an instance of a registered type by its UID. */
     virtual IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const = 0;

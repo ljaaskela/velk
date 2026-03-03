@@ -101,11 +101,11 @@ public:
     virtual array_view<MemberDesc> get_static_metadata() const = 0;
 
     /** @brief Returns the runtime property instance for the named member, or nullptr. */
-    virtual IProperty::Ptr get_property(string_view name) const = 0;
+    virtual IProperty::Ptr get_property(string_view name, Resolve mode = Resolve::Create) const = 0;
     /** @brief Returns the runtime event instance for the named member, or nullptr. */
-    virtual IEvent::Ptr get_event(string_view name) const = 0;
+    virtual IEvent::Ptr get_event(string_view name, Resolve mode = Resolve::Create) const = 0;
     /** @brief Returns the runtime function instance for the named member, or nullptr. */
-    virtual IFunction::Ptr get_function(string_view name) const = 0;
+    virtual IFunction::Ptr get_function(string_view name, Resolve mode = Resolve::Create) const = 0;
 
     /** @brief Broadcasts a notification to all instantiated members of the given kind and interface. */
     virtual void notify(MemberKind kind, Uid interfaceUid, Notification notification) const = 0;
@@ -149,31 +149,33 @@ detail::StateWriter<T>::~StateWriter()
  * @param name Property name to look up.
  * @return The runtime property instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IProperty::Ptr get_property(const IMetadata* meta, string_view name)
+inline IProperty::Ptr get_property(const IMetadata* meta, string_view name, Resolve mode = Resolve::Create)
 {
-    return meta ? meta->get_property(name) : nullptr;
+    return meta ? meta->get_property(name, mode) : nullptr;
 }
 
 /**
  * @brief Null-safe event lookup on an IMetadata pointer.
  * @param meta Metadata interface pointer (may be nullptr).
  * @param name Event name to look up.
+ * @param mode Resolve::Create (default) to lazily create, Resolve::Existing to only return cached.
  * @return The runtime event instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IEvent::Ptr get_event(const IMetadata* meta, string_view name)
+inline IEvent::Ptr get_event(const IMetadata* meta, string_view name, Resolve mode = Resolve::Create)
 {
-    return meta ? meta->get_event(name) : nullptr;
+    return meta ? meta->get_event(name, mode) : nullptr;
 }
 
 /**
  * @brief Null-safe function lookup on an IMetadata pointer.
  * @param meta Metadata interface pointer (may be nullptr).
  * @param name Function name to look up.
+ * @param mode Resolve::Create (default) to lazily create, Resolve::Existing to only return cached.
  * @return The runtime function instance, or nullptr if @p meta is null or the name is not found.
  */
-inline IFunction::Ptr get_function(const IMetadata* meta, string_view name)
+inline IFunction::Ptr get_function(const IMetadata* meta, string_view name, Resolve mode = Resolve::Create)
 {
-    return meta ? meta->get_function(name) : nullptr;
+    return meta ? meta->get_function(name, mode) : nullptr;
 }
 
 /**

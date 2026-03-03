@@ -1,4 +1,4 @@
-#include "metadata_container.h"
+#include "object_storage.h"
 
 #include "array_property.h"
 #include "event.h"
@@ -10,19 +10,24 @@
 #include <velk/interface/intf_function.h>
 #include <velk/interface/types.h>
 
+#include <algorithm>
+#include <limits>
+
 namespace velk {
 
-MetadataContainer::MetadataContainer(array_view<MemberDesc> members, IInterface* owner)
+static constexpr size_t AttachmentSentinel = std::numeric_limits<size_t>::max();
+
+ObjectStorage::ObjectStorage(array_view<MemberDesc> members, IInterface* owner)
     : members_(members),
       owner_(owner)
 {}
 
-array_view<MemberDesc> MetadataContainer::get_static_metadata() const
+array_view<MemberDesc> ObjectStorage::get_static_metadata() const
 {
     return members_;
 }
 
-IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
+IInterface::Ptr ObjectStorage::create(MemberDesc desc) const
 {
     // instantiate directly to avoid factory lookups
     IInterface::Ptr created;
@@ -91,19 +96,11 @@ IInterface::Ptr MetadataContainer::create(MemberDesc desc) const
     return created;
 }
 
-void MetadataContainer::bind(const MemberDesc& m, const IInterface::Ptr& fn) const
+void ObjectStorage::bind(const MemberDesc& m, const IInterface::Ptr& fn) const
 {
-    // Wire virtual dispatch: if the interface declared a fn_Name()
-    // virtual (via VELK_INTERFACE), bind the FunctionImpl so that
-    // invoke() routes through the static trampoline to the virtual
-    // method on the owning object's interface subobject.
-
-    auto* fk = m.functionKind(); // Only valid for functions
+    auto* fk = m.functionKind();
     if (fk && fk->trampoline && owner_) {
         if (auto* fi = interface_cast<IFunctionInternal>(fn)) {
-            // Resolve the interface pointer that declared this function.
-            // This is the 'self' the trampoline will static_cast back to
-            // the concrete interface type (e.g. IMyWidget*).
             void* intf_ptr = owner_->get_interface(m.interfaceInfo->uid);
             if (intf_ptr) {
                 fi->bind(intf_ptr, fk->trampoline);
@@ -112,15 +109,18 @@ void MetadataContainer::bind(const MemberDesc& m, const IInterface::Ptr& fn) con
     }
 }
 
-IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind kind) const
+IInterface::Ptr ObjectStorage::find_or_create(string_view name, MemberKind kind, Resolve mode) const
 {
     auto matches = [&](const MemberDesc& m) { return m.kind == kind && m.name == name; };
 
-    // Check cache first
-    for (auto& [idx, ptr] : instances_) {
-        if (matches(members_[idx])) {
-            return ptr;
+    // Check cache first (skip attachment region)
+    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
+        if (matches(members_[instances_[i].first])) {
+            return instances_[i].second;
         }
+    }
+    if (mode == Resolve::Existing) {
+        return {};
     }
     IInterface::Ptr created;
     // Find in static metadata and create if found
@@ -138,28 +138,31 @@ IInterface::Ptr MetadataContainer::find_or_create(string_view name, MemberKind k
     return created;
 }
 
-IProperty::Ptr MetadataContainer::get_property(string_view name) const
+IProperty::Ptr ObjectStorage::get_property(string_view name, Resolve mode) const
 {
-    auto result = find_or_create(name, MemberKind::Property);
+    auto result = find_or_create(name, MemberKind::Property, mode);
     if (!result) {
-        result = find_or_create(name, MemberKind::ArrayProperty);
+        result = find_or_create(name, MemberKind::ArrayProperty, mode);
     }
     return interface_pointer_cast<IProperty>(result);
 }
 
-IEvent::Ptr MetadataContainer::get_event(string_view name) const
+IEvent::Ptr ObjectStorage::get_event(string_view name, Resolve mode) const
 {
-    return interface_pointer_cast<IEvent>(find_or_create(name, MemberKind::Event));
+    return interface_pointer_cast<IEvent>(find_or_create(name, MemberKind::Event, mode));
 }
 
-IFunction::Ptr MetadataContainer::get_function(string_view name) const
+IFunction::Ptr ObjectStorage::get_function(string_view name, Resolve mode) const
 {
-    return interface_pointer_cast<IFunction>(find_or_create(name, MemberKind::Function));
+    return interface_pointer_cast<IFunction>(find_or_create(name, MemberKind::Function, mode));
 }
 
-void MetadataContainer::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
+void ObjectStorage::notify(MemberKind kind, Uid interfaceUid, Notification notification) const
 {
-    for (auto& [idx, ptr] : instances_) {
+    // Iterate only metadata entries (skip attachment region)
+    for (size_t i = attachment_end_; i < instances_.size(); ++i) {
+        auto idx = instances_[i].first;
+        auto& ptr = instances_[i].second;
         auto& m = members_[idx];
         if (m.kind != kind || !m.interfaceInfo || m.interfaceInfo->uid != interfaceUid) {
             continue;
@@ -177,6 +180,73 @@ void MetadataContainer::notify(MemberKind kind, Uid interfaceUid, Notification n
             break;
         }
     }
+}
+
+ReturnValue ObjectStorage::add_attachment(const IInterface::Ptr& attachment)
+{
+    if (!attachment) {
+        return ReturnValue::InvalidArgument;
+    }
+    instances_.insert(instances_.begin() + attachment_end_, {AttachmentSentinel, attachment});
+    attachment_end_++;
+    return ReturnValue::Success;
+}
+
+ReturnValue ObjectStorage::remove_attachment(const IInterface::Ptr& attachment)
+{
+    if (!attachment) {
+        return ReturnValue::InvalidArgument;
+    }
+    for (uint32_t i = 0; i < attachment_end_; ++i) {
+        if (instances_[i].second.get() == attachment.get()) {
+            instances_.erase(instances_.begin() + i);
+            attachment_end_--;
+            return ReturnValue::Success;
+        }
+    }
+    return ReturnValue::NothingToDo;
+}
+
+size_t ObjectStorage::attachment_count() const
+{
+    return attachment_end_;
+}
+
+IInterface::Ptr ObjectStorage::get_attachment(size_t index) const
+{
+    if (index < attachment_end_) {
+        return instances_[index].second;
+    }
+    return {};
+}
+
+IInterface::Ptr ObjectStorage::find_attachment(const AttachmentQuery& query, Resolve mode)
+{
+    const bool matchInterface = query.interfaceUid != Uid{};
+    const bool matchClass = query.classUid != Uid{};
+
+    for (uint32_t i = 0; i < attachment_end_; ++i) {
+        auto& att = instances_[i].second;
+        if (matchInterface && !att->get_interface(query.interfaceUid)) {
+            continue;
+        }
+        if (matchClass) {
+            if (auto* obj = att->get_interface<IObject>()) {
+                if (obj->get_class_uid() != query.classUid) {
+                    continue;
+                }
+            }
+        }
+        return att;
+    }
+    if (mode == Resolve::Create && matchClass) {
+        auto created = instance().create<IInterface>(query.classUid);
+        if (created) {
+            add_attachment(created);
+        }
+        return created;
+    }
+    return {};
 }
 
 } // namespace velk

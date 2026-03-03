@@ -1,12 +1,15 @@
 #include <velk/api/any.h>
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
+#include <velk/api/object.h>
 #include <velk/api/property.h>
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
+#include <velk/interface/intf_container.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_metadata.h>
+#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/intf_property.h>
 #include <velk/interface/types.h>
 
@@ -246,19 +249,20 @@ TEST_F(ObjectTest, InterfaceListViaGetClassInfo)
     ASSERT_NE(info, nullptr);
 
     // Object<TestWidget, ITestWidget, ITestSerializable, ITestMath, ITestRaw>
-    // Pack is {IMetadata, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
-    // IObject is not prepended because it is reachable via IMetadata->IPropertyState->IObject.
-    // Chain walks: IMetadata->IPropertyState->IObject,
+    // Pack is {IObjectStorage, ITestWidget, ITestSerializable, ITestMath, ITestRaw}
+    // IObject is not prepended because it is reachable via IObjectStorage chain.
+    // Chain walks: IObjectStorage->IMetadata->IPropertyState->IObject,
     //             ITestWidget, ITestSerializable, ITestMath, ITestRaw
-    EXPECT_EQ(info->interfaces.size(), 7u);
+    EXPECT_EQ(info->interfaces.size(), 8u);
 
-    EXPECT_EQ(info->interfaces[0].uid, IMetadata::UID);
-    EXPECT_EQ(info->interfaces[1].uid, IPropertyState::UID);
-    EXPECT_EQ(info->interfaces[2].uid, IObject::UID);
-    EXPECT_EQ(info->interfaces[3].uid, ITestWidget::UID);
-    EXPECT_EQ(info->interfaces[4].uid, ITestSerializable::UID);
-    EXPECT_EQ(info->interfaces[5].uid, ITestMath::UID);
-    EXPECT_EQ(info->interfaces[6].uid, ITestRaw::UID);
+    EXPECT_EQ(info->interfaces[0].uid, IObjectStorage::UID);
+    EXPECT_EQ(info->interfaces[1].uid, IMetadata::UID);
+    EXPECT_EQ(info->interfaces[2].uid, IPropertyState::UID);
+    EXPECT_EQ(info->interfaces[3].uid, IObject::UID);
+    EXPECT_EQ(info->interfaces[4].uid, ITestWidget::UID);
+    EXPECT_EQ(info->interfaces[5].uid, ITestSerializable::UID);
+    EXPECT_EQ(info->interfaces[6].uid, ITestMath::UID);
+    EXPECT_EQ(info->interfaces[7].uid, ITestRaw::UID);
 }
 
 TEST_F(ObjectTest, StaticDefaultValues)
@@ -806,6 +810,100 @@ TEST_F(ObjectTest, DeferredWriteStateDestroyedBeforeUpdate)
     instance().update();
 }
 
+// --- Resolve::Existing tests ---
+
+TEST_F(ObjectTest, ResolveExistingPropertyReturnsNullBeforeAccess)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // No property has been created yet
+    auto prop = meta->get_property("width", Resolve::Existing);
+    EXPECT_FALSE(prop);
+}
+
+TEST_F(ObjectTest, ResolveExistingPropertyReturnsInstanceAfterCreate)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // Force creation with default Create mode
+    auto created = meta->get_property("width");
+    ASSERT_TRUE(created);
+
+    // Now Existing should find it
+    auto existing = meta->get_property("width", Resolve::Existing);
+    EXPECT_TRUE(existing);
+    EXPECT_EQ(existing.get(), created.get());
+}
+
+TEST_F(ObjectTest, ResolveExistingEventReturnsNullBeforeAccess)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto evt = meta->get_event("on_clicked", Resolve::Existing);
+    EXPECT_FALSE(evt);
+}
+
+TEST_F(ObjectTest, ResolveExistingEventReturnsInstanceAfterCreate)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto created = meta->get_event("on_clicked");
+    ASSERT_TRUE(created);
+
+    auto existing = meta->get_event("on_clicked", Resolve::Existing);
+    EXPECT_TRUE(existing);
+    EXPECT_EQ(existing.get(), created.get());
+}
+
+TEST_F(ObjectTest, ResolveExistingFunctionReturnsNullBeforeAccess)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto fn = meta->get_function("reset", Resolve::Existing);
+    EXPECT_FALSE(fn);
+}
+
+TEST_F(ObjectTest, ResolveExistingFunctionReturnsInstanceAfterCreate)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    auto created = meta->get_function("reset");
+    ASSERT_TRUE(created);
+
+    auto existing = meta->get_function("reset", Resolve::Existing);
+    EXPECT_TRUE(existing);
+    EXPECT_EQ(existing.get(), created.get());
+}
+
+TEST_F(ObjectTest, ResolveExistingSkipsStorageCreation)
+{
+    auto obj = instance().create<IObject>(TestWidget::class_id());
+    auto* meta = interface_cast<IMetadata>(obj);
+    ASSERT_NE(meta, nullptr);
+
+    // Resolve::Existing on a fresh object should not allocate storage
+    EXPECT_FALSE(meta->get_property("width", Resolve::Existing));
+    EXPECT_FALSE(meta->get_event("on_clicked", Resolve::Existing));
+    EXPECT_FALSE(meta->get_function("reset", Resolve::Existing));
+
+    // After a Create call, storage exists and Existing works
+    auto prop = meta->get_property("width");
+    ASSERT_TRUE(prop);
+    EXPECT_TRUE(meta->get_property("width", Resolve::Existing));
+}
+
 TEST_F(ObjectTest, ImmediateWriteStateCallback)
 {
     auto obj = instance().create<IObject>(TestWidget::class_id());
@@ -822,4 +920,272 @@ TEST_F(ObjectTest, ImmediateWriteStateCallback)
     // Immediate: applied and notified synchronously
     EXPECT_EQ(widthNotified, 1);
     EXPECT_FLOAT_EQ(iw->width().get_value(), 600.f);
+}
+
+// --- Object API wrapper tests ---
+
+class ObjectWrapperTest : public ::testing::Test
+{
+protected:
+    static void SetUpTestSuite() { instance().type_registry().register_type<TestWidget>(); }
+
+    ::velk::Object make() { return ::velk::Object(instance().create<IObject>(TestWidget::class_id())); }
+};
+
+TEST_F(ObjectWrapperTest, DefaultConstructedIsInvalid)
+{
+    ::velk::Object obj;
+    EXPECT_FALSE(obj);
+}
+
+TEST_F(ObjectWrapperTest, ConstructedFromPtrIsValid)
+{
+    auto obj = make();
+    EXPECT_TRUE(obj);
+}
+
+TEST_F(ObjectWrapperTest, ClassUid)
+{
+    auto obj = make();
+    EXPECT_EQ(obj.class_uid(), TestWidget::class_id());
+}
+
+TEST_F(ObjectWrapperTest, ClassName)
+{
+    auto obj = make();
+    EXPECT_FALSE(obj.class_name().empty());
+}
+
+TEST_F(ObjectWrapperTest, Flags)
+{
+    auto obj = make();
+    EXPECT_EQ(obj.flags(), static_cast<uint32_t>(ObjectFlags::None));
+}
+
+TEST_F(ObjectWrapperTest, AsRawPointer)
+{
+    auto obj = make();
+    auto* iw = obj.as<ITestWidget>();
+    EXPECT_NE(iw, nullptr);
+
+    // Non-implemented interface returns nullptr
+    auto* bad = obj.as<IVelk>();
+    EXPECT_EQ(bad, nullptr);
+}
+
+TEST_F(ObjectWrapperTest, AsSharedPointer)
+{
+    auto obj = make();
+    auto ptr = obj.as_ptr<ITestWidget>();
+    EXPECT_TRUE(ptr);
+
+    auto badPtr = obj.as_ptr<IVelk>();
+    EXPECT_FALSE(badPtr);
+}
+
+TEST_F(ObjectWrapperTest, GetProperty)
+{
+    auto obj = make();
+    auto prop = obj.get_property("width");
+    EXPECT_TRUE(prop);
+
+    auto bogus = obj.get_property("nonexistent");
+    EXPECT_FALSE(bogus);
+}
+
+TEST_F(ObjectWrapperTest, GetEvent)
+{
+    auto obj = make();
+    auto evt = obj.get_event("on_clicked");
+    EXPECT_TRUE(evt);
+
+    auto bogus = obj.get_event("nonexistent");
+    EXPECT_FALSE(bogus);
+}
+
+TEST_F(ObjectWrapperTest, GetFunction)
+{
+    auto obj = make();
+    auto fn = obj.get_function("reset");
+    EXPECT_TRUE(fn);
+
+    auto bogus = obj.get_function("nonexistent");
+    EXPECT_FALSE(bogus);
+}
+
+TEST_F(ObjectWrapperTest, GetPropertyResolveExisting)
+{
+    auto obj = make();
+
+    // Before any access, Existing returns null
+    EXPECT_FALSE(obj.get_property("width", Resolve::Existing));
+
+    // Force creation
+    obj.get_property("width");
+
+    // Now Existing finds it
+    EXPECT_TRUE(obj.get_property("width", Resolve::Existing));
+}
+
+TEST_F(ObjectWrapperTest, StaticMetadata)
+{
+    auto obj = make();
+    auto meta = obj.static_metadata();
+    // ITestWidget(5) + ITestSerializable(2) + ITestMath(1) + ITestRaw(1) = 9
+    EXPECT_EQ(meta.size(), 9u);
+}
+
+TEST_F(ObjectWrapperTest, ReadState)
+{
+    auto obj = make();
+    auto reader = obj.read_state<ITestWidget>();
+    ASSERT_TRUE(reader);
+    EXPECT_FLOAT_EQ(reader->width, 100.f);
+    EXPECT_FLOAT_EQ(reader->height, 50.f);
+}
+
+TEST_F(ObjectWrapperTest, WriteState)
+{
+    auto obj = make();
+    {
+        auto writer = obj.write_state<ITestWidget>();
+        ASSERT_TRUE(writer);
+        writer->width = 300.f;
+    }
+    auto reader = obj.read_state<ITestWidget>();
+    EXPECT_FLOAT_EQ(reader->width, 300.f);
+}
+
+TEST_F(ObjectWrapperTest, WriteStateCallback)
+{
+    auto obj = make();
+
+    obj.write_state<ITestWidget>([](ITestWidget::State& s) { s.width = 500.f; });
+
+    auto reader = obj.read_state<ITestWidget>();
+    EXPECT_FLOAT_EQ(reader->width, 500.f);
+}
+
+TEST_F(ObjectWrapperTest, WriteStateCallbackDeferred)
+{
+    auto obj = make();
+
+    obj.write_state<ITestWidget>([](ITestWidget::State& s) { s.width = 700.f; }, Deferred);
+
+    // Not applied yet
+    EXPECT_FLOAT_EQ(obj.read_state<ITestWidget>()->width, 100.f);
+
+    instance().update();
+
+    EXPECT_FLOAT_EQ(obj.read_state<ITestWidget>()->width, 700.f);
+}
+
+TEST_F(ObjectWrapperTest, InvokeFunction)
+{
+    auto obj = make();
+    auto result = obj.invoke_function("add");
+
+    // Also test with value args (auto-wrapped in Any)
+    auto sum = obj.invoke_function("add", 3, 7);
+    ASSERT_TRUE(sum);
+    int value = 0;
+    sum->get_data(&value, sizeof(int), type_uid<int>());
+    EXPECT_EQ(value, 10);
+}
+
+TEST_F(ObjectWrapperTest, InvokeEvent)
+{
+    auto obj = make();
+    auto rv = obj.invoke_event("on_clicked");
+    EXPECT_TRUE(succeeded(rv));
+}
+
+TEST_F(ObjectWrapperTest, InvokeFunctionVoid)
+{
+    auto obj = make();
+    auto result = obj.invoke_function("reset");
+    // void function returns nullptr
+    EXPECT_FALSE(result);
+
+    // Verify it was called
+    auto* raw = static_cast<TestWidget*>(obj.as<ITestWidget>());
+    EXPECT_EQ(raw->resetCallCount, 1);
+}
+
+TEST_F(ObjectWrapperTest, AddAndFindAttachment)
+{
+    auto obj = make();
+
+    // Initially no attachments
+    EXPECT_EQ(obj.attachment_count(), 0u);
+
+    // Create a container and attach it
+    auto container = instance().create<IInterface>(ClassId::Container);
+    ASSERT_TRUE(container);
+
+    EXPECT_TRUE(succeeded(obj.add_attachment(container)));
+    EXPECT_EQ(obj.attachment_count(), 1u);
+
+    // Find it
+    auto found = obj.find_attachment<IContainer>();
+    EXPECT_TRUE(found);
+
+    // Remove it
+    EXPECT_TRUE(succeeded(obj.remove_attachment(container)));
+    EXPECT_EQ(obj.attachment_count(), 0u);
+}
+
+TEST_F(ObjectWrapperTest, FindOrCreateAttachment)
+{
+    auto obj = make();
+    auto c = obj.find_or_create_attachment<IContainer>(ClassId::Container);
+    EXPECT_TRUE(c);
+    EXPECT_EQ(obj.attachment_count(), 1u);
+
+    // Second call returns the same one
+    auto c2 = obj.find_or_create_attachment<IContainer>(ClassId::Container);
+    EXPECT_EQ(c.get(), c2.get());
+    EXPECT_EQ(obj.attachment_count(), 1u);
+}
+
+TEST_F(ObjectWrapperTest, ArrowOperator)
+{
+    auto obj = make();
+    EXPECT_EQ(obj->get_class_uid(), TestWidget::class_id());
+}
+
+TEST_F(ObjectWrapperTest, GetReturnsPtr)
+{
+    auto obj = make();
+    EXPECT_TRUE(obj.get());
+
+    ::velk::Object empty;
+    EXPECT_FALSE(empty.get());
+}
+
+TEST_F(ObjectWrapperTest, NullObjectSafe)
+{
+    ::velk::Object obj;
+
+    // All methods should be safe on null
+    EXPECT_EQ(obj.class_uid(), Uid{});
+    EXPECT_TRUE(obj.class_name().empty());
+    EXPECT_EQ(obj.flags(), 0u);
+    EXPECT_EQ(obj.as<ITestWidget>(), nullptr);
+    EXPECT_FALSE(obj.as_ptr<ITestWidget>());
+    EXPECT_FALSE(obj.get_property("width"));
+    EXPECT_FALSE(obj.get_event("on_clicked"));
+    EXPECT_FALSE(obj.get_function("reset"));
+    EXPECT_EQ(obj.static_metadata().size(), 0u);
+    EXPECT_FALSE(obj.read_state<ITestWidget>());
+    EXPECT_FALSE(obj.write_state<ITestWidget>());
+    obj.write_state<ITestWidget>([](ITestWidget::State&) {}); // should not crash
+    EXPECT_FALSE(obj.invoke_function("reset"));
+    EXPECT_EQ(obj.invoke_event("on_clicked"), ReturnValue::InvalidArgument);
+    EXPECT_EQ(obj.add_attachment(IInterface::Ptr{}), ReturnValue::InvalidArgument);
+    EXPECT_EQ(obj.remove_attachment(IInterface::Ptr{}), ReturnValue::InvalidArgument);
+    EXPECT_EQ(obj.attachment_count(), 0u);
+    EXPECT_FALSE(obj.find_attachment<IContainer>());
+    EXPECT_FALSE(obj.find_or_create_attachment<IContainer>(ClassId::Container));
+    EXPECT_FALSE(obj.get());
 }

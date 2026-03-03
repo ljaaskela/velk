@@ -14,7 +14,7 @@
 
 namespace velk {
 
-class MetadataContainer;
+class ObjectStorage;
 
 /**
  * @brief Singleton implementation of IVelk.
@@ -38,8 +38,8 @@ public:
     ILog& log() override { return *this; }
     const ILog& log() const override { return const_cast<VelkInstance&>(*this); }
 
-    IMetadata* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
-    void destroy_metadata_container(IMetadata* meta) const override;
+    IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
+    void destroy_metadata_container(IObjectStorage* storage) const override;
     IInterface::Ptr create(Uid uid, uint32_t flags = ObjectFlags::None) const override;
     IAny::Ptr create_any(Uid type) const override;
     IProperty::Ptr create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const override;
@@ -60,8 +60,8 @@ private:
     /** @brief Coalesces and applies queued deferred property sets (last-write-wins). */
     void flush_deferred_properties(std::vector<DeferredPropertySet>& propSets) const;
 
-    mutable RawHive<MetadataContainer>
-        metadata_hive_;                 ///< Pool allocator for MetadataContainers (destroyed last).
+    mutable RawHive<ObjectStorage>
+        metadata_hive_;                 ///< Pool allocator for ObjectStorage instances (destroyed last).
     LogLevel level_{LogLevel::Info};    ///< Minimum log level (before type_registry_ for init order).
     ILogSink::Ptr sink_;                ///< Custom log sink (empty = default stderr).
     TypeRegistry type_registry_;        ///< Registry of class factories.

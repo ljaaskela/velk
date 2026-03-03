@@ -58,6 +58,7 @@ Abstract interfaces (pure virtual). These define the ABI contracts.
 | `intf_interface.h` | `IInterface` root with UID-based `get_interface()` and ref-counting; `Interface<T>` CRTP with auto UID |
 | `intf_object.h` | `IObject` base with `get_self()` for shared_ptr retrieval |
 | `intf_metadata.h` | `MemberDesc`, `IMetadata`, `VELK_INTERFACE` macro |
+| `intf_object_storage.h` | `AttachmentQuery`, `IObjectStorage` extends `IMetadata` with attachment support |
 | `intf_property.h` | `IProperty` with type-erased get/set and on_changed |
 | `intf_event.h` | `IEvent` (inherits `IFunction`) with add/remove handler (immediate or deferred) |
 | `intf_function.h` | `FnArgs` argument view, `IFunction` invocable callback with `InvokeType` support |
@@ -79,7 +80,7 @@ CRTP helpers and template implementations.
 | `interface_dispatch.h` | `ext::InterfaceDispatch<Interfaces...>` generic `get_interface` dispatching across a pack of interfaces (walks parent interface chain) |
 | `refcounted_dispatch.h` | `ext::RefCountedDispatch<Interfaces...>` extends `InterfaceDispatch` with intrusive ref-counting |
 | `core_object.h` | `ext::ObjectFactory<T>` singleton factory; `ext::ObjectCore<T, Interfaces...>` CRTP with factory, self-pointer |
-| `object.h` | `ext::Object<T, Interfaces...>` adds `IMetadata` support with collected metadata |
+| `object.h` | `ext::Object<T, Interfaces...>` adds `IObjectStorage` support with collected metadata and attachments |
 | `metadata.h` | `ext::TypeMetadata<T>`, `ext::CollectedMetadata<Interfaces...>` constexpr metadata collection |
 | `any.h` | `ext::AnyBase`, `ext::AnyMulti<Types...>`, `ext::AnyCore<T>`, `ext::AnyValue<T>` |
 | `event.h` | `ext::LazyEvent` helper for deferred event creation |
@@ -98,6 +99,9 @@ User-facing typed wrappers.
 | `function.h` | `Function` wrapper around existing IFunction, variadic `invoke_function` overloads |
 | `event.h` | `Event` wrapper around existing IEvent |
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
+| `object.h` | `Object` convenience wrapper with null-safe metadata, state, and attachment access |
+| `container.h` | `Container<T>` typed wrapper inheriting `Object` for `IContainer` operations |
+| `attachment.h` | `find_or_create_attachment<T>()` free function helpers |
 
 ## src/
 
@@ -108,7 +112,7 @@ Internal runtime implementations (compiled into the DLL).
 | `velk_instance.cpp/h` | `VelkInstance` implementing `IVelk`, `ITypeRegistry`, and `IPluginRegistry` |
 | `library_handle.h` | Platform-abstracted shared library loading (`LoadLibrary`/`dlopen`) |
 | `platform.h` | Platform-specific OS includes (`windows.h`, `dlfcn.h`, `pthread.h`) |
-| `metadata_container.cpp/h` | `MetadataContainer` implementing `IMetadata` with lazy member creation |
+| `object_storage.cpp/h` | `ObjectStorage` implementing `IObjectStorage` with lazy member creation and attachments |
 | `property.cpp/h` | `PropertyImpl` |
 | `function.cpp/h` | `FunctionImpl` implementing `IFunction` |
 | `event.cpp/h` | `EventImpl` implementing `IEvent` (inherits `IFunction`) |
@@ -145,6 +149,10 @@ classDiagram
     class IMetadata {
         <<interface>>
         get_property() / get_event() / get_function()
+    }
+    class IObjectStorage {
+        <<interface>>
+        add/remove/find attachment
     }
     class IProperty {
         <<interface>>
@@ -183,6 +191,7 @@ classDiagram
     IObject <|-- IAny
     IObject <|-- IPropertyState
     IPropertyState <|-- IMetadata
+    IMetadata <|-- IObjectStorage
 
     IInterface <|-- IProperty
     IInterface <|-- IFunction
@@ -213,7 +222,7 @@ classDiagram
         factory, UID, name
     }
     class Object~Final, Interfaces...~ {
-        meta_ unique_ptr
+        storage_ IObjectStorage*
         states_ tuple
     }
     class Plugin~Final~ {
@@ -262,7 +271,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | | | `ext::AnyMulti<Types...>` | |
 | | | `ext::AnyCore<Final, T>` | |
 | | | `ext::AnyValue<T>` | |
-| **Object** | `IObject` | `ext::ObjectCore<Final, Intf...>` | — |
+| **Object** | `IObject`, `IObjectStorage` | `ext::ObjectCore<Final, Intf...>` | `Object`, `Container<T>` |
 | | | `ext::Object<Final, Intf...>` | |
 | **Property** | `IProperty` | — | `ConstProperty<T>`, `Property<T>` |
 | **Function** | `IFunction` | — | `Function` (wrapper), `Callback` (creator) |
@@ -283,7 +292,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | Class | Role | When to use |
 |-------|------|-------------|
 | `ext::ObjectCore<Final, Intf...>` | Minimal base (no metadata) | Internal implementations (`PropertyImpl`, `FunctionImpl`, `VelkInstance`) |
-| `ext::Object<Final, Intf...>` | Full base with metadata collection | User-defined types with `VELK_INTERFACE` |
+| `ext::Object<Final, Intf...>` | Full base with metadata and attachments | User-defined types with `VELK_INTERFACE` |
 | `ext::Plugin<Final>` | Plugin base with static metadata | Plugin implementations |
 
 ## ABI stability
@@ -333,7 +342,7 @@ The public headers (`interface/`, `ext/`, `api/`) use several STL types. These a
 
 | Type | Where | Why it's safe |
 |---|---|---|
-| `std::array` | Metadata arrays in `VELK_INTERFACE` and `ext::CollectedMetadata` | Compile-time only. Converted to `array_view<MemberDesc>` before reaching `ClassInfo` or `MetadataContainer`. The `std::array` itself never crosses the DLL boundary. |
+| `std::array` | Metadata arrays in `VELK_INTERFACE` and `ext::CollectedMetadata` | Compile-time only. Converted to `array_view<MemberDesc>` before reaching `ClassInfo` or `ObjectStorage`. The `std::array` itself never crosses the DLL boundary. |
 | `std::tuple` | `ext::Object::states_` stores per-interface `State` structs | Template instantiated in consumer code. Both the object and its accessors compile from the same headers, so the layout is identical. Never passed to the DLL as a tuple. Individual states are accessed via `array_view` or raw pointers (`get_property_state`). |
 | `std::atomic` | `control_block` ref counts, `ObjectData` flags | Layout is platform-defined (same size as the underlying integer). The control block is allocated inside the DLL and accessed through exported functions, so both sides agree on the layout. |
 

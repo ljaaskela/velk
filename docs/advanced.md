@@ -45,7 +45,7 @@ Property::set_value(from)  -->  data_->copy_from(from)  -->  on_changed fires
 Property::get_value()      -->  returns data_
 ```
 
-When a property is created by `MetadataContainer` for a `VELK_INTERFACE` member, `data_` is set to an `AnyRef<T>` pointing into the object's State struct. The property doesn't know or care what concrete IAny type backs it. This indirection is what makes extensions possible.
+When a property is created by `ObjectStorage` for a `VELK_INTERFACE` member, `data_` is set to an `AnyRef<T>` pointing into the object's State struct. The property doesn't know or care what concrete IAny type backs it. This indirection is what makes extensions possible.
 
 ### IAnyExtension: stacking values on a property
 
@@ -224,7 +224,7 @@ public:
     //    value type. getDefault returns a pointer to a static ext::AnyRef<T>
     //    pointing into a shared default State singleton. createRef creates an
     //    ext::AnyRef<T> pointing into the State struct at the given base address,
-    //    used by MetadataContainer to back properties with contiguous state storage.
+    //    used by ObjectStorage to back properties with contiguous state storage.
     //
     //    detail::ArrBind<State, &State::member> works the same way but its
     //    createRef returns an ext::ArrayAnyRef<T> that implements both IAny
