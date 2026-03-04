@@ -36,9 +36,9 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
   - [Adding and removing](#adding-and-removing)
   - [Finding attachments](#finding-attachments)
   - [Find or create](#find-or-create)
-  - [Hierarchy](#hierarchy)
-    - [Events](#events)
-    - [IHierarchyAware](#ihierarchyaware)
+- [Hierarchy](#hierarchy)
+  - [Events](#events)
+  - [IHierarchyAware](#ihierarchyaware)
 
 ## Declaring interfaces
 
@@ -868,7 +868,7 @@ auto h1 = find_or_create_attachment<IHierarchy>(storage, ClassId::Hierarchy);
 auto h2 = find_or_create_attachment<IHierarchy>(obj.get(), ClassId::Hierarchy);
 ```
 
-### Hierarchy
+## Hierarchy
 
 Velk objects are flat by default: an `IObject` has metadata and attachments, but no notion of parent/child relationships. Hierarchy is **external**: a standalone `Hierarchy` object (`ClassId::Hierarchy`) manages a single-root tree of `IObject` references. Objects don't know about hierarchy; hierarchy knows about objects.
 
@@ -942,7 +942,7 @@ h.child_count(node);            // works directly
 
 `for_each_child` (on both `Node` and `Hierarchy`) accepts `void(T&)` or `bool(T&)` callables. Returning `false` from a `bool` visitor stops iteration early. Children that do not implement `T` are skipped.
 
-#### Events
+### Events
 
 Every hierarchy exposes two multicast events via `VELK_INTERFACE`: `on_changing` (fires before a mutation) and `on_changed` (fires after). Both deliver a `HierarchyChange` argument describing the operation:
 
@@ -967,7 +967,7 @@ ih->on_changed().add_handler(Callback([](const HierarchyChange& change) {
 
 For `Remove`, events fire once for the subtree root, not per descendant. `on_changing` is informational (no veto); it fires before the mutation so handlers can inspect the pre-mutation state.
 
-#### IHierarchyAware
+### IHierarchyAware
 
 Objects that implement `IHierarchyAware` receive per-object lifecycle callbacks when they enter or leave a hierarchy:
 
