@@ -18,9 +18,9 @@ public:
     /** @brief Returns the inner IAny this extension wraps (const). */
     virtual IAny::ConstPtr get_inner() const = 0;
     /** @brief Takes ownership of the inner IAny, leaving this extension empty. */
-    virtual IAny::Ptr take_inner() = 0;
+    virtual IAny::Ptr take_inner(IInterface& owner) = 0;
     /** @brief Sets the inner IAny this extension wraps. */
-    virtual void set_inner(IAny::Ptr inner) = 0;
+    virtual void set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner) = 0;
 };
 
 } // namespace velk

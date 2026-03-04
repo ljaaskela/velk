@@ -3,6 +3,7 @@
 
 #include <velk/array_view.h>
 #include <velk/interface/intf_metadata.h>
+#include <velk/interface/intf_property.h>
 #include <velk/interface/intf_velk.h>
 #include <velk/plugins/animator/easing.h>
 
@@ -67,10 +68,12 @@ public:
     virtual void restart() = 0;
     /** @brief Seeks to a normalized position (0..1) and applies the interpolated value. */
     virtual void seek(float progress) = 0;
-    /** @brief Sets the target property to animate. */
-    virtual void set_target(const IProperty::Ptr& target) = 0;
     /** @brief Replaces all keyframes. Shares ownership of each entry's value. */
     virtual void set_keyframes(array_view<KeyframeEntry> keyframes) = 0;
+    /** @brief Installs this animation on a property target. */
+    virtual void add_target(const IProperty::Ptr& target) = 0;
+    /** @brief Removes this animation from a property target. */
+    virtual void remove_target(const IProperty::Ptr& target) = 0;
 };
 
 } // namespace velk

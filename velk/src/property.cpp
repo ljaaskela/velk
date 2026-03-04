@@ -110,7 +110,7 @@ bool PropertyImpl::install_extension(const IAnyExtension::Ptr& extension)
     if (!extension) {
         return false;
     }
-    extension->set_inner(data_);
+    extension->set_inner(data_, IInterface::WeakPtr(get_self<IInterface>()));
     set_any(interface_pointer_cast<IAny>(extension));
     return true;
 }
@@ -123,24 +123,27 @@ bool PropertyImpl::remove_extension(const IAnyExtension::Ptr& extension)
 
     auto ext_as_any = interface_pointer_cast<IAny>(extension);
 
+    IInterface& self = static_cast<IPropertyInternal&>(*this);
+
     // Case 1: extension is at the head of the chain
     if (data_ == ext_as_any) {
-        auto inner = extension->take_inner();
+        auto inner = extension->take_inner(self);
         set_any(inner);
         return true;
     }
 
     // Case 2: extension is deeper in the chain; walk to find its predecessor.
     // Use take/restore to get non-const access to each link.
+    auto weakSelf = IInterface::WeakPtr(get_self<IInterface>());
     auto* prev = interface_cast<IAnyExtension>(data_);
     while (prev) {
-        auto inner = prev->take_inner();
+        auto inner = prev->take_inner(self);
         if (inner == ext_as_any) {
-            prev->set_inner(extension->take_inner());
+            prev->set_inner(extension->take_inner(self), weakSelf);
             return true;
         }
         auto* next = interface_cast<IAnyExtension>(inner);
-        prev->set_inner(std::move(inner));
+        prev->set_inner(std::move(inner), weakSelf);
         prev = next;
     }
     return false;

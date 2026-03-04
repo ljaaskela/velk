@@ -24,12 +24,14 @@ public:
 
     /** @brief Advances the transition. Returns true if still animating. */
     virtual bool tick(Duration dt) = 0;
-    /** @brief Sets the target property for this transition. */
-    virtual void set_target(const IProperty::Ptr& target) = 0;
-    /** @brief Returns the target property. */
-    virtual IProperty::Ptr get_target() const = 0;
     /** @brief Sets the easing function. */
     virtual void set_easing(easing::EasingFn easing) = 0;
+    /** @brief Installs this transition on a property target. */
+    virtual void add_target(const IProperty::Ptr& target) = 0;
+    /** @brief Removes this transition from a property target. */
+    virtual void remove_target(const IProperty::Ptr& target) = 0;
+    /** @brief Detaches the transition from all properties. */
+    virtual void uninstall() = 0;
 };
 
 } // namespace velk

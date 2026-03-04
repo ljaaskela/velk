@@ -223,7 +223,7 @@ protected:
 
 TEST_F(AnimatorTest, TweenAndTick)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     EXPECT_EQ(1u, animator_->active_count());
     EXPECT_TRUE(h.is_playing());
     EXPECT_FALSE(h.is_finished());
@@ -240,7 +240,7 @@ TEST_F(AnimatorTest, TweenAndTick)
 
 TEST_F(AnimatorTest, FinishedAnimationStaysInAnimator)
 {
-    tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     EXPECT_EQ(1u, animator_->count());
     EXPECT_EQ(1u, animator_->active_count());
 
@@ -252,7 +252,7 @@ TEST_F(AnimatorTest, FinishedAnimationStaysInAnimator)
 TEST_F(AnimatorTest, TweenTo)
 {
     prop_.set_value(50.f);
-    auto h = tween_to(*animator_, prop_, 100.f, sec(1.f));
+    auto h = create_tween_to(*animator_, prop_, 100.f, sec(1.f));
 
     animator_->tick(dt(1.f));
     flush();
@@ -262,7 +262,7 @@ TEST_F(AnimatorTest, TweenTo)
 
 TEST_F(AnimatorTest, TweenWithEasing)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f), easing::in_quad);
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f), easing::in_quad);
 
     animator_->tick(dt(0.5f));
     flush();
@@ -271,8 +271,8 @@ TEST_F(AnimatorTest, TweenWithEasing)
 
 TEST_F(AnimatorTest, CancelAll)
 {
-    tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
-    tween(*animator_, prop_, 0.f, 200.f, sec(2.f));
+    create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    create_tween(*animator_, prop_, 0.f, 200.f, sec(2.f));
     EXPECT_EQ(2u, animator_->count());
 
     animator_->cancel_all();
@@ -282,7 +282,7 @@ TEST_F(AnimatorTest, CancelAll)
 
 TEST_F(AnimatorTest, StopResetsToIdle)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     animator_->tick(dt(0.5f));
     flush();
 
@@ -297,7 +297,7 @@ TEST_F(AnimatorTest, StopResetsToIdle)
 
 TEST_F(AnimatorTest, FinishJumpsToEnd)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     animator_->tick(dt(0.25f));
     flush();
 
@@ -310,7 +310,7 @@ TEST_F(AnimatorTest, FinishJumpsToEnd)
 
 TEST_F(AnimatorTest, RemoveAnimation)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     EXPECT_EQ(1u, animator_->count());
 
     animator_->remove(h.get_animation_interface());
@@ -321,8 +321,8 @@ TEST_F(AnimatorTest, MultipleAnimations)
 {
     auto prop2 = create_property<float>(0.f);
 
-    tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
-    tween(*animator_, prop2, 0.f, 50.f, sec(0.5f));
+    create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    create_tween(*animator_, prop2, 0.f, 50.f, sec(0.5f));
     EXPECT_EQ(2u, animator_->active_count());
 
     animator_->tick(dt(0.5f));
@@ -345,7 +345,7 @@ TEST_F(AnimatorTest, MultipleAnimations)
 
 TEST_F(AnimatorTest, PauseAndResume)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     animator_->tick(dt(0.25f));
     flush();
     EXPECT_NEAR(25.f, prop_.get_value(), 0.1f);
@@ -368,7 +368,7 @@ TEST_F(AnimatorTest, PauseAndResume)
 
 TEST_F(AnimatorTest, Restart)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     animator_->tick(dt(1.f));
     flush();
     EXPECT_TRUE(h.is_finished());
@@ -385,7 +385,7 @@ TEST_F(AnimatorTest, Restart)
 
 TEST_F(AnimatorTest, SeekWhilePaused)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     h.pause();
 
     h.seek(0.5f);
@@ -396,7 +396,7 @@ TEST_F(AnimatorTest, SeekWhilePaused)
 
 TEST_F(AnimatorTest, SeekWhileIdle)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     h.stop();
 
     h.seek(0.5f);
@@ -406,7 +406,7 @@ TEST_F(AnimatorTest, SeekWhileIdle)
 
 TEST_F(AnimatorTest, ProgressProperty)
 {
-    auto h = tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
+    auto h = create_tween(*animator_, prop_, 0.f, 100.f, sec(1.f));
     EXPECT_FLOAT_EQ(0.f, h.get_progress());
 
     animator_->tick(dt(0.5f));
@@ -443,7 +443,7 @@ TEST_F(TrackTest, WalksKeyframes)
         {sec(1.f), 100.f, easing::linear},
         {sec(2.f), 50.f, easing::linear},
     };
-    auto h = track(*animator_, prop_, kfs);
+    auto h = create_track(*animator_, prop_, kfs);
 
     flush();
     EXPECT_FLOAT_EQ(0.f, prop_.get_value());
@@ -468,12 +468,12 @@ TEST_F(TrackTest, WalksKeyframes)
 
 TEST_F(TrackTest, PerSegmentEasing)
 {
-    auto h = track(*animator_,
-                   prop_,
-                   vector<Keyframe<float>>{
-                       {sec(0.f), 0.f},
-                       {sec(1.f), 100.f, easing::in_quad},
-                   });
+    auto h = create_track(*animator_,
+                          prop_,
+                          vector<Keyframe<float>>{
+                              {sec(0.f), 0.f},
+                              {sec(1.f), 100.f, easing::in_quad},
+                          });
 
     animator_->tick(dt(0.5f));
     flush();
@@ -482,12 +482,12 @@ TEST_F(TrackTest, PerSegmentEasing)
 
 TEST_F(TrackTest, FinishesAtLastKeyframe)
 {
-    auto h = track(*animator_,
-                   prop_,
-                   vector<Keyframe<float>>{
-                       {sec(0.f), 0.f},
-                       {sec(1.f), 100.f},
-                   });
+    auto h = create_track(*animator_,
+                          prop_,
+                          vector<Keyframe<float>>{
+                              {sec(0.f), 0.f},
+                              {sec(1.f), 100.f},
+                          });
 
     animator_->tick(dt(5.f));
     flush();
@@ -497,11 +497,11 @@ TEST_F(TrackTest, FinishesAtLastKeyframe)
 
 TEST_F(TrackTest, SingleKeyframeFinishesImmediately)
 {
-    auto h = track(*animator_,
-                   prop_,
-                   vector<Keyframe<float>>{
-                       {sec(0.f), 42.f},
-                   });
+    auto h = create_track(*animator_,
+                          prop_,
+                          vector<Keyframe<float>>{
+                              {sec(0.f), 42.f},
+                          });
 
     animator_->tick(dt(0.1f));
     flush();
@@ -537,7 +537,7 @@ TEST(DefaultAnimator, TicksViaUpdate)
     auto prop = create_property<float>(0.f);
     auto& da = default_animator();
 
-    tween(da, prop, 0.f, 100.f, sec(1.f));
+    create_tween(da, prop, 0.f, 100.f, sec(1.f));
 
     instance().update({1'000'000});
     instance().update({1'500'000});
@@ -574,7 +574,7 @@ protected:
 
 TEST_F(ImplicitAnimationTest, TransitionAnimatesOnSetValue)
 {
-    auto tr = transition(prop_, sec(1.f));
+    auto tr = create_transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Value should not jump immediately
@@ -593,7 +593,7 @@ TEST_F(ImplicitAnimationTest, TransitionAnimatesOnSetValue)
 
 TEST_F(ImplicitAnimationTest, RetargetMidAnimation)
 {
-    auto tr = transition(prop_, sec(1.f));
+    auto tr = create_transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Advance halfway
@@ -616,7 +616,7 @@ TEST_F(ImplicitAnimationTest, RetargetMidAnimation)
 
 TEST_F(ImplicitAnimationTest, RemoveTransitionRestoresImmediate)
 {
-    auto tr = transition(prop_, sec(1.f));
+    auto tr = create_transition(prop_, sec(1.f));
     prop_.set_value(50.f);
 
     // Value animating, not yet at 50
@@ -634,7 +634,7 @@ TEST_F(ImplicitAnimationTest, RemoveTransitionRestoresImmediate)
 
 TEST_F(ImplicitAnimationTest, OnChangedFiresDuringTick)
 {
-    auto tr = transition(prop_, sec(1.f));
+    auto tr = create_transition(prop_, sec(1.f));
 
     int changeCount = 0;
     Callback handler([&](FnArgs) -> ReturnValue {
@@ -657,7 +657,7 @@ TEST_F(ImplicitAnimationTest, OnChangedFiresDuringTick)
 
 TEST_F(ImplicitAnimationTest, EasingApplied)
 {
-    auto tr = transition(prop_, sec(1.f), easing::in_quad);
+    auto tr = create_transition(prop_, sec(1.f), easing::in_quad);
     prop_.set_value(100.f);
 
     advance(0.5f);
@@ -672,7 +672,7 @@ TEST_F(ImplicitAnimationTest, EasingApplied)
 
 TEST_F(ImplicitAnimationTest, DeferredWriteBypassesAnimation)
 {
-    auto tr = transition(prop_, sec(1.f));
+    auto tr = create_transition(prop_, sec(1.f));
     prop_.set_value(100.f);
 
     // Deferred write should bypass animation
@@ -697,7 +697,8 @@ TEST_F(AnimatorPluginTest, KeyframeArrayProperty)
     ASSERT_NE(nullptr, anim);
 
     auto prop = create_property<float>(0.f);
-    anim->set_target(prop.get_property_interface());
+    auto* pi = interface_cast<IPropertyInternal>(prop.get_property_interface().get());
+    pi->install_extension(interface_pointer_cast<IAnyExtension>(interface_pointer_cast<IAnimation>(obj)));
 
     Any<float> v0(0.f), v1(50.f), v2(100.f);
     KeyframeEntry kfs[] = {
@@ -738,6 +739,160 @@ TEST_F(AnimatorPluginTest, KeyframeArrayPropertyReadOnly)
     Any<KeyframeEntry> val(KeyframeEntry{});
     EXPECT_EQ(ap->push_back(val), ReturnValue::ReadOnly);
     EXPECT_EQ(ap->erase_at(0), ReturnValue::ReadOnly);
+}
+
+// ============================================================================
+// Multi-target transition tests
+// ============================================================================
+
+TEST_F(ImplicitAnimationTest, MultiTargetTransition)
+{
+    auto prop2 = create_property<float>(0.f);
+
+    // Create targetless transition, add two targets
+    auto tr = create_transition(sec(1.f));
+    tr.add_target(prop_);
+    tr.add_target(prop2);
+
+    // Set different values on each property
+    prop_.set_value(100.f);
+    prop2.set_value(200.f);
+
+    // Values should not jump immediately
+    EXPECT_NEAR(0.f, prop_.get_value(), 0.1f);
+    EXPECT_NEAR(0.f, prop2.get_value(), 0.1f);
+
+    // After half duration, both should be mid-transition
+    advance(0.5f);
+    EXPECT_NEAR(50.f, prop_.get_value(), 1.f);
+    EXPECT_NEAR(100.f, prop2.get_value(), 1.f);
+
+    // After full duration, both should reach their targets
+    advance(0.5f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+    EXPECT_NEAR(200.f, prop2.get_value(), 0.1f);
+
+    tr.remove();
+}
+
+TEST_F(ImplicitAnimationTest, MultiTargetTransitionRemoveOne)
+{
+    auto prop2 = create_property<float>(0.f);
+
+    auto tr = create_transition(sec(1.f));
+    tr.add_target(prop_);
+    tr.add_target(prop2);
+
+    // Remove prop_ from transition
+    tr.remove_target(prop_);
+
+    // prop_ should now be immediate
+    prop_.set_value(100.f);
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+
+    // prop2 should still animate
+    prop2.set_value(200.f);
+    EXPECT_NEAR(0.f, prop2.get_value(), 0.1f);
+
+    advance(1.f);
+    EXPECT_NEAR(200.f, prop2.get_value(), 0.1f);
+
+    tr.remove();
+}
+
+TEST_F(ImplicitAnimationTest, MultiTargetTransitionEasingPropagates)
+{
+    auto prop2 = create_property<float>(0.f);
+
+    auto tr = create_transition(sec(1.f), easing::in_quad);
+    tr.add_target(prop_);
+    tr.add_target(prop2);
+
+    prop_.set_value(100.f);
+    prop2.set_value(100.f);
+
+    advance(0.5f);
+    // in_quad at t=0.5 => 0.25, both should be ~25
+    EXPECT_NEAR(25.f, prop_.get_value(), 1.f);
+    EXPECT_NEAR(25.f, prop2.get_value(), 1.f);
+
+    advance(0.5f);
+    EXPECT_NEAR(100.f, prop_.get_value(), 0.1f);
+    EXPECT_NEAR(100.f, prop2.get_value(), 0.1f);
+
+    tr.remove();
+}
+
+// ============================================================================
+// Multi-target animation tests
+// ============================================================================
+
+TEST_F(AnimatorTest, MultiTargetTween)
+{
+    auto prop2 = create_property<float>(0.f);
+
+    // Create targetless tween, add two targets, play
+    auto h = create_tween(*animator_, 0.f, 100.f, sec(1.f));
+    EXPECT_TRUE(h.is_idle());
+
+    h.add_target(prop_);
+    h.add_target(prop2);
+    h.play();
+
+    EXPECT_TRUE(h.is_playing());
+
+    animator_->tick(dt(0.5f));
+    flush();
+    EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
+    EXPECT_NEAR(50.f, prop2.get_value(), 0.1f);
+
+    animator_->tick(dt(0.5f));
+    flush();
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+    EXPECT_FLOAT_EQ(100.f, prop2.get_value());
+    EXPECT_TRUE(h.is_finished());
+}
+
+TEST_F(AnimatorTest, TargetlessTweenThenAddTarget)
+{
+    auto h = create_tween(*animator_, 0.f, 100.f, sec(1.f));
+    EXPECT_TRUE(h.is_idle());
+
+    h.add_target(prop_);
+    h.play();
+
+    animator_->tick(dt(1.f));
+    flush();
+    EXPECT_FLOAT_EQ(100.f, prop_.get_value());
+    EXPECT_TRUE(h.is_finished());
+}
+
+TEST_F(AnimatorTest, RemoveTargetMidAnimation)
+{
+    auto prop2 = create_property<float>(0.f);
+
+    auto h = create_tween(*animator_, 0.f, 100.f, sec(1.f));
+    h.add_target(prop_);
+    h.add_target(prop2);
+    h.play();
+
+    animator_->tick(dt(0.5f));
+    flush();
+    EXPECT_NEAR(50.f, prop_.get_value(), 0.1f);
+    EXPECT_NEAR(50.f, prop2.get_value(), 0.1f);
+
+    // Remove prop_ mid-animation
+    h.remove_target(prop_);
+    float prop1_mid = prop_.get_value();
+
+    animator_->tick(dt(0.5f));
+    flush();
+
+    // prop_ should not have changed after removal
+    EXPECT_FLOAT_EQ(prop1_mid, prop_.get_value());
+    // prop2 should have finished
+    EXPECT_FLOAT_EQ(100.f, prop2.get_value());
+    EXPECT_TRUE(h.is_finished());
 }
 
 #endif // TEST_ANIMATOR_DLL_PATH

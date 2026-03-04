@@ -1,7 +1,5 @@
 #include "animator_plugin.h"
 
-#include "animated_any.h"
-
 #include <velk/ext/any.h>
 
 namespace velk {
@@ -14,10 +12,6 @@ ReturnValue AnimatorPlugin::initialize(IVelk& velk, PluginConfig& config)
         return rv;
     }
     rv = register_type<AnimatorImpl>(velk);
-    if (failed(rv)) {
-        return rv;
-    }
-    rv = register_type<AnimatedAny>(velk);
     if (failed(rv)) {
         return rv;
     }

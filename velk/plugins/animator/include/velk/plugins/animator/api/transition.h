@@ -47,8 +47,44 @@ public:
         }
     }
 
-    /** @brief Uninstalls and releases the transition. */
-    void remove() { *this = Transition{}; }
+    /** @brief Installs this transition on a property target. */
+    void add_target(const IProperty::Ptr& target)
+    {
+        if (auto* t = intf()) {
+            t->add_target(target);
+        }
+    }
+
+    /** @brief Installs this transition on a typed property target. */
+    template <class T>
+    void add_target(Property<T> target)
+    {
+        add_target(target.get_property_interface());
+    }
+
+    /** @brief Removes this transition from a property target. */
+    void remove_target(const IProperty::Ptr& target)
+    {
+        if (auto* t = intf()) {
+            t->remove_target(target);
+        }
+    }
+
+    /** @brief Removes this transition from a typed property target. */
+    template <class T>
+    void remove_target(Property<T> target)
+    {
+        remove_target(target.get_property_interface());
+    }
+
+    /** @brief Detaches from all properties and releases the handle. */
+    void remove()
+    {
+        if (auto* t = intf()) {
+            t->uninstall();
+        }
+        *this = Transition{};
+    }
 
     /** @brief Returns the underlying ITransition as a shared pointer. */
     ITransition::Ptr get_transition_interface() const { return as_ptr<ITransition>(); }

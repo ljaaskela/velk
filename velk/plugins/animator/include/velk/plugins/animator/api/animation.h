@@ -126,6 +126,36 @@ public:
         return a ? a->progress().get_value() : 0.f;
     }
 
+    /** @brief Installs this animation on a property target. */
+    void add_target(const IProperty::Ptr& target)
+    {
+        if (auto* a = intf()) {
+            a->add_target(target);
+        }
+    }
+
+    /** @brief Installs this animation on a typed property target. */
+    template <class T>
+    void add_target(Property<T> target)
+    {
+        add_target(target.get_property_interface());
+    }
+
+    /** @brief Removes this animation from a property target. */
+    void remove_target(const IProperty::Ptr& target)
+    {
+        if (auto* a = intf()) {
+            a->remove_target(target);
+        }
+    }
+
+    /** @brief Removes this animation from a typed property target. */
+    template <class T>
+    void remove_target(Property<T> target)
+    {
+        remove_target(target.get_property_interface());
+    }
+
     /** @brief Returns the underlying IAnimation as a shared pointer. */
     IAnimation::Ptr get_animation_interface() const { return as_ptr<IAnimation>(); }
 

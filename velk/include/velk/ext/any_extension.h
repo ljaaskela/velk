@@ -56,8 +56,8 @@ class AnyExtension
 {
 public: // IAnyExtension
     IAny::ConstPtr get_inner() const override { return inner_; }
-    IAny::Ptr take_inner() override { return std::move(inner_); }
-    void set_inner(IAny::Ptr inner) override { inner_ = std::move(inner); }
+    IAny::Ptr take_inner(IInterface&) override { return std::move(inner_); }
+    void set_inner(IAny::Ptr inner, const IInterface::WeakPtr&) override { inner_ = std::move(inner); }
 
 public: // IAny passthrough defaults
     array_view<Uid> get_compatible_types() const override

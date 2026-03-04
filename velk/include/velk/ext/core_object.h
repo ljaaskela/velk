@@ -32,7 +32,7 @@ IObject::Ptr make_object(uint32_t flags = ObjectFlags::None)
     auto* obj = new T;
     detail::BlockAccess::set_flags(*obj, flags);
     auto* block = detail::BlockAccess::get(*obj);
-    IObject::Ptr result(static_cast<IObject*>(obj), block, adopt_ref);
+    IObject::Ptr result(static_cast<IObject*>(static_cast<void*>(obj)), block, adopt_ref);
     if (block && !block->get_ptr()) {
         block->set_ptr(result.get());
     }
@@ -76,7 +76,7 @@ public:
             detail::dealloc_control_block(detail::BlockAccess::get(*obj));
             detail::BlockAccess::replace(*obj, block);
         }
-        return static_cast<IObject*>(obj);
+        return static_cast<IObject*>(static_cast<void*>(obj));
     }
     void destroy_in_place(void* location) const override
     {

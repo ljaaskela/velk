@@ -9,11 +9,13 @@ The animator plugin (`velk_animator`) provides property animation for Velk. It s
   - [Tweens](#tweens)
   - [Tween from current value](#tween-from-current-value)
   - [Multi-keyframe tracks](#multi-keyframe-tracks)
+  - [Multi-target animations](#multi-target-animations)
   - [Playback control](#playback-control)
   - [The animator](#the-animator)
   - [Default animator](#default-animator)
 - [Implicit animations (transitions)](#implicit-animations-transitions)
   - [Installing a transition](#installing-a-transition)
+  - [Multi-target transitions](#multi-target-transitions)
   - [Retargeting](#retargeting)
   - [Removing a transition](#removing-a-transition)
   - [Modifying a transition](#modifying-a-transition)
@@ -45,13 +47,13 @@ Explicit animations drive a property from one value to another over a specified 
 
 ### Tweens
 
-`tween()` creates a simple from-to animation on a property:
+`create_tween()` creates a simple from-to animation on a property:
 
 ```cpp
 auto widget = instance().create<IMyWidget>(MyWidget::class_id());
 
 // Animate width from 0 to 100 over 500ms
-auto anim = velk::tween(
+auto anim = velk::create_tween(
     velk::default_animator(),
     widget->width(),            // target property
     0.f,                        // from
@@ -65,11 +67,11 @@ The returned `Animation` handle holds a strong reference. The animation starts p
 
 ### Tween from current value
 
-`tween_to()` reads the property's current value as the start:
+`create_tween_to()` reads the property's current value as the start:
 
 ```cpp
 // Animate from whatever width is now, to 200
-auto anim = velk::tween_to(
+auto anim = velk::create_tween_to(
     velk::default_animator(),
     widget->width(),
     200.f,
@@ -79,7 +81,7 @@ auto anim = velk::tween_to(
 
 ### Multi-keyframe tracks
 
-`track()` creates an animation with multiple keyframes. Each keyframe specifies a time, value, and optional easing for the segment arriving at that keyframe:
+`create_track()` creates an animation with multiple keyframes. Each keyframe specifies a time, value, and optional easing for the segment arriving at that keyframe:
 
 ```cpp
 Keyframe<float> keyframes[] = {
@@ -88,7 +90,7 @@ Keyframe<float> keyframes[] = {
     { Duration{500},  50.f,  easing::out_cubic  },  // ease out to 50 at 500ms
 };
 
-auto anim = velk::track(
+auto anim = velk::create_track(
     velk::default_animator(),
     widget->width(),
     array_view<Keyframe<float>>{keyframes, 3}
@@ -96,6 +98,28 @@ auto anim = velk::track(
 ```
 
 The total duration is determined by the last keyframe's time. Each segment interpolates between adjacent keyframes using the destination keyframe's easing function.
+
+### Multi-target animations
+
+An animation can drive multiple properties with the same keyframes. Create a targetless animation and add targets before playing:
+
+```cpp
+auto anim = velk::create_tween(
+    velk::default_animator(),
+    0.f, 100.f,              // from, to (no target property)
+    Duration{500}
+);
+
+anim.add_target(widget->width());
+anim.add_target(widget->height());
+anim.play();
+```
+
+You can add and remove targets at any time, including mid-animation:
+
+```cpp
+anim.remove_target(widget->height());  // height stops updating
+```
 
 ### Playback control
 
@@ -176,7 +200,7 @@ The plugin provides a default animator that is ticked automatically during `inst
 IAnimator& animator = velk::default_animator();
 ```
 
-When you use `tween()`, `tween_to()`, or `track()` with `default_animator()`, animations advance automatically without any manual ticking. Just call `instance().update()` in your frame loop.
+When you use `create_tween()`, `create_tween_to()`, or `create_track()` with `default_animator()`, animations advance automatically without any manual ticking. Just call `instance().update()` in your frame loop.
 
 ## Implicit animations (transitions)
 
@@ -185,7 +209,7 @@ Transitions make a property animate automatically whenever its value changes. In
 ### Installing a transition
 
 ```cpp
-auto t = velk::transition(
+auto t = velk::create_transition(
     widget->width(),     // target property
     Duration{300},       // duration
     easing::out_quad     // easing (optional, default: linear)
@@ -195,9 +219,48 @@ auto t = velk::transition(
 widget->width().set_value(200.f);  // smoothly animates from current to 200
 ```
 
-The returned `Transition` handle is an RAII object. The transition stays active as long as the handle is alive. Dropping the handle uninstalls the transition and restores normal property behavior.
+The returned `Transition` handle holds a strong reference. The transition stays active as long as the handle is alive.
 
 Transitions are ticked automatically during `instance().update()`.
+
+You can also install a transition by calling `install_extension` directly on a property:
+
+```cpp
+auto obj = instance().create<IObject>(ClassId::Transition);
+auto tr = interface_pointer_cast<ITransition>(obj);
+tr->duration().set_value(Duration{300});
+
+auto* pi = interface_cast<IPropertyInternal>(widget->width().get_property_interface().get());
+pi->install_extension(interface_pointer_cast<IAnyExtension>(tr));
+```
+
+### Multi-target transitions
+
+A single transition can animate multiple properties with the same duration and easing. Create a targetless transition and add targets:
+
+```cpp
+auto t = velk::create_transition(
+    Duration{300},       // duration
+    easing::out_quad     // easing
+);
+
+t.add_target(widget->width());
+t.add_target(widget->height());
+t.add_target(widget->opacity());
+
+// Setting any of these properties now animates:
+widget->width().set_value(200.f);
+widget->height().set_value(100.f);
+widget->opacity().set_value(0.5f);
+```
+
+Each property animates independently (its own from/to/elapsed state) but shares the transition's duration and easing.
+
+You can remove individual targets:
+
+```cpp
+t.remove_target(widget->opacity());  // opacity now updates immediately
+```
 
 ### Retargeting
 
@@ -214,7 +277,7 @@ The retarget preserves continuity. The "from" value becomes whatever the display
 
 ### Removing a transition
 
-Either drop the handle or call `remove()`:
+Either call `remove()` or let the handle go out of scope:
 
 ```cpp
 t.remove();                        // explicit removal
@@ -222,6 +285,8 @@ t.remove();                        // explicit removal
 ```
 
 After removal, `set_value` takes effect immediately as normal.
+
+Note: `remove()` calls `uninstall()` to eagerly detach from properties. This is necessary because when a transition is installed on a property, the property holds a strong reference to the extension, which would otherwise keep the transition alive.
 
 ### Modifying a transition
 
@@ -232,10 +297,12 @@ t.set_duration(Duration{500});
 t.set_easing(easing::in_out_cubic);
 ```
 
+Changes apply to all targets. In-flight animations on any target will use the new duration and easing from their next tick.
+
 Query the current state:
 
 ```cpp
-t.is_animating();    // true while mid-animation
+t.is_animating();    // true if any target is mid-animation
 t.get_duration();    // current duration
 ```
 
@@ -308,7 +375,7 @@ instance().type_registry().register_interpolator(
     type_uid<Vec2>(), my_vec2_interpolator);
 ```
 
-The interpolator must be registered before the type is used with `tween()`, `track()`, or `transition()`. Transitions resolve the interpolator at install time from the property's type UID.
+The interpolator must be registered before the type is used with `create_tween()`, `create_track()`, or `create_transition()`. Transitions resolve the interpolator at install time from the property's type UID.
 
 ## How it works
 
@@ -326,7 +393,7 @@ flowchart LR
     end
 ```
 
-An `IAnimation` holds a list of `KeyframeEntry` values and a reference to the target property. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written to the property via `set_value_silent`, which uses `copy_from` to bypass `set_data` (so installed transitions are not triggered). The animation then queues a deferred `on_changed` notification so listeners see the update.
+An `IAnimation` holds a list of `KeyframeEntry` values and a list of target properties. Each tick, the animation computes the current segment, applies the segment's easing function to get a progress value, and calls the registered interpolator to produce the intermediate value. The result is written to all targets via `copy_from`, which bypasses `set_data` (so installed transitions are not triggered). The animation then queues a deferred `on_changed` notification so listeners see the update.
 
 The `IAnimator` manages a collection of `IAnimation` objects, ticking all playing animations each frame.
 
@@ -334,21 +401,29 @@ The `IAnimator` manages a collection of `IAnimation` objects, ticking all playin
 
 Transitions use the [IAnyExtension](../advanced.md#ianyextension-stacking-values-on-a-property) mechanism to intercept property value writes at the storage level.
 
+**Architecture:**
+
+A `TransitionImpl` manages one or more `TransitionProxy` objects. Each proxy is a lightweight `IAnyExtension` installed on a single property, containing a `TransitionDriver` that holds the per-property animation state (display, from, target, and result buffers, plus elapsed time).
+
+Both paths create proxies:
+- `create_transition(prop, ...)` installs the TransitionImpl as an extension, which internally creates a proxy
+- `create_transition(dur, ...)` + `add_target(prop)` creates a proxy directly on each target property
+
 **Installation:**
 
 ```mermaid
 flowchart LR
-    A["transition(prop, dur, ease)"] --> B[Create AnimatedAny]
+    A["create_transition(prop, dur, ease)"] --> B[Create TransitionImpl]
     B --> C["install_extension()"]
-    C --> D["Register with plugin"]
+    C --> D[TransitionImpl creates TransitionProxy]
+    D --> E["Register with plugin"]
 
     subgraph "Property value chain"
         direction LR
-        E[AnimatedAny] -->|inner_| F[AnyRef original]
+        F[TransitionImpl] -->|delegates to| G[TransitionProxy]
+        G -->|inner_| H[Original IAny]
     end
 ```
-
-When you call `transition(prop, ...)`, the plugin creates an `AnimatedAny` and installs it as an IAnyExtension on the property. The property's `data_` now points to `AnimatedAny`, which wraps the original `IAny` as its inner.
 
 **Write interception:**
 
@@ -356,39 +431,43 @@ When you call `transition(prop, ...)`, the plugin creates an `AnimatedAny` and i
 sequenceDiagram
     participant User
     participant Property
-    participant AnimatedAny
+    participant Proxy as TransitionProxy
+    participant Driver as TransitionDriver
     participant Inner as Original IAny
 
     User->>Property: set_value(200)
-    Property->>AnimatedAny: set_data(200)
-    Note over AnimatedAny: Snapshot display → from<br/>Store 200 → target<br/>Start animating
-    AnimatedAny-->>Property: NothingToDo
+    Property->>Proxy: set_data(200)
+    Proxy->>Driver: start(200)
+    Note over Driver: Snapshot display → from<br/>Store 200 → target<br/>Reset elapsed
+    Proxy-->>Property: NothingToDo
     Note over Property: Skips on_changed
 ```
 
-When user code calls `set_value`, the property calls `set_data` on the head of the chain. `AnimatedAny` intercepts this: it snapshots the current display value as "from", stores the new value as "target", and returns `NothingToDo` so the property skips its normal `on_changed` notification.
+When user code calls `set_value`, the property calls `set_data` on the proxy. The proxy delegates to its driver's `start()` method, which snapshots the current display value as "from", stores the new value as "target", resets elapsed time, and returns `NothingToDo` so the property skips its normal `on_changed` notification.
 
 **Tick loop:**
 
 ```mermaid
 sequenceDiagram
     participant Plugin as AnimatorPlugin
-    participant Transition as ITransition
-    participant AnimatedAny
+    participant Transition as TransitionImpl
+    participant Proxy as TransitionProxy
+    participant Driver as TransitionDriver
     participant Listeners as on_changed
 
     Plugin->>Transition: tick(dt)
-    Transition->>AnimatedAny: tick(dt)
-    Note over AnimatedAny: elapsed += dt<br/>t = elapsed / duration<br/>eased = easing(t)<br/>result = interpolate(from, target, eased)
-    AnimatedAny->>AnimatedAny: display = result
-    AnimatedAny->>AnimatedAny: inner = result
-    AnimatedAny->>Listeners: invoke on_changed
+    loop Each proxy
+        Transition->>Driver: tick(dt, duration, easing, interpolator)
+        Note over Driver: elapsed += dt<br/>t = elapsed / duration<br/>eased = easing(t)<br/>result = interpolate(from, target, eased)
+        Driver->>Driver: display = result, inner = result
+        Driver->>Listeners: invoke on_changed
+    end
 ```
 
-Each frame during `instance().update()`, the plugin ticks all registered transitions. The tick advances elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The interpolated result becomes both the display value and the inner value. The property's `on_changed` fires with the interpolated value.
+Each frame during `instance().update()`, the plugin ticks all registered transitions. The `TransitionImpl::tick` iterates its proxy children, passing its own duration and easing to each driver. Each driver advances its elapsed time, applies the easing function, and calls the interpolator to blend between "from" and "target". The interpolated result becomes both the display value and the inner value. The property's `on_changed` fires with the interpolated value.
 
 If `set_value` is called again while animating, the animation retargets: the current display becomes the new "from" and the incoming value becomes the new "target", with elapsed reset to zero.
 
-**Removal:** When the transition handle is dropped, the destructor calls `remove_extension()` which unlinks `AnimatedAny` from the property's value chain, restoring normal write behavior.
+**Removal:** When `uninstall()` is called (via `Transition::remove()` or the destructor), all proxies are removed from their properties via `remove_extension()`, restoring normal write behavior. For directly installed transitions, the TransitionImpl itself is also removed from the property chain.
 
 This design means transitions are transparent to the rest of the system. Code that reads or observes the property sees smoothly interpolated values without any changes to how it interacts with properties.

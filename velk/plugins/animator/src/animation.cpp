@@ -25,11 +25,6 @@ void AnimationImpl::set_keyframes(array_view<KeyframeEntry> keyframes)
     sorted_ = false;
 }
 
-void AnimationImpl::set_target(const IProperty::Ptr& target)
-{
-    target_ = target;
-}
-
 void AnimationImpl::play()
 {
     auto* s = state();
@@ -73,8 +68,8 @@ void AnimationImpl::finish()
         return;
     }
     ensure_init(*s);
-    if (!s->keyframes.empty() && target_) {
-        write_to_target(*s->keyframes.back().value);
+    if (!s->keyframes.empty() && has_targets()) {
+        write_value(*s->keyframes.back().value);
     }
     s->elapsed = s->duration;
     s->progress = 1.f;
@@ -125,39 +120,37 @@ void AnimationImpl::ensure_init(IAnimation::State& s)
         s.duration = s.keyframes.back().time;
     }
 
-    // Resolve type info and interpolator from target property
-    if (target_) {
-        auto val = target_->get_value();
-        if (val) {
-            auto types = val->get_compatible_types();
-            if (!types.empty()) {
-                typeUid_ = types[0];
-                interpolator_ = instance().type_registry().find_interpolator(typeUid_);
-            }
-            result_ = val->clone();
+    // Resolve type info and interpolator from first target's inner
+    if (!targets_.empty() && targets_[0].inner) {
+        auto& inner = targets_[0].inner;
+        auto types = inner->get_compatible_types();
+        if (!types.empty()) {
+            typeUid_ = types[0];
+            interpolator_ = instance().type_registry().find_interpolator(typeUid_);
         }
+        result_ = inner->clone();
     }
     sorted_ = true;
 }
 
 void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
 {
-    if (s.keyframes.size() < 2 || !target_) {
-        if (!s.keyframes.empty() && target_) {
-            write_to_target(*s.keyframes.front().value);
+    if (s.keyframes.size() < 2 || !has_targets()) {
+        if (!s.keyframes.empty() && has_targets()) {
+            write_value(*s.keyframes.front().value);
         }
         return;
     }
 
     if (global_t >= 1.f) {
         if (s.keyframes.back().value) {
-            write_to_target(*s.keyframes.back().value);
+            write_value(*s.keyframes.back().value);
         }
         return;
     }
     if (global_t <= 0.f) {
         if (s.keyframes.front().value) {
-            write_to_target(*s.keyframes.front().value);
+            write_value(*s.keyframes.front().value);
         }
         return;
     }
@@ -169,7 +162,7 @@ void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
     }
     if (i >= s.keyframes.size()) {
         if (s.keyframes.back().value) {
-            write_to_target(*s.keyframes.back().value);
+            write_value(*s.keyframes.back().value);
         }
         return;
     }
@@ -183,23 +176,26 @@ void AnimationImpl::apply_at(IAnimation::State& s, float global_t)
                           : 1.f;
         float eased_t = kf1.easing(seg_t);
         interpolator_(*kf0.value, *kf1.value, eased_t, *result_);
-        write_to_target(*result_);
+        write_value(*result_);
     }
 }
 
-void AnimationImpl::write_to_target(const IAny& value)
+void AnimationImpl::write_value(const IAny& value)
 {
-    auto pi = interface_pointer_cast<IPropertyInternal>(target_);
-    // This is essentially the same as calling target_->set_value(value, Deferred);
-    // - But this way we we avoid cloning the value into the deferred task queue.
-    // - Animations are usually ticked in instance().update()
-    // - We're already anyway just about to set the value
-    // - Instead of queuing the set_value, we set the value immediately but queue the property on_changed()
-    //   invocation.
-    if (pi && pi->set_value_silent(value) == ReturnValue::Success) {
-        // Queue notification-only (null value) so on_changed fires during flush
-        // alongside other deferred property notifications.
-        instance().queue_deferred_property({pi, nullptr});
+    if (display_) {
+        display_->copy_from(value);
+    }
+    for (auto& entry : targets_) {
+        if (entry.inner) {
+            entry.inner->copy_from(value);
+        }
+        auto prop = entry.owner.lock();
+        if (prop) {
+            auto pi = interface_pointer_cast<IPropertyInternal>(prop);
+            if (pi) {
+                instance().queue_deferred_property({pi, nullptr});
+            }
+        }
     }
 }
 
@@ -219,8 +215,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     auto& s = *st;
 
     if (s.keyframes.size() < 2) {
-        if (!s.keyframes.empty() && target_) {
-            write_to_target(*s.keyframes.front().value);
+        if (!s.keyframes.empty() && has_targets()) {
+            write_value(*s.keyframes.front().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -231,8 +227,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     ensure_init(s);
 
     // Set initial value on first tick
-    if (s.elapsed.us == 0 && target_ && s.keyframes.front().value) {
-        write_to_target(*s.keyframes.front().value);
+    if (s.elapsed.us == 0 && has_targets() && s.keyframes.front().value) {
+        write_value(*s.keyframes.front().value);
     }
 
     if (dt.us) {
@@ -242,8 +238,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     if (s.elapsed.us >= s.duration.us) {
         s.elapsed = s.duration;
         s.progress = 1.f;
-        if (target_ && s.keyframes.back().value) {
-            write_to_target(*s.keyframes.back().value);
+        if (has_targets() && s.keyframes.back().value) {
+            write_value(*s.keyframes.back().value);
         }
         s.state = PlayState::Finished;
         notify_state(s);
@@ -260,8 +256,8 @@ bool AnimationImpl::tick(const UpdateInfo& info)
     }
 
     if (i >= s.keyframes.size()) {
-        if (target_ && s.keyframes.back().value) {
-            write_to_target(*s.keyframes.back().value);
+        if (has_targets() && s.keyframes.back().value) {
+            write_value(*s.keyframes.back().value);
         }
         s.state = PlayState::Finished;
         s.progress = 1.f;
@@ -269,7 +265,7 @@ bool AnimationImpl::tick(const UpdateInfo& info)
         return false;
     }
 
-    if (target_ && interpolator_ && result_ && s.keyframes[i - 1].value && s.keyframes[i].value) {
+    if (has_targets() && interpolator_ && result_ && s.keyframes[i - 1].value && s.keyframes[i].value) {
         auto& kf0 = s.keyframes[i - 1];
         auto& kf1 = s.keyframes[i];
         int64_t seg_duration = kf1.time.us - kf0.time.us;
@@ -278,11 +274,132 @@ bool AnimationImpl::tick(const UpdateInfo& info)
                           : 1.f;
         float eased_t = kf1.easing(seg_t);
         interpolator_(*kf0.value, *kf1.value, eased_t, *result_);
-        write_to_target(*result_);
+        write_value(*result_);
     }
 
     notify_state(s);
     return false;
+}
+
+// IAnyExtension
+
+IAny::ConstPtr AnimationImpl::get_inner() const
+{
+    return targets_.empty() ? nullptr : targets_[0].inner;
+}
+
+void AnimationImpl::set_inner(IAny::Ptr inner, const IInterface::WeakPtr& owner)
+{
+    // First target entry: initialize display/result/interpolator
+    if (targets_.empty() && inner) {
+        display_ = inner->clone();
+        result_ = inner->clone();
+
+        auto types = inner->get_compatible_types();
+        if (!types.empty()) {
+            typeUid_ = types[0];
+            interpolator_ = instance().type_registry().find_interpolator(typeUid_);
+        }
+    }
+    targets_.push_back({owner, std::move(inner)});
+}
+
+IAny::Ptr AnimationImpl::take_inner(IInterface& owner)
+{
+    for (auto it = targets_.begin(); it != targets_.end(); ++it) {
+        auto locked = it->owner.lock();
+        if (locked && locked.get() == &owner) {
+            auto inner = std::move(it->inner);
+            targets_.erase(it);
+            if (targets_.empty()) {
+                display_ = nullptr;
+                result_ = nullptr;
+                interpolator_ = nullptr;
+            }
+            return inner;
+        }
+    }
+    return nullptr;
+}
+
+// IAnimation: add_target / remove_target
+
+void AnimationImpl::add_target(const IProperty::Ptr& target)
+{
+    auto* pi = interface_cast<IPropertyInternal>(target.get());
+    if (pi) {
+        pi->install_extension(get_self<IAnyExtension>());
+    }
+}
+
+void AnimationImpl::remove_target(const IProperty::Ptr& target)
+{
+    auto* pi = interface_cast<IPropertyInternal>(target.get());
+    if (pi) {
+        pi->remove_extension(get_self<IAnyExtension>());
+    }
+}
+
+// IAny overrides
+
+array_view<Uid> AnimationImpl::get_compatible_types() const
+{
+    return display_ ? display_->get_compatible_types() : array_view<Uid>{};
+}
+
+size_t AnimationImpl::get_data_size(Uid type) const
+{
+    return display_ ? display_->get_data_size(type) : 0;
+}
+
+ReturnValue AnimationImpl::get_data(void* to, size_t toSize, Uid type) const
+{
+    auto* s = const_cast<AnimationImpl*>(this)->state();
+    if (s && (s->state == PlayState::Playing || s->state == PlayState::Paused)) {
+        return display_ ? display_->get_data(to, toSize, type) : ReturnValue::Fail;
+    }
+    return (!targets_.empty() && targets_[0].inner) ? targets_[0].inner->get_data(to, toSize, type)
+                                                    : ReturnValue::Fail;
+}
+
+ReturnValue AnimationImpl::set_data(void const* from, size_t fromSize, Uid type)
+{
+    ReturnValue ret = ReturnValue::Fail;
+    for (auto& entry : targets_) {
+        if (entry.inner) {
+            auto r = entry.inner->set_data(from, fromSize, type);
+            if (succeeded(r)) {
+                ret = r;
+            }
+        }
+    }
+    if (display_ && succeeded(ret)) {
+        display_->set_data(from, fromSize, type);
+    }
+    return ret;
+}
+
+ReturnValue AnimationImpl::copy_from(const IAny& other)
+{
+    ReturnValue ret = ReturnValue::Fail;
+    for (auto& entry : targets_) {
+        if (entry.inner) {
+            auto r = entry.inner->copy_from(other);
+            if (succeeded(r)) {
+                ret = r;
+            }
+        }
+    }
+    if (display_ && succeeded(ret)) {
+        display_->copy_from(other);
+    }
+    return ret;
+}
+
+IAny::Ptr AnimationImpl::clone() const
+{
+    return display_ ? display_->clone()
+                    : ((!targets_.empty() && targets_[0].inner) ? targets_[0].inner->clone() : nullptr);
 }
 
 } // namespace velk
