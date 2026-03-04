@@ -36,7 +36,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
   - [Adding and removing](#adding-and-removing)
   - [Finding attachments](#finding-attachments)
   - [Find or create](#find-or-create)
-  - [Container: adding hierarchy](#container-adding-hierarchy)
+  - [Hierarchy](#hierarchy)
 
 ## Declaring interfaces
 
@@ -801,7 +801,7 @@ If the object is destroyed before `update()`, the queued callback is silently sk
 
 Attachments are `IInterface::Ptr` instances stored alongside metadata in `IObjectStorage`. They let you inject capabilities into objects at runtime without modifying the class definition. Every `ext::Object` supports them out of the box.
 
-Use cases include adding hierarchy (via `IContainer`), decorating objects with extra interfaces, and associating arbitrary data with an object.
+Use cases include decorating objects with extra interfaces and associating arbitrary data with an object.
 
 ### Adding and removing
 
@@ -849,9 +849,9 @@ Under the hood this calls the virtual `find_attachment(AttachmentQuery)` with `R
 
 ```cpp
 // First call creates and attaches, second call returns the existing one
-auto container = storage->find_attachment<IContainer>(ClassId::Container);
-auto same      = storage->find_attachment<IContainer>(ClassId::Container);
-// container == same
+auto h = storage->find_attachment<IHierarchy>(ClassId::Hierarchy);
+auto same = storage->find_attachment<IHierarchy>(ClassId::Hierarchy);
+// h == same
 ```
 
 Free functions in `api/attachment.h` provide the same behavior without needing to cast to `IObjectStorage` yourself:
@@ -860,44 +860,82 @@ Free functions in `api/attachment.h` provide the same behavior without needing t
 #include <velk/api/attachment.h>
 
 // From an IObjectStorage*
-auto c1 = find_or_create_attachment<IContainer>(storage, ClassId::Container);
+auto h1 = find_or_create_attachment<IHierarchy>(storage, ClassId::Hierarchy);
 
 // From any IInterface* (casts to IObjectStorage internally)
-auto c2 = find_or_create_attachment<IContainer>(obj.get(), ClassId::Container);
+auto h2 = find_or_create_attachment<IHierarchy>(obj.get(), ClassId::Hierarchy);
 ```
 
 ### Hierarchy
 
-Velk objects are flat by default: an `IObject` has metadata and attachments, but no notion of parent/child relationships. Hierarchy support is injected through the attachment system using two building blocks.
+Velk objects are flat by default: an `IObject` has metadata and attachments, but no notion of parent/child relationships. Hierarchy is **external**: a standalone `Hierarchy` object (`ClassId::Hierarchy`) manages a single-root tree of `IObject` references. Objects don't know about hierarchy; hierarchy knows about objects.
 
-**`IContainer`** (`ClassId::Container`) is a pure data layer: an ordered list of child `IObject` pointers with a vector-like API (`add`, `remove`, `insert`, `replace`, `get_at`, `get_all`, `size`, `clear`). It can be attached to any object that has `IObjectStorage`, but on its own it is just storage with no extra behavior.
+Why external rather than baked into objects?
 
-**`Node`** (`ClassId::Node`) also implements `IContainer`, but instead of storing children directly it lazy-creates a `ClassId::Container` attachment on itself when the first child is added. This means read operations on a fresh node are free (no allocation), and the actual storage is only created on demand. Node is the recommended entry point for hierarchy.
+- **Separation of concerns.** An object represents data and behavior. How objects relate to each other is a separate concern that belongs to the structure holding them. This keeps `IObject` small and focused.
+- **Multiple hierarchies.** The same object can participate in several hierarchies simultaneously (e.g. a visual tree and a logical tree) without conflicting parent pointers or duplicated state.
+- **No per-object overhead.** Objects that never appear in a hierarchy pay nothing: no vtable entries, no parent/child storage, no extra allocations. The cost exists only where it is used.
+- **Cache-friendly storage.** All parent/child relationships live in a single flat map owned by the `Hierarchy`, rather than scattered across individual objects on the heap. Traversal touches fewer cache lines.
+- **Simpler lifetime model.** The hierarchy holds shared pointers to its members. Removing an object from the hierarchy releases the hierarchy's reference. There are no weak back-pointers from children to parents that could dangle.
 
 ```cpp
-#include <velk/api/node.h>
+#include <velk/api/hierarchy.h>
 
-// Create a standalone node
-auto node = create_node();
-node.add(instance().create<IObject>(MyWidget::class_id()));
-node.add(instance().create<IObject>(MyWidget::class_id()));
-node.size();    // 2
+auto h = create_hierarchy();
 
-// Attach a node to an existing object
-auto parent = instance().create<IObject>(MyWidget::class_id());
-auto container = find_or_create_attachment<IContainer>(parent.get(), ClassId::Node);
-container->add(child);
+auto root = instance().create<IObject>(MyWidget::class_id());
+auto child1 = instance().create<IObject>(MyWidget::class_id());
+auto child2 = instance().create<IObject>(MyWidget::class_id());
+
+h.set_root(root);
+h.add(root, child1);
+h.add(root, child2);
+h.size();                    // 3
+h.child_count(root);         // 2
+h.parent_of(child1);         // root
 ```
 
-`Node` inherits `Container` (in `api/container.h`), which wraps `IContainer` with null-safe access and templated methods for typed retrieval:
+The `Hierarchy` wrapper (in `api/hierarchy.h`) provides null-safe access and convenience methods. All query methods that return objects return `Node` wrappers:
 
 ```cpp
-Node node(create_node());
-node.get_at<IMyWidget>(0);               // returns IMyWidget::Ptr
-node.get_all<IMyWidget>();               // returns vector<IMyWidget::Ptr>
-node.for_each<IMyWidget>([](IMyWidget& w) {
+h.parent_of(child1);                        // Node (empty for root)
+h.children_of(root);                        // vector<Node>
+h.child_at(root, 0);                        // Node
+
+// Typed iteration with early stop
+h.for_each_child<IMyWidget>(root, [](IMyWidget& w) -> bool {
     w.width().set_value(100.f);
+    return true;    // continue
 });
+
+// Positional operations
+h.insert(root, 0, new_child);               // insert at index
+h.replace(old_child, new_child);            // swap in-place, preserves children
+h.remove(subtree_root);                     // removes object and all descendants
 ```
 
-`for_each` accepts `void(T&)` or `bool(T&)` callables. Returning `false` from a `bool` visitor stops iteration early. Children that do not implement `T` are skipped.
+`node_of()` and `root()` return a `Node` wrapper that extends `Object`, so all IObject accessors work directly on it. `Node` also provides hierarchy-aware navigation and implicitly converts to `IObject::Ptr`, so it can be passed directly to `Hierarchy` methods:
+
+```cpp
+auto node = h.root();
+node.object();                   // IObject::Ptr
+node.get_parent();               // Node (empty for root)
+node.has_parent();               // false for root
+node.get_children();             // vector<Node>
+node.child_at(0);                // Node
+node.child_at<IMyWidget>(0);     // IMyWidget::Ptr
+node.child_count();              // size_t
+node.hierarchy();                // IHierarchy::Ptr (null if expired)
+
+// Inherited from Object:
+node.get_property("width");      // works on the node's object
+node.as<IMyWidget>();            // interface cast
+
+// Implicit conversion to IObject::Ptr:
+h.add(node, new_child);         // no need for node.object()
+h.child_count(node);            // works directly
+```
+
+`Node` queries the hierarchy on demand, so it always reflects the current state of the tree. Adding or removing children after obtaining a `Node` is immediately visible through that node.
+
+`for_each_child` (on both `Node` and `Hierarchy`) accepts `void(T&)` or `bool(T&)` callables. Returning `false` from a `bool` visitor stops iteration early. Children that do not implement `T` are skipped.

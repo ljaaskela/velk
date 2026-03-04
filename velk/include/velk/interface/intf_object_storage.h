@@ -17,7 +17,7 @@ struct AttachmentQuery
  *
  * IObjectStorage adds an attachment mechanism to the standard metadata container. Attachments
  * are IInterface::Ptr instances that can be added/removed/queried by index or by interface type.
- * This enables object hierarchies (via IContainer attachment), decorators, and other extension
+ * This enables decorators, and other extension
  * patterns without modifying the core object system.
  *
  * Chain: IInterface -> IObject -> IPropertyState -> IMetadata -> IObjectStorage

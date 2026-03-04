@@ -100,8 +100,7 @@ User-facing typed wrappers.
 | `event.h` | `Event` wrapper around existing IEvent |
 | `function_context.h` | `FunctionContext` view for multi-arg access with count validation |
 | `object.h` | `Object` convenience wrapper with null-safe metadata, state, and attachment access |
-| `container.h` | `Container` wrapper inheriting `Object` for `IContainer` operations |
-| `node.h` | `Node` wrapper inheriting `Container`, validates `ClassId::Node` |
+| `hierarchy.h` | `Hierarchy` wrapper inheriting `Object` for `IHierarchy` operations; `Node` wrapper for `HierarchyNode` snapshots |
 | `attachment.h` | `find_or_create_attachment<T>()` free function helpers |
 
 ## src/
@@ -272,7 +271,7 @@ Each concept in Velk has types at up to three layers. The naming follows a consi
 | | | `ext::AnyMulti<Types...>` | |
 | | | `ext::AnyCore<Final, T>` | |
 | | | `ext::AnyValue<T>` | |
-| **Object** | `IObject`, `IObjectStorage` | `ext::ObjectCore<Final, Intf...>` | `Object`, `Container`, `Node` |
+| **Object** | `IObject`, `IObjectStorage` | `ext::ObjectCore<Final, Intf...>` | `Object`, `Hierarchy`, `Node` |
 | | | `ext::Object<Final, Intf...>` | |
 | **Property** | `IProperty` | — | `ConstProperty<T>`, `Property<T>` |
 | **Function** | `IFunction` | — | `Function` (wrapper), `Callback` (creator) |

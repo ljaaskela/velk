@@ -6,7 +6,7 @@
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
 #include <velk/ext/object.h>
-#include <velk/interface/intf_container.h>
+#include <velk/interface/intf_hierarchy.h>
 #include <velk/interface/intf_event.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/intf_object_storage.h>
@@ -1119,32 +1119,32 @@ TEST_F(ObjectWrapperTest, AddAndFindAttachment)
     // Initially no attachments
     EXPECT_EQ(obj.attachment_count(), 0u);
 
-    // Create a container and attach it
-    auto container = instance().create<IInterface>(ClassId::Container);
-    ASSERT_TRUE(container);
+    // Create a hierarchy and attach it
+    auto hierarchy = instance().create<IInterface>(ClassId::Hierarchy);
+    ASSERT_TRUE(hierarchy);
 
-    EXPECT_TRUE(succeeded(obj.add_attachment(container)));
+    EXPECT_TRUE(succeeded(obj.add_attachment(hierarchy)));
     EXPECT_EQ(obj.attachment_count(), 1u);
 
     // Find it
-    auto found = obj.find_attachment<IContainer>();
+    auto found = obj.find_attachment<IHierarchy>();
     EXPECT_TRUE(found);
 
     // Remove it
-    EXPECT_TRUE(succeeded(obj.remove_attachment(container)));
+    EXPECT_TRUE(succeeded(obj.remove_attachment(hierarchy)));
     EXPECT_EQ(obj.attachment_count(), 0u);
 }
 
 TEST_F(ObjectWrapperTest, FindOrCreateAttachment)
 {
     auto obj = make();
-    auto c = obj.find_or_create_attachment<IContainer>(ClassId::Container);
-    EXPECT_TRUE(c);
+    auto h = obj.find_or_create_attachment<IHierarchy>(ClassId::Hierarchy);
+    EXPECT_TRUE(h);
     EXPECT_EQ(obj.attachment_count(), 1u);
 
     // Second call returns the same one
-    auto c2 = obj.find_or_create_attachment<IContainer>(ClassId::Container);
-    EXPECT_EQ(c.get(), c2.get());
+    auto h2 = obj.find_or_create_attachment<IHierarchy>(ClassId::Hierarchy);
+    EXPECT_EQ(h.get(), h2.get());
     EXPECT_EQ(obj.attachment_count(), 1u);
 }
 
@@ -1185,7 +1185,7 @@ TEST_F(ObjectWrapperTest, NullObjectSafe)
     EXPECT_EQ(obj.add_attachment(IInterface::Ptr{}), ReturnValue::InvalidArgument);
     EXPECT_EQ(obj.remove_attachment(IInterface::Ptr{}), ReturnValue::InvalidArgument);
     EXPECT_EQ(obj.attachment_count(), 0u);
-    EXPECT_FALSE(obj.find_attachment<IContainer>());
-    EXPECT_FALSE(obj.find_or_create_attachment<IContainer>(ClassId::Container));
+    EXPECT_FALSE(obj.find_attachment<IHierarchy>());
+    EXPECT_FALSE(obj.find_or_create_attachment<IHierarchy>(ClassId::Hierarchy));
     EXPECT_FALSE(obj.get());
 }

@@ -17,10 +17,8 @@ add_library(velk SHARED
     include/velk/uid.h
     src/object_storage.cpp
     src/object_storage.h
-    src/container.cpp
-    src/container.h
-    src/node.cpp
-    src/node.h
+    src/hierarchy.cpp
+    src/hierarchy.h
     src/future.cpp
     src/future.h
     src/type_registry.cpp
@@ -52,8 +50,7 @@ add_library(velk SHARED
     include/velk/interface/intf_velk.h
     include/velk/interface/intf_metadata.h
     include/velk/interface/intf_object_storage.h
-    include/velk/interface/intf_container.h
-    include/velk/interface/intf_node.h
+    include/velk/interface/intf_hierarchy.h
     include/velk/interface/member_desc.h
     include/velk/interface/types.h
     include/velk/api/any.h
@@ -67,8 +64,7 @@ add_library(velk SHARED
     include/velk/api/traits.h
     include/velk/api/velk.h
     include/velk/api/attachment.h
-    include/velk/api/container.h
-    include/velk/api/node.h
+    include/velk/api/hierarchy.h
     include/velk/api/object.h
     include/velk/ext/any.h
     include/velk/ext/any_extension.h
@@ -77,7 +73,6 @@ add_library(velk SHARED
     include/velk/ext/metadata.h
     include/velk/ext/object.h
     include/velk/ext/event.h
-    include/velk/ext/node.h
     include/velk/ext/plugin.h
     include/velk/api/hive/hive.h
     include/velk/api/hive/object_hive.h
