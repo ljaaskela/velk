@@ -36,9 +36,10 @@ add_executable(tests
     test_string_view.cpp
     test_shared_ptr.cpp
     test_vector.cpp
+    test_c_api.cpp
 )
 
-target_link_libraries(tests PRIVATE velk GTest::gtest_main)
+target_link_libraries(tests PRIVATE velk velk_c GTest::gtest_main)
 target_include_directories(tests PRIVATE $<TARGET_PROPERTY:velk_animator,INTERFACE_INCLUDE_DIRECTORIES>)
 
 # Pass the test plugin DLL path as a compile definition so tests can find it.

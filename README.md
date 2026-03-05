@@ -71,6 +71,7 @@ velk::invoke_function(w->reset());
 | **Extensible** | <p>[Plugin registry](docs/plugins.md) for inline or DLL-based plugins with declarative dependencies and multi-plugin bundles<p>[Type registry](#query-metadata-without-instance) for UID-based creation and runtime introspection<p>[Attachments](docs/guide.md#attachments) for injecting capabilities (decorators, custom behaviors) into objects at runtime<p>[External hierarchy](docs/guide.md#hierarchy) that manages parent/child trees without per-object overhead |
 | **[Hive](docs/hive.md) storage** | Dense, cache-friendly containers with slot reuse, zombie lifecycle, and automatic page management |
 | **Performance-focused** | <p>Inline state structs, lazy instantiation, single-indirect-call dispatch, and direct state access with zero overhead<p>No RTTI or exceptions, builds with `/GR- /EHs-c-` (MSVC) or `-fno-rtti -fno-exceptions` (GCC/Clang) |
+| **[C API](docs/c_api.md)** | Flat C API (`velk_c.dll`) with opaque typed handles for FFI consumption from any language |
 
 ## Documentation
 
@@ -83,6 +84,7 @@ velk::invoke_function(w->reset());
 | [Plugins](docs/plugins.md) | Extending Velk with inline or DLL-based plugins |
 | [Performance](docs/performance.md) | Benchmark numbers, memory layout, and object sizes |
 | [Advanced](docs/advanced.md) | Any types and value chains, writing metadata by hand, shared_ptr internals |
+| [C API](docs/c_api.md) | Flat C API for FFI: handles, ref counting, property access, events |
 | **Built-in plugins** | |
 | [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
 
@@ -109,6 +111,7 @@ velk/
       ext/                CRTP helpers and template implementations
       api/                User-facing typed wrappers
     src/                  DLL internals (compiled into velk.dll)
+    c_api/                Flat C API (compiled into velk_c.dll)
     plugins/              Built-in plugins (compiled into separate dlls)
   test/                   Unit tests (GoogleTest)
 ```
@@ -124,6 +127,7 @@ cmake --build build --config Release
 
 Output: 
 * `build/bin/Release/velk.dll` (shared library)
+* `build/bin/Release/velk_c.dll` (C API shared library)
 * `build/bin/Release/velk_animator.dll` (shared library)
 * `build/bin/Release/demo.exe` (demo)
 * `build/bin/Release/tests.exe` (unit tests)
