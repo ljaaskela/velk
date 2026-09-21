@@ -1,6 +1,7 @@
 #include "perf_log.h"
 
 #include <velk/api/velk.h>
+#include <velk/thread.h>
 
 #include <algorithm>
 #include <chrono>
@@ -60,12 +61,13 @@ void PerfLog::print_stats() const
 void PerfLog::start_perf(uint64_t key, string_view label, const char* file, uint32_t line)
 {
     auto start = now();
+    auto thread = current_thread_id();
     std::lock_guard<std::mutex> lock(perf_mutex_);
     if (perf_sink_) {
         perf_sink_->start_perf(key, label, file, line);
     }
     for (auto& e : perf_entries_) {
-        if (e.key == key) {
+        if (e.key == key && e.thread == thread) {
             // Existing key, restart measurement
             e.label = label;
             e.start = start;
@@ -75,6 +77,7 @@ void PerfLog::start_perf(uint64_t key, string_view label, const char* file, uint
     // New key
     PerfEntry e;
     e.key = key;
+    e.thread = thread;
     e.label = label;
     e.start = start;
     perf_entries_.emplace_back(std::move(e));
@@ -82,9 +85,10 @@ void PerfLog::start_perf(uint64_t key, string_view label, const char* file, uint
 
 Duration PerfLog::end_perf(uint64_t key)
 {
+    auto thread = current_thread_id();
     std::lock_guard<std::mutex> lock(perf_mutex_);
     for (auto e = perf_entries_.begin(); e != perf_entries_.end(); e++) {
-        if (e->key == key) {
+        if (e->key == key && e->thread == thread) {
             auto elapsed = now() - e->start;
             auto label = e->label;
             if (stats_enabled_) {
@@ -141,9 +145,10 @@ void PerfLog::accumulate(uint64_t key, string_view label, Duration elapsed)
 
 Duration PerfLog::get_perf(uint64_t key) const
 {
+    auto thread = current_thread_id();
     std::lock_guard<std::mutex> lock(perf_mutex_);
     for (auto& e : perf_entries_) {
-        if (e.key == key) {
+        if (e.key == key && e.thread == thread) {
             return now() - e.start;
         }
     }

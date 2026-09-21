@@ -2,6 +2,7 @@
 #include <velk/ext/core_object.h>
 
 #include <gtest/gtest.h>
+#include <atomic>
 #include <thread>
 #include <vector>
 
@@ -107,6 +108,38 @@ TEST_F(PerfTest, NoSinkNoCrash)
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
     auto elapsed = velk_.perf_log().end_perf(key);
     EXPECT_GE(elapsed.to_milliseconds(), 1);
+}
+
+TEST_F(PerfTest, SameKeyOnTwoThreadsOverlaps)
+{
+    // No sink: TestPerfSink's record list is not thread-safe.
+    velk_.perf_log().set_perf_sink({});
+    constexpr uint64_t key = make_hash64("overlap");
+
+    std::atomic<int> step{0};
+    Duration inner{};
+    std::thread other([&] {
+        while (step.load() < 1) {
+            std::this_thread::yield();
+        }
+        velk_.perf_log().start_perf(key, "overlap");
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
+        inner = velk_.perf_log().end_perf(key);
+        step = 2;
+    });
+
+    velk_.perf_log().start_perf(key, "overlap");
+    std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    step = 1;
+    while (step.load() < 2) {
+        std::this_thread::yield();
+    }
+    auto outer = velk_.perf_log().end_perf(key);
+    other.join();
+
+    // Each thread measured its own scope, and the outer one spans the inner.
+    EXPECT_GE(inner.to_milliseconds(), 5);
+    EXPECT_GE(outer.to_milliseconds(), 10);
 }
 
 TEST_F(PerfTest, EndPerfUnknownKeyReturnsZero)

@@ -34,9 +34,12 @@ public:
     void event(PerfEvent type) override;
 
 private:
+    /// An open measurement. Keyed by label key and thread, so the same scope
+    /// can be open on several threads at once (e.g. task pool workers).
     struct PerfEntry
     {
         uint64_t key = 0;
+        uint32_t thread = 0;
         string label;
         Duration start;
     };
