@@ -8,6 +8,7 @@
 #include <velk/interface/intf_object.h>
 #include <velk/interface/intf_object_factory.h>
 #include <velk/interface/intf_plugin_registry.h>
+#include <velk/interface/intf_task_pool.h>
 #include <velk/interface/intf_type_registry.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
@@ -134,6 +135,9 @@ public:
     virtual IResourceStore& resource_store() = 0;
     /** @brief Returns the resource store (const). */
     virtual const IResourceStore& resource_store() const = 0;
+
+    /** @brief Returns the shared background task pool. Worker threads start on the first submit. */
+    virtual ITaskPool::Ptr task_pool() const = 0;
 
     /**
      * @brief Enqueues tasks to be executed on the next update() call.

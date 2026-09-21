@@ -29,6 +29,8 @@ public:
      *
      * @param fn The continuation function.
      * @param type Immediate fires synchronously; Deferred queues via instance().queue_deferred_tasks().
+     *             Auto is resolved when the continuation fires: Immediate if that happens on the
+     *             thread that created the future, Deferred otherwise.
      */
     virtual void add_continuation(const IFunction::ConstPtr& fn, InvokeType type = Auto) = 0;
 
@@ -40,6 +42,7 @@ public:
      *
      * @param fn The continuation function.
      * @param type Immediate fires synchronously; Deferred queues via instance().queue_deferred_tasks().
+     *             Auto is resolved when the continuation fires, as in add_continuation().
      * @return A new IFuture that resolves when the continuation completes.
      */
     virtual IFuture::Ptr then(const IFunction::ConstPtr& fn, InvokeType type = Auto) = 0;

@@ -47,7 +47,6 @@ ReturnValue Future::set_result(const IAny* result)
 
 void Future::add_continuation(const IFunction::ConstPtr& fn, InvokeType type)
 {
-    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     if (!fn) {
         return;
     }
@@ -70,8 +69,11 @@ void Future::fire_continuation(const Continuation& cont, const IAny* result) con
         args = {&result, 1};
     }
 
-    if (cont.type == Immediate) {
-        cont.fn->invoke(args);
+    // Auto is resolved here rather than when the continuation was added, so a
+    // result set from another thread lands on the owner thread's update().
+    if (resolve_invoke_type(cont.type, get_object_data().owner_thread_id) == Immediate) {
+        // The timing is decided; don't let the function re-resolve against its own owner.
+        cont.fn->invoke(args, Immediate);
     } else {
         DeferredTask task;
         task.fn = cont.fn;
@@ -82,11 +84,10 @@ void Future::fire_continuation(const Continuation& cont, const IAny* result) con
 
 IFuture::Ptr Future::then(const IFunction::ConstPtr& fn, InvokeType type)
 {
-    type = resolve_invoke_type(type, get_object_data().owner_thread_id);
     auto chained = instance().create_future();
     auto* internal = interface_cast<IFutureInternal>(chained);
     Callback wrapper([internal, chained, fn](FnArgs args) -> IAny::Ptr {
-        auto result = fn->invoke(args);
+        auto result = fn->invoke(args, Immediate);
         if (internal) {
             internal->set_result(result.get());
         }

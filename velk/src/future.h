@@ -21,6 +21,8 @@ namespace velk::impl {
  * Continuations attached before set_result() are stored and fired when
  * the result arrives. Continuations attached after are fired immediately
  * (Immediate type) or queued via instance().queue_deferred_tasks() (Deferred type).
+ * Auto is resolved when a continuation fires: Immediate on the future's owner
+ * thread, Deferred on any other thread.
  */
 class Future final : public ext::ObjectCore<Future, IFutureInternal>
 {

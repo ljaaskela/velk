@@ -86,7 +86,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | Document | Description |
 |---|---|
 | [Quick start](#quick-start) | Define an interface, implement it, create objects, and use typed accessors |
-| [Guide](docs/guide.md) | How to declare interfaces, work with properties, functions, events, and futures |
+| [Guide](docs/guide.md) | How to declare interfaces, work with properties, functions, events, futures, and task pools |
 | [Architecture](docs/architecture.md) | How the four layers fit together, type hierarchy, and ABI stability |
 | [Hive](docs/hive.md) | Storing objects in dense, cache-friendly containers |
 | [Plugins](docs/plugins.md) | Extending Velk with inline or DLL-based plugins |

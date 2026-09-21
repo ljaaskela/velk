@@ -45,6 +45,8 @@ public:
     IResourceStore& resource_store() override { return resource_store_; }
     const IResourceStore& resource_store() const override { return resource_store_; }
 
+    ITaskPool::Ptr task_pool() const override { return task_pool_; }
+
     VelkStats get_stats() const override;
     IObjectStorage* create_metadata_container(const ClassInfo& info, IInterface* owner) const override;
     void destroy_metadata_container(IObjectStorage* storage) const override;
@@ -69,6 +71,7 @@ private:
     PluginRegistry plugin_registry_; ///< Registry of loaded plugins.
     ResourceStore resource_store_;   ///< URI-based resource access service.
     PerfLog perf_log_;               ///< Performance logging.
+    ITaskPool::Ptr task_pool_;       ///< Shared background pool. Released before plugins shut down.
 
     mutable std::mutex deferred_mutex_;           ///< Guards @c deferred_queue_.
     mutable vector<DeferredTask> deferred_queue_; ///< Tasks queued for the next update() call.

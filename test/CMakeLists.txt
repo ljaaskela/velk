@@ -26,6 +26,7 @@ add_executable(tests
     test_binding.cpp
     test_property.cpp
     test_future.cpp
+    test_task_pool.cpp
     test_function.cpp
     test_object.cpp
     test_hierarchy.cpp

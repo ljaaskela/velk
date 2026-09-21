@@ -4,6 +4,8 @@
 #include "object_storage.h"
 #include "resource/file_protocol.h"
 #include "resource/memory_protocol.h"
+#include "manual_task_pool.h"
+#include "threaded_task_pool.h"
 
 #include <velk/interface/intf_storage_owned.h>
 #include <velk/interface/types.h>
@@ -25,6 +27,11 @@ VelkInstance::VelkInstance()
 {
     type_registry_.register_type(FileProtocol::get_factory());
     type_registry_.register_type(MemoryProtocol::get_factory());
+    type_registry_.register_type(impl::ThreadedTaskPool::get_factory());
+    type_registry_.register_type(impl::ManualTaskPool::get_factory());
+
+    // Shared background pool. No worker threads start until the first submit.
+    task_pool_ = interface_pointer_cast<ITaskPool>(ext::make_object<impl::ThreadedTaskPool>());
 
     // Register file:// protocol (absolute paths).
     auto file_proto = ext::make_object<FileProtocol>();
@@ -43,6 +50,8 @@ VelkInstance::VelkInstance()
 VelkInstance::~VelkInstance()
 {
     perf_log_.print_stats();
+    // Join the workers before plugins unload, so no task runs code from an unloaded library.
+    task_pool_ = nullptr;
     plugin_registry_.shutdown_all();
 }
 

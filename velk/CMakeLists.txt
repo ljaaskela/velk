@@ -36,6 +36,10 @@ add_library(velk SHARED
     src/generic_object.h
     src/future.cpp
     src/future.h
+    src/manual_task_pool.cpp
+    src/manual_task_pool.h
+    src/threaded_task_pool.cpp
+    src/threaded_task_pool.h
     src/type_registry.cpp
     src/type_registry.h
     src/plugin_registry.cpp
@@ -68,6 +72,7 @@ add_library(velk SHARED
     include/velk/interface/intf_function.h
     include/velk/interface/intf_event.h
     include/velk/interface/intf_future.h
+    include/velk/interface/intf_task_pool.h
     include/velk/interface/intf_any_extension.h
     include/velk/interface/intf_property.h
     include/velk/interface/intf_object_factory.h
@@ -95,6 +100,7 @@ add_library(velk SHARED
     include/velk/api/event.h
     include/velk/api/property.h
     include/velk/api/future.h
+    include/velk/api/task_pool.h
     include/velk/api/function.h
     include/velk/api/function_context.h
     include/velk/api/state.h

@@ -24,6 +24,10 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Then chaining](#then-chaining)
     - [Type transforms](#type-transforms)
     - [Thread safety](#thread-safety)
+  - [Task pools](#task-pools)
+    - [Threaded pools](#threaded-pools)
+    - [Manual pools](#manual-pools)
+    - [Lifetime](#lifetime)
 - [Properties](#properties)
   - [Change notifications](#change-notifications)
   - [Custom Any types](#custom-any-types)
@@ -648,6 +652,58 @@ consumer.join();
 ```
 
 Resolution, waiting, and continuation dispatch are all mutex-protected internally. Continuations added after resolution fire immediately (for `Immediate` type) or are queued (for `Deferred` type).
+
+`Auto` continuations are resolved when they fire, not when they are added. If the future is resolved on the thread that created it, they run immediately; if it is resolved on another thread, they are queued for that owner thread's next `instance().update()`. This is what makes results from [task pools](#task-pools) land back on the main thread.
+
+### Task pools
+
+A task pool runs tasks for you, either on worker threads or at a point you choose. `submit()` returns a `Future<T>` for the task's return value, and `post()` is fire and forget (no future is allocated). Both accept the same callables as `Callback`, take no arguments, and are safe to call from any thread.
+
+All task pool interfaces are in `velk/interface/intf_task_pool.h`, and the wrappers are in `velk/api/task_pool.h`.
+
+#### Threaded pools
+
+`default_task_pool()` returns a pool shared through `instance().task_pool()`. Its worker threads start on the first task, so it costs nothing if unused. `create_threaded_task_pool(n)` creates a separate pool with `n` workers (0 for the default of hardware threads minus one).
+
+```cpp
+#include <velk/api/task_pool.h>
+
+default_task_pool()
+    .submit([]() -> int { return expensive_computation(); })   // runs on a worker
+    .then([](int value) { use(value); });                      // runs in instance().update()
+
+auto io = create_threaded_task_pool(2);
+io.post([]() { write_log_file(); });
+```
+
+The continuation uses the default `Auto` type, so it runs on the thread that called `submit()` during its next `instance().update()`. Pass `Immediate` to `then()` to run it on the worker instead.
+
+#### Manual pools
+
+A manual pool only runs tasks when its owner calls `drain()`, on the calling thread. `drain(max_tasks, budget)` limits how much work is done per call, by task count, by time, or both (0 means no limit).
+
+A typical use is GPU uploads: loader tasks decode on workers and queue the upload, and the renderer drains the queue once per frame within a time budget:
+
+```cpp
+auto uploads = create_manual_task_pool();   // owned by the renderer
+
+// Loader: decode on a worker, queue the upload for the render thread
+default_task_pool().post([uploads, uri]() mutable {
+    auto pixels = decode_image(uri);
+    uploads.post([pixels]() { upload_texture(pixels); });
+});
+
+// Renderer, once per frame
+uploads.drain(0, Duration::from_milliseconds(2));
+```
+
+* The budget is checked between tasks, so a task is never interrupted and at least one task runs per call if any are queued.
+* Tasks queued while draining (including by the tasks themselves) run in the next `drain()`.
+* Futures from `submit()` resolve during `drain()`. Their `Auto` continuations run immediately if `drain()` is called on the submitting thread, and otherwise are queued for that thread's `instance().update()`.
+
+#### Lifetime
+
+When a pool is destroyed, tasks that have not started are dropped and their futures never resolve. Tasks already running finish first. The shared pool is shut down before plugins are unloaded, so no task runs code from an unloaded library.
 
 ## Properties
 

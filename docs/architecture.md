@@ -398,7 +398,7 @@ inline InvokeType resolve_invoke_type(InvokeType type, uint32_t owner_thread_id)
 }
 ```
 
-This happens at the top of each DLL-side implementation (`ClassId::Property`, `ClassId::Function`, `ClassId::Event`, `ClassId::Future`). API wrappers and interfaces pass `Auto` through unchanged; resolution always happens inside the DLL where the object's thread ID is accessible.
+This happens at the top of each DLL-side implementation (`ClassId::Property`, `ClassId::Function`, `ClassId::Event`). `ClassId::Future` is the exception: it resolves `Auto` when each continuation fires, so a result set on a worker thread (for example by a task pool) routes the continuation to the owner thread's `update()`. API wrappers and interfaces pass `Auto` through unchanged; resolution always happens inside the DLL where the object's thread ID is accessible.
 
 The `Auto = 0` enum value means that zero-initialized or default-constructed `InvokeType` fields are Auto, making it the natural default everywhere.
 
@@ -446,6 +446,7 @@ h.set_thread_context(ctx);
 | `instance().plugin_registry()` | Thread-safe (concurrent reads, exclusive writes) |
 | `instance().queue_deferred_tasks()` | Thread-safe (mutex-protected queue) |
 | `instance().create_future()` | Thread-safe (safe to resolve, wait, and add continuations from any thread) |
+| `ITaskPool` (threaded and manual) | Thread-safe (`submit`, `post` and `pending` from any thread; `IManualTaskPool::drain` runs tasks on the calling thread) |
 | `IThreadContext` | Thread-safe (wraps `std::shared_mutex`; satisfies SharedMutex named requirements) |
 | Properties, events, functions | Not internally synchronized. `InvokeMode::Auto` routes cross-thread writes through the deferred queue. Opt-in `IThreadContext` available for read/write synchronization. |
 
