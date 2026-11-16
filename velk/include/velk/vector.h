@@ -114,6 +114,12 @@ template <class T>
 class vector : private vector_base
 {
     static constexpr bool is_trivial() { return std::is_trivially_copyable_v<T>; }
+    /// Whether a new element can be made by zeroing its bytes: not when it has default member
+    /// initializers or a constructor of its own, which value-initializing has to run.
+    static constexpr bool is_zero_constructible()
+    {
+        return std::is_trivially_copyable_v<T> && std::is_trivially_default_constructible_v<T>;
+    }
 
 public:
     using value_type = T; ///< The element type.
@@ -127,7 +133,7 @@ public:
         if (count == 0) {
             return;
         }
-        if constexpr (is_trivial()) {
+        if constexpr (is_zero_constructible()) {
             data_ = alloc_raw(count * sizeof(T));
             capacity_ = count;
             std::memset(data_, 0, count * sizeof(T));
@@ -547,7 +553,7 @@ public:
             }
         } else if (count > size_) {
             ensure_capacity(count);
-            if constexpr (is_trivial()) {
+            if constexpr (is_zero_constructible()) {
                 std::memset(static_cast<char*>(data_) + size_ * sizeof(T), 0, (count - size_) * sizeof(T));
             } else {
                 T* d = typed_data();
