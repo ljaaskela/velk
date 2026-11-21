@@ -1,10 +1,13 @@
+#include <velk/api/any.h>
 #include <velk/api/hierarchy.h>
+#include <velk/api/math_types.h>
 #include <velk/api/object_ref.h>
 #include <velk/api/store.h>
 #include <velk/api/velk.h>
 #include <velk/ext/core_object.h>
 #include <velk/ext/object.h>
 #include <velk/ext/plugin.h>
+#include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_object_ref.h>
 #include <velk/interface/resource/intf_resource.h>
@@ -1415,3 +1418,75 @@ TEST_F(ImporterTest, ResourceRef)
     EXPECT_EQ(string_view("app://fonts/arial.ttf"), tr->uri().get_value());
 }
 
+
+namespace velk {
+
+namespace {
+
+/** @brief Converts @p value to JSON and back; returns the JSON text. */
+template <class T>
+string round_trip(IJsonValueCodec& codec, const T& value, T& back)
+{
+    Any<T> any(value);
+    string json = codec.to_json(*any.get_any_interface(), type_uid<T>());
+    auto read = codec.from_json(json, type_uid<T>());
+    if (read) {
+        read->get_data(&back, sizeof(T), type_uid<T>());
+    }
+    return json;
+}
+
+} // namespace
+
+TEST_F(ImporterTest, JsonValueCodecBuiltIns)
+{
+    load_importer();
+    auto* codec = interface_cast<IJsonValueCodec>(importer_);
+    ASSERT_NE(nullptr, codec);
+
+    float f = 0.f;
+    EXPECT_EQ(string("0.1"), round_trip(*codec, 0.1f, f));
+    EXPECT_EQ(0.1f, f);
+
+    int32_t i = 0;
+    EXPECT_EQ(string("-42"), round_trip(*codec, int32_t(-42), i));
+    EXPECT_EQ(-42, i);
+
+    bool b = false;
+    EXPECT_EQ(string("true"), round_trip(*codec, true, b));
+    EXPECT_TRUE(b);
+
+    string s;
+    EXPECT_EQ(string("\"a \\\"quoted\\\" word\""), round_trip(*codec, string("a \"quoted\" word"), s));
+    EXPECT_EQ(string("a \"quoted\" word"), s);
+
+    color c{};
+    EXPECT_EQ(string("{\"r\":0.1,\"g\":0.2,\"b\":0.3,\"a\":1}"), round_trip(*codec, color{0.1f, 0.2f, 0.3f, 1.f}, c));
+    EXPECT_EQ(0.2f, c.g);
+
+    vec3 v{};
+    EXPECT_EQ(string("{\"x\":1,\"y\":2.5,\"z\":-3}"), round_trip(*codec, vec3{1.f, 2.5f, -3.f}, v));
+    EXPECT_EQ(2.5f, v.y);
+
+    aabb box{};
+    round_trip(*codec, aabb{{1.f, 2.f, 3.f}, {4.f, 5.f, 6.f}}, box);
+    EXPECT_EQ(5.f, box.extent.height);
+
+    EXPECT_FALSE(codec->from_json("not json", type_uid<float>()));
+    EXPECT_FALSE(codec->from_json("\"text\"", type_uid<float>()));
+}
+
+TEST_F(ImporterTest, JsonValueCodecArrays)
+{
+    load_importer();
+    auto* codec = interface_cast<IJsonValueCodec>(importer_);
+    ASSERT_NE(nullptr, codec);
+    const float values[] = {1.f, 2.5f};
+    auto any = instance().create_any(type_uid<vector<float>>());
+    auto* array = interface_cast<IArrayAny>(any);
+    ASSERT_NE(nullptr, array);
+    ASSERT_TRUE(succeeded(array->set_from_buffer(values, 2, type_uid<float>())));
+    EXPECT_EQ(string("[1,2.5]"), codec->to_json(*any, type_uid<vector<float>>()));
+}
+
+} // namespace velk

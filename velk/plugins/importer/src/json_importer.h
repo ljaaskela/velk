@@ -4,6 +4,7 @@
 #include "json_parser.h"
 
 #include <velk/ext/core_object.h>
+#include <velk/interface/intf_exporter_extension.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_metadata.h>
 #include <velk/interface/member_desc.h>
@@ -17,12 +18,16 @@
 
 namespace velk {
 
-class JsonImporter : public ext::ObjectCore<JsonImporter, IStoreImporter>
+class JsonImporter : public ext::ObjectCore<JsonImporter, IStoreImporter, IJsonValueCodec>
 {
 public:
     VELK_CLASS_UID(ClassId::JsonImporter, "JsonImporter");
 
     ImportResult import_from(string_view json) const override;
+
+    // IJsonValueCodec
+    string to_json(const IAny& value, Uid type) const override;
+    IAny::Ptr from_json(string_view json, Uid type) const override;
 
 private:
     friend class ImportResolver;
@@ -49,7 +54,8 @@ private:
                                ImportResult& result) const;
     void set_properties(IObject& obj, const JsonValue& props, const ClassInfo& info,
                         const ImportContext& ctx, ImportResult& result) const;
-    void set_property_value(IPropertyInternal& pi, const PropertyKind& pk, const JsonValue& val) const;
+    /** @brief Writes @p val, converted to the property's type; returns true when it was written. */
+    bool set_property_value(IPropertyInternal& pi, const PropertyKind& pk, const JsonValue& val) const;
     void register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
                                   ImportResult& result) const;
     void build_hierarchies(const JsonValue& hierarchies, IStore& store, ImportResult& result) const;
@@ -78,8 +84,11 @@ private:
                            ImportResult& result) const;
     void dispatch_extensions(const JsonValue& root, IStore& store, const ImportContext& ctx) const;
     void discover_type_extensions() const;
+    /** @brief Writes @p value, of @p type, to @p out. Returns false for types it cannot write. */
+    bool write_value(const IAny& value, Uid type, IExportData& out) const;
 
     mutable std::unordered_map<Uid, IImporterTypeExtension::Ptr> type_extensions_;
+    mutable std::unordered_map<Uid, IExporterTypeExtension::Ptr> exporter_extensions_;
 };
 
 } // namespace velk

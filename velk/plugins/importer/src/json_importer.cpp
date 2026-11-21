@@ -228,134 +228,134 @@ void JsonImporter::set_properties(IObject& obj, const JsonValue& props, const Cl
     }
 }
 
-void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind& pk,
+bool JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind& pk,
                                       const JsonValue& val) const
 {
     Uid typeUid = pk.typeUid;
 
     if (typeUid == type_uid<float>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         float v = static_cast<float>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<double>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         double v = val.as_number();
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<int32_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         int32_t v = static_cast<int32_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<uint32_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         uint32_t v = static_cast<uint32_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<int64_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         int64_t v = static_cast<int64_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<uint64_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         uint64_t v = static_cast<uint64_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<uint8_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         uint8_t v = static_cast<uint8_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<int8_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         int8_t v = static_cast<int8_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<uint16_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         uint16_t v = static_cast<uint16_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<int16_t>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         int16_t v = static_cast<int16_t>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<bool>()) {
         if (val.type() != JsonType::Bool) {
-            return;
+            return false;
         }
         bool v = val.as_bool();
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<int>()) {
         if (val.type() != JsonType::Number) {
-            return;
+            return false;
         }
         int v = static_cast<int>(val.as_number());
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (typeUid == type_uid<::velk::string>()) {
         if (val.type() != JsonType::String) {
-            return;
+            return false;
         }
         auto v = val.as_string();
-        pi.set_data(&v, sizeof(v), typeUid);
+        return succeeded(pi.set_data(&v, sizeof(v), typeUid));
     } else if (val.type() == JsonType::Array) {
         auto& arr = val.as_array();
         if (typeUid == type_uid<vec2>() && arr.size() == 2) {
             vec2 v{static_cast<float>(arr[0].as_number()), static_cast<float>(arr[1].as_number())};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<vec3>() && arr.size() == 3) {
             vec3 v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
                    static_cast<float>(arr[2].as_number())};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<vec4>() && arr.size() == 4) {
             vec4 v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
                    static_cast<float>(arr[2].as_number()),
                    static_cast<float>(arr[3].as_number())};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<quat>() && arr.size() == 4) {
             quat v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
                    static_cast<float>(arr[2].as_number()),
                    static_cast<float>(arr[3].as_number())};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<size>() && arr.size() >= 2) {
             size v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
                    arr.size() >= 3 ? static_cast<float>(arr[2].as_number()) : 0.f};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<rect>() && arr.size() == 4) {
             rect v{static_cast<float>(arr[0].as_number()),
                    static_cast<float>(arr[1].as_number()),
                    static_cast<float>(arr[2].as_number()),
                    static_cast<float>(arr[3].as_number())};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<color>() && arr.size() >= 3) {
             color v{static_cast<float>(arr[0].as_number()),
                     static_cast<float>(arr[1].as_number()),
                     static_cast<float>(arr[2].as_number()),
                     arr.size() >= 4 ? static_cast<float>(arr[3].as_number()) : 1.f};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<mat4>() && arr.size() == 16) {
             mat4 v{};
             for (int i = 0; i < 16; ++i) {
                 v.m[i] = static_cast<float>(arr[i].as_number());
             }
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         }
     } else if (val.type() == JsonType::Object) {
         auto f = [&](string_view key) -> float {
@@ -368,13 +368,13 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
         };
         if (typeUid == type_uid<vec2>()) {
             vec2 v{f("x"), f("y")};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<vec3>()) {
             vec3 v{f("x"), f("y"), f("z")};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<vec4>()) {
             vec4 v{f("x"), f("y"), f("z"), f("w")};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<quat>()) {
             // Accept an object as either a raw quaternion {x,y,z,w} or an
             // Euler-degree triple {x,y,z} (no `w`), matching the legacy
@@ -382,7 +382,7 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
             auto* w_node = val.find(string_view{"w"});
             if (w_node) {
                 quat v{f("x"), f("y"), f("z"), f("w")};
-                pi.set_data(&v, sizeof(v), typeUid);
+                return succeeded(pi.set_data(&v, sizeof(v), typeUid));
             } else {
                 constexpr float kDegToRad = 0.0174532925199433f;
                 quat v = quat::from_euler({
@@ -390,17 +390,17 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
                     f("y") * kDegToRad,
                     f("z") * kDegToRad,
                 });
-                pi.set_data(&v, sizeof(v), typeUid);
+                return succeeded(pi.set_data(&v, sizeof(v), typeUid));
             }
         } else if (typeUid == type_uid<size>()) {
             size v{f("width"), f("height"), f("depth")};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<rect>()) {
             rect v{f("x"), f("y"), f("width"), f("height")};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<color>()) {
             color v{f("r"), f("g"), f("b"), f1("a", 1.f)};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         } else if (typeUid == type_uid<aabb>()) {
             auto* pos_node = val.find(string_view{"position"});
             auto* ext_node = val.find(string_view{"extent"});
@@ -413,7 +413,7 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
             };
             aabb v{{fp(pos_node, "x"), fp(pos_node, "y"), fp(pos_node, "z")},
                    {fp(ext_node, "width"), fp(ext_node, "height"), fp(ext_node, "depth")}};
-            pi.set_data(&v, sizeof(v), typeUid);
+            return succeeded(pi.set_data(&v, sizeof(v), typeUid));
         }
     }
 
@@ -423,9 +423,10 @@ void JsonImporter::set_property_value(IPropertyInternal& pi, const PropertyKind&
         JsonImportData wrapped(val);
         auto result = ext_it->second->deserialize(typeUid, wrapped);
         if (result) {
-            pi.set_value(*result);
+            return succeeded(pi.set_value(*result));
         }
     }
+    return false;
 }
 
 void JsonImporter::register_imported_object(ImportContext& ctx, IObject::Ptr obj, const JsonValue& obj_node,
@@ -971,6 +972,29 @@ void JsonImporter::discover_type_extensions() const
         auto types = ext->supported_types();
         for (size_t i = 0; i < types.size(); i++) {
             type_extensions_[types[i]] = ext;
+        }
+    }
+
+    // Writers, usually the same classes.
+    exporter_extensions_.clear();
+    vector<Uid> exporter_uids;
+    registry.for_each_class(&exporter_uids, [](void* ctx, const ClassInfo& info) -> bool {
+        for (size_t i = 0; i < info.interfaces.size(); i++) {
+            if (info.interfaces[i].uid == IExporterTypeExtension::UID) {
+                static_cast<vector<Uid>*>(ctx)->push_back(info.uid);
+                break;
+            }
+        }
+        return true;
+    });
+    for (auto uid : exporter_uids) {
+        auto ext = interface_pointer_cast<IExporterTypeExtension>(registry.create(uid));
+        if (!ext) {
+            continue;
+        }
+        auto types = ext->supported_types();
+        for (size_t i = 0; i < types.size(); i++) {
+            exporter_extensions_[types[i]] = ext;
         }
     }
 }

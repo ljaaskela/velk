@@ -6,6 +6,9 @@ add_library(velk_importer SHARED
     src/json_import_data.h
     src/json_importer.h
     src/json_importer.cpp
+    src/json_value_codec.cpp
+    src/json_writer.h
+    src/json_writer.cpp
     include/velk/plugins/importer/api/importer.h
     include/velk/plugins/importer/interface/intf_importer_plugin.h
     include/velk/plugins/importer/plugin.h

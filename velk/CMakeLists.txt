@@ -91,6 +91,7 @@ add_library(velk SHARED
     include/velk/interface/resource/intf_resource_protocol.h
     include/velk/interface/resource/intf_resource_store.h
     include/velk/interface/intf_importer_extension.h
+    include/velk/interface/intf_exporter_extension.h
     include/velk/interface/intf_thread_context.h
     include/velk/interface/member_desc.h
     include/velk/interface/types.h

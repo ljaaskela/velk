@@ -37,6 +37,23 @@ public:
  *
  * Chain: IInterface -> IImporterPlugin
  */
+/**
+ * @brief Converts single values to and from store-file JSON text.
+ *
+ * Implemented by the JSON importer (ClassId::JsonImporter). Built-in types are
+ * converted directly; others through IImporterTypeExtension and
+ * IExporterTypeExtension. Object references are not values here.
+ */
+class IJsonValueCodec : public Interface<IJsonValueCodec>
+{
+public:
+    /** @brief @p value, of type @p type, as store-file JSON text; empty when it cannot be written. */
+    virtual string to_json(const IAny& value, Uid type) const = 0;
+
+    /** @brief A value of @p type read from store-file JSON text, or null when it cannot be read. */
+    virtual IAny::Ptr from_json(string_view json, Uid type) const = 0;
+};
+
 class IImporterPlugin : public Interface<IImporterPlugin>
 {
 public:
