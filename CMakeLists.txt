@@ -15,6 +15,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/bin/)
 add_subdirectory(velk)
 add_subdirectory(velk/plugins/animator)
 add_subdirectory(velk/plugins/importer)
+add_subdirectory(velk/plugins/remote)
 add_subdirectory(velk/plugins/script/js)
 add_subdirectory(velk/c_api)
 
