@@ -393,6 +393,20 @@ void TypeRegistry::for_each_class(void* ctx, ClassVisitorFn visitor) const
     }
 }
 
+void TypeRegistry::for_each_instance(Uid classUid, void* ctx, InstanceVisitorFn visitor) const
+{
+    // Visit outside the lock: the visitor may create objects, which takes it again.
+    IObject::Ptr hive;
+    if (const Entry* entry = find(classUid)) {
+        std::shared_lock lock(mutex_);
+        hive = entry->hive;
+    }
+    // The registry's objects are born zombies, which IObjectHive::for_each skips.
+    if (hive) {
+        static_cast<impl::ObjectHive*>(hive.get())->for_each_live(ctx, visitor);
+    }
+}
+
 IProperty::Ptr TypeRegistry::create_property(Uid type, const IAny::Ptr& value, uint32_t flags) const
 {
     static const auto& factory = impl::StandaloneProperty::get_factory();

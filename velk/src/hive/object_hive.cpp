@@ -611,6 +611,22 @@ void ObjectHive::for_each(void* context, VisitorFn visitor) const
     scan_active(0, [&](void* slot) { return visitor(context, *static_cast<IObject*>(slot)); });
 }
 
+void ObjectHive::for_each_live(void* context, VisitorFn visitor) const
+{
+    std::shared_lock lock(mutex_);
+    IterationGuard guard(&mutex_);
+    for (auto& page_ptr : pages_) {
+        auto& page = *page_ptr;
+        for (size_t i = 0; i < page.capacity; ++i) {
+            const SlotState s = page.state[i];
+            if ((s == SlotState::Active || s == SlotState::Zombie)
+                && !visitor(context, *static_cast<IObject*>(slot_ptr(page, i)))) {
+                return;
+            }
+        }
+    }
+}
+
 void ObjectHive::for_each_state(ptrdiff_t state_offset, void* context, StateVisitorFn visitor) const
 {
     std::shared_lock lock(mutex_);

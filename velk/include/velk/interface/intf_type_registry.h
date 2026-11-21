@@ -132,6 +132,19 @@ public:
      */
     using ClassVisitorFn = bool (*)(void* ctx, const ClassInfo&);
     virtual void for_each_class(void* ctx, ClassVisitorFn visitor) const = 0;
+
+    /**
+     * @brief Iterates the live instances of a class that were created from its hive.
+     *
+     * Classes under 1 KB use a hive by default. Instances created with
+     * CreationPolicy::Alloc are not visited.
+     * @param classUid The class.
+     * @param ctx Opaque pointer forwarded to the visitor.
+     * @param visitor Called for each live instance. Return false to stop early. It must not
+     *        release the last reference to an instance of @p classUid.
+     */
+    using InstanceVisitorFn = bool (*)(void* ctx, IObject& object);
+    virtual void for_each_instance(Uid classUid, void* ctx, InstanceVisitorFn visitor) const = 0;
 };
 
 } // namespace velk

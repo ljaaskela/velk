@@ -53,6 +53,7 @@ public:
                                          IFunction::ContextDeleter* deleter) const override;
     Uid find_class_by_name(string_view name) const override;
     void for_each_class(void* ctx, ClassVisitorFn visitor) const override;
+    void for_each_instance(Uid classUid, void* ctx, InstanceVisitorFn visitor) const override;
 
     /** @brief Gathers per-type stats for all registered types. */
     vector<TypeStats> gather_type_stats() const;

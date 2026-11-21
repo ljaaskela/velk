@@ -86,6 +86,13 @@ public:
     /** @brief Returns true if any page has live objects or outstanding weak refs. */
     bool has_outstanding_refs() const;
 
+    /**
+     * @brief Visits every live object, including the born-zombie ones allocate() made.
+     *
+     * The visitor must not release the last reference to an object of this hive.
+     */
+    void for_each_live(void* context, VisitorFn visitor) const;
+
     /** @brief Scans all active slots with prefetching, calling visit(slot_ptr) for each. */
     template <class VisitFn>
     void scan_active(ptrdiff_t prefetch_offset, VisitFn&& visit) const;
