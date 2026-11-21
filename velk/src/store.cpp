@@ -27,6 +27,12 @@ IObject::Ptr Store::object_at(size_t index) const
     return index < entries_.size() ? entries_[index].object : nullptr;
 }
 
+string Store::id_at(size_t index) const
+{
+    std::shared_lock lock(mutex_);
+    return index < entries_.size() ? entries_[index].id : string();
+}
+
 ReturnValue Store::add(string_view id, const IObject::Ptr& object)
 {
     if (id.empty() || !object) {

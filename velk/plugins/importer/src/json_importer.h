@@ -23,7 +23,7 @@ class JsonImporter : public ext::ObjectCore<JsonImporter, IStoreImporter, IJsonV
 public:
     VELK_CLASS_UID(ClassId::JsonImporter, "JsonImporter");
 
-    ImportResult import_from(string_view json) const override;
+    ImportResult import_from(string_view json, string_view source = {}) const override;
 
     // IJsonValueCodec
     string to_json(const IAny& value, Uid type) const override;
@@ -77,7 +77,7 @@ private:
                                         string_view path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     string_view path) const;
-    void process_attachments(const JsonValue& root, IStore& store, const ImportContext& ctx,
+    void process_attachments(const JsonValue& root, IStore& store, ImportContext& ctx,
                              ImportResult& result) const;
     void process_resource_protocols(const JsonValue& root, ImportResult& result) const;
     void process_resources(const JsonValue& root, IStore& store, ImportContext& ctx,

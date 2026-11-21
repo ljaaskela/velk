@@ -30,6 +30,7 @@ See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json)
   - [Writing a type extension](#writing-a-type-extension)
   - [Example: dim type (velk-ui)](#example-dim-type-velk-ui)
 - [Advanced](#advanced)
+  - [Source tracking](#source-tracking)
   - [Class aliases](#class-aliases)
   - [Direct interface access](#direct-interface-access)
 
@@ -39,13 +40,15 @@ See the [JSON schema](../../velk/plugins/importer/schema/velk-store.schema.json)
 #include <velk/plugins/importer/api/importer.h>
 
 auto importer = velk::create_json_importer();
-auto result = importer.import_from(json_string);
+auto result = importer.import_from(json_string, "app://ui/main.json");
 
 if (result) {
     auto obj = result.store->find("widget_1");
     // ...
 }
 ```
+
+The second argument is optional: where the text came from, usually the file's path. [Source tracking](#source-tracking) records it.
 
 ## JSON format
 
@@ -133,12 +136,13 @@ Supported value types: `float`, `double`, `int32_t`, `uint32_t`, `int64_t`, `uin
 
 ### Attachments
 
-Attachments create objects and attach them to target objects via `IObjectStorage::add_attachment()`. Each entry has a `class`, optional `properties`, and a `targets` array of object ids:
+Attachments create objects and attach them to target objects via `IObjectStorage::add_attachment()`. Each entry has a `class`, optional `properties`, a `targets` array of object ids, and an optional `id`:
 
 ```json
 {
     "attachments": [
         {
+            "id": "row_size",
             "targets": ["child1", "child3"],
             "class": "velk-ui.FixedSize",
             "properties": { "height": "150px" }
@@ -155,6 +159,8 @@ Attachments create objects and attach them to target objects via `IObjectStorage
 The importer creates one object per entry and attaches it to every target in the `targets` array. When an entry targets multiple objects, they share the same attachment instance. Class resolution and property setting follow the same rules as top-level objects.
 
 Target objects must have `IObjectStorage` (which they do if they inherit from `ext::Object`). Targets are resolved by id using the same lookup as object references.
+
+An attachment with an `id` is stored as `"attachment:<id>"`, and references and bindings name it like an object (`{ "ref": "row_size" }`, `{ "bind": "row_size.height" }`) or with the `attachments.` qualifier. Ids must be unique among the attachments. An attachment without an id cannot be named, and source tracking gives it no entry.
 
 ### Hierarchies
 
@@ -236,12 +242,13 @@ Object properties can reference resources using the `resources.` qualifier in re
 "properties": { "font": { "ref": "resources.main_font" } }
 ```
 
-Unqualified refs default to the objects section. Explicit `objects.` qualifier is also supported:
+Unqualified refs look up ids and names from all sections, then the store. Explicit `objects.` and `attachments.` qualifiers are also supported:
 
 ```json
-{ "ref": "widget_1" }             // looks up in objects (default)
-{ "ref": "objects.widget_1" }     // explicit objects lookup
-{ "ref": "resources.main_font" }  // explicit resources lookup
+{ "ref": "widget_1" }               // ids and names (default)
+{ "ref": "objects.widget_1" }       // explicit objects lookup
+{ "ref": "resources.main_font" }    // explicit resources lookup
+{ "ref": "attachments.row_size" }   // explicit attachments lookup
 ```
 
 ### Extension collections
@@ -537,6 +544,24 @@ velk::register_type<velk::ext::AnyValue<dim>>(velk);
 ```
 
 ## Advanced
+
+### Source tracking
+
+Source tracking records where each imported object came from: the source passed to `import_from()` and the object's entry in the file. It is for tools such as an editor that write changes back to the files. It is off by default and costs nothing while off.
+
+```cpp
+auto ip = velk::get_or_load_plugin<IImporterPlugin>(PluginId::ImporterPlugin);
+ip->set_track_sources(true);   // before any content is imported
+
+auto result = velk::create_json_importer().import_from(json, "app://ui/main.json");
+if (auto source = ip->source_of(*result.store->find("widget_1"))) {
+    // source.source == "app://ui/main.json", source.entry == "objects/widget_1"
+}
+```
+
+* While tracking is on, `create_json_importer()` returns a tracking importer (`ClassId::TrackingJsonImporter`). Importers created while it is off, and `ClassId::JsonImporter` created directly, record nothing.
+* Entries are `objects/<id>`, `resources/<id>` and `attachments/<id>`. Attachments without an id and objects created by extensions or in code have no entry.
+* Tracking holds objects weakly, so it does not keep them alive; `source_of()` returns an empty `ImportSource` for an object that was not tracked.
 
 ### Class aliases
 

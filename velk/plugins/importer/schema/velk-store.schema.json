@@ -124,6 +124,10 @@
       "type": "object",
       "description": "Creates a single object instance and attaches it to one or more targets.",
       "properties": {
+        "id": {
+          "type": "string",
+          "description": "Optional. Stored as 'attachment:<id>'; references and bindings name it like an object or with the 'attachments.' qualifier."
+        },
         "targets": {
           "type": "array",
           "items": { "type": "string" },

@@ -25,6 +25,7 @@ public:
     IObject::Ptr find(string_view id) const override;
     size_t object_count() const override;
     IObject::Ptr object_at(size_t index) const override;
+    string id_at(size_t index) const override;
     ReturnValue add(string_view id, const IObject::Ptr& object) override;
 
     struct Entry

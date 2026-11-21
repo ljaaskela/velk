@@ -50,6 +50,12 @@ public:
         return with<IStore>([&](auto& s) { return s.object_at(index); });
     }
 
+    /** @brief Returns the id of the object at the given index, or an empty string. */
+    string id_at(size_t index) const
+    {
+        return with<IStore>([&](auto& s) { return s.id_at(index); });
+    }
+
     /** @brief Adds an object with the given id. */
     ReturnValue add(string_view id, const IObject::Ptr& object)
     {

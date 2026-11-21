@@ -26,8 +26,22 @@ struct ImportResult
 class IStoreImporter : public Interface<IStoreImporter>
 {
 public:
-    /** @brief Imports from a source string and returns a populated IStore with any errors. */
-    virtual ImportResult import_from(string_view source) const = 0;
+    /**
+     * @brief Imports @p text and returns a populated IStore with any errors.
+     * @param source Where @p text came from, usually the file's path. Recorded for each
+     *               imported object while source tracking is on (IImporterPlugin::set_track_sources).
+     */
+    virtual ImportResult import_from(string_view text, string_view source = {}) const = 0;
+};
+
+/** @brief Where an imported object came from. Empty when the object was not tracked. */
+struct ImportSource
+{
+    string source; ///< The source passed to import_from, usually the file's path.
+    string entry;  ///< The object's entry in the file: "objects/<id>", "resources/<id>" or "attachments/<id>".
+
+    /** @brief Returns true if the object was tracked. */
+    explicit operator bool() const { return !entry.empty(); }
 };
 
 /**
@@ -69,6 +83,27 @@ public:
 
     /** @brief Resolves a class name or UUID string to a class UID, or zero Uid if not found. */
     virtual Uid resolve_class(string_view name) const = 0;
+
+    /**
+     * @brief Turns source tracking on or off. Off by default.
+     *
+     * While it is on, create_json_importer() returns an importer that records, for each
+     * object it creates with an id, the source and the object's entry in the file
+     * (source_of). Importers created while it is off record nothing. Turn it on before
+     * any content is imported.
+     */
+    virtual void set_track_sources(bool on) = 0;
+
+    /** @brief Returns true if source tracking is on. */
+    virtual bool track_sources() const = 0;
+
+    /**
+     * @brief Where @p object was imported from, or an empty ImportSource.
+     *
+     * Only objects imported while source tracking was on have a source. Tracking holds
+     * objects weakly, so it does not keep them alive.
+     */
+    virtual ImportSource source_of(const IObject& object) const = 0;
 };
 
 } // namespace velk

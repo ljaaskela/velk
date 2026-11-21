@@ -10,10 +10,12 @@
 #include <velk/interface/intf_array_any.h>
 #include <velk/interface/intf_importer_extension.h>
 #include <velk/interface/intf_object_ref.h>
+#include <velk/interface/intf_object_storage.h>
 #include <velk/interface/resource/intf_resource.h>
 #include <velk/interface/resource/intf_resource_decoder.h>
 #include <velk/interface/resource/intf_resource_store.h>
 #include <velk/plugins/animator/plugin.h>
+#include <velk/plugins/importer/api/importer.h>
 #include <velk/plugins/importer/interface/intf_importer_plugin.h>
 #include <velk/plugins/importer/plugin.h>
 #include <velk/string.h>
@@ -1487,6 +1489,153 @@ TEST_F(ImporterTest, JsonValueCodecArrays)
     ASSERT_NE(nullptr, array);
     ASSERT_TRUE(succeeded(array->set_from_buffer(values, 2, type_uid<float>())));
     EXPECT_EQ(string("[1,2.5]"), codec->to_json(*any, type_uid<vector<float>>()));
+}
+
+TEST_F(ImporterTest, AttachmentIdResolves)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "objects": [
+            { "id": "w1", "class": "test.Widget" },
+            { "id": "c1", "class": "test.Container", "properties": { "target": { "ref": "panel" } } },
+            { "id": "c2", "class": "test.Container", "properties": { "target": { "ref": "attachments.panel" } } }
+        ],
+        "attachments": [
+            { "id": "panel", "class": "test.Panel", "targets": ["w1"], "properties": { "opacity": 0.5 } },
+            { "class": "test.Panel", "targets": ["w1"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto panel = result.store->find("attachment:panel");
+    ASSERT_TRUE(panel);
+    EXPECT_DOUBLE_EQ(0.5, interface_cast<ITestImportPanel>(panel)->opacity().get_value());
+
+    auto* storage = interface_cast<IObjectStorage>(result.store->find("w1"));
+    ASSERT_NE(nullptr, storage);
+    EXPECT_EQ(2u, storage->attachment_count());
+
+    for (string_view id : {string_view("c1"), string_view("c2")}) {
+        auto* container = interface_cast<ITestImportContainer>(result.store->find(id));
+        ASSERT_NE(nullptr, container);
+        auto* ref = interface_cast<IObjectRef>(container->target().get_value());
+        ASSERT_NE(nullptr, ref);
+        EXPECT_EQ(panel, ref->get_object()) << id;
+    }
+}
+
+TEST_F(ImporterTest, AttachmentIdErrors)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "objects": [ { "id": "w1", "class": "test.Widget" } ],
+        "attachments": [
+            { "id": 5, "class": "test.Panel", "targets": ["w1"] },
+            { "id": "p", "class": "test.Panel", "targets": ["w1"] },
+            { "id": "p", "class": "test.Panel", "targets": ["w1"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_EQ(2u, result.errors.size());
+}
+
+TEST_F(ImporterTest, SourceTrackingOffRecordsNothing)
+{
+    load_importer();
+    auto* ip = interface_cast<IImporterPlugin>(instance().plugin_registry().find_plugin(PluginId::ImporterPlugin));
+    ASSERT_NE(nullptr, ip);
+    EXPECT_FALSE(ip->track_sources());
+
+    auto importer = create_json_importer();
+    auto result = importer.import_from(R"({ "version": 1, "objects": [ { "id": "w1", "class": "test.Widget" } ] })",
+                                       "scene.json");
+    ASSERT_TRUE(result.store);
+    auto w1 = result.store->find("w1");
+    ASSERT_TRUE(w1);
+    EXPECT_FALSE(ip->source_of(*w1));
+}
+
+TEST_F(ImporterTest, SourceTrackingRecordsEntries)
+{
+    load_importer();
+    auto* ip = interface_cast<IImporterPlugin>(instance().plugin_registry().find_plugin(PluginId::ImporterPlugin));
+    ASSERT_NE(nullptr, ip);
+    ip->set_track_sources(true);
+    EXPECT_TRUE(ip->track_sources());
+
+    auto importer = create_json_importer();
+    auto result = importer.import_from(R"({
+        "version": 1,
+        "objects": [ { "id": "w1", "class": "test.Widget" } ],
+        "resources": [ { "id": "r1", "class": "test.Resource" } ],
+        "hierarchies": { "scene": { "w1": [] } },
+        "attachments": [
+            { "id": "panel", "class": "test.Panel", "targets": ["w1"] },
+            { "class": "test.Panel", "targets": ["w1"] }
+        ]
+    })", "scene.json");
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto expect_source = [&](const IObject::Ptr& object, const char* entry) {
+        ASSERT_TRUE(object) << entry;
+        auto source = ip->source_of(*object);
+        EXPECT_EQ(string("scene.json"), source.source) << entry;
+        EXPECT_EQ(string(entry), source.entry);
+    };
+    expect_source(result.store->find("w1"), "objects/w1");
+    expect_source(result.store->find("resource:r1"), "resources/r1");
+    expect_source(result.store->find("attachment:panel"), "attachments/panel");
+
+    // An attachment without an id has no entry.
+    auto* storage = interface_cast<IObjectStorage>(result.store->find("w1"));
+    ASSERT_NE(nullptr, storage);
+    ASSERT_EQ(2u, storage->attachment_count());
+    auto unnamed = interface_pointer_cast<IObject>(storage->get_attachment(1));
+    ASSERT_TRUE(unnamed);
+    EXPECT_NE(result.store->find("attachment:panel"), unnamed);
+    EXPECT_FALSE(ip->source_of(*unnamed));
+
+    // Hierarchies are not entries.
+    auto hierarchy = result.store->find("hierarchy:scene");
+    ASSERT_TRUE(hierarchy);
+    EXPECT_FALSE(ip->source_of(*hierarchy));
+
+    // The plain importer records nothing, even with tracking on.
+    auto plain = importer_->import_from(R"({ "version": 1, "objects": [ { "id": "w2", "class": "test.Widget" } ] })",
+                                        "plain.json");
+    ASSERT_TRUE(plain.store);
+    EXPECT_FALSE(ip->source_of(*plain.store->find("w2")));
+}
+
+TEST_F(ImporterTest, SourceTrackingHoldsObjectsWeakly)
+{
+    load_importer();
+    auto* ip = interface_cast<IImporterPlugin>(instance().plugin_registry().find_plugin(PluginId::ImporterPlugin));
+    ASSERT_NE(nullptr, ip);
+    ip->set_track_sources(true);
+
+    IObject::WeakPtr weak;
+    {
+        auto result = create_json_importer().import_from(
+            R"({ "version": 1, "objects": [ { "id": "w1", "class": "test.Widget" } ] })", "scene.json");
+        ASSERT_TRUE(result.store);
+        auto w1 = result.store->find("w1");
+        ASSERT_TRUE(w1);
+        EXPECT_TRUE(ip->source_of(*w1));
+        weak = w1;
+    }
+    EXPECT_FALSE(weak.lock());
+
+    // A new object, possibly at the dead one's address, has no source.
+    auto fresh = instance().create<IObject>(TestImportWidget::static_class_id());
+    ASSERT_TRUE(fresh);
+    EXPECT_FALSE(ip->source_of(*fresh));
 }
 
 } // namespace velk

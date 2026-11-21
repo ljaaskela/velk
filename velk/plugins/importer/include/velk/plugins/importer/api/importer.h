@@ -17,10 +17,13 @@ public:
     /** @brief Returns true if the importer is valid. */
     explicit operator bool() const { return imp_.operator bool(); }
 
-    /** @brief Imports from a source string and returns a populated store with any errors. */
-    ImportResult import_from(string_view source) const
+    /**
+     * @brief Imports @p text and returns a populated store with any errors.
+     * @param source Where @p text came from, usually the file's path; used by source tracking.
+     */
+    ImportResult import_from(string_view text, string_view source = {}) const
     {
-        return imp_ ? imp_->import_from(source) : ImportResult{};
+        return imp_ ? imp_->import_from(text, source) : ImportResult{};
     }
 
     /** @brief Returns the underlying IStoreImporter pointer. */
@@ -30,11 +33,17 @@ private:
     IStoreImporter::Ptr imp_;
 };
 
-/** @brief Creates a JSON importer. Loads the importer plugin if not already loaded. */
+/**
+ * @brief Creates a JSON importer. Loads the importer plugin if not already loaded.
+ *
+ * While source tracking is on (IImporterPlugin::set_track_sources), the importer records
+ * where each object came from.
+ */
 inline Importer create_json_importer()
 {
-    ::velk::get_or_load_plugin<IImporterPlugin>(PluginId::ImporterPlugin);
-    auto obj = ::velk::instance().create<IStoreImporter>(ClassId::JsonImporter);
+    auto ip = ::velk::get_or_load_plugin<IImporterPlugin>(PluginId::ImporterPlugin);
+    const Uid cls = ip && ip->track_sources() ? ClassId::TrackingJsonImporter : ClassId::JsonImporter;
+    auto obj = ::velk::instance().create<IStoreImporter>(cls);
     return obj ? Importer(obj) : Importer{};
 }
 

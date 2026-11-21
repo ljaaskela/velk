@@ -47,7 +47,7 @@ const MemberDesc* find_property_desc(const ClassInfo& info, string_view name)
 
 } // namespace
 
-ImportResult JsonImporter::import_from(string_view json) const
+ImportResult JsonImporter::import_from(string_view json, string_view) const
 {
     ImportResult result;
 
@@ -554,14 +554,22 @@ IObject::Ptr JsonImporter::resolve_object(IStore& store, const ImportContext& ct
         return resolve_object_by_path(store, ctx, path);
     }
 
-    // Namespace-qualified lookup: "resources.id" or "objects.id"
+    // Namespace-qualified lookup: "resources.id", "attachments.id" or "objects.id"
     string_view prefix_resources = "resources.";
+    string_view prefix_attachments = "attachments.";
     string_view prefix_objects = "objects.";
 
     if (path.size() > prefix_resources.size() &&
         string_view(path.data(), prefix_resources.size()) == prefix_resources) {
         auto id = path.substr(prefix_resources.size());
         auto store_key = string("resource:") + string(id);
+        return store.find(store_key);
+    }
+
+    if (path.size() > prefix_attachments.size() &&
+        string_view(path.data(), prefix_attachments.size()) == prefix_attachments) {
+        auto id = path.substr(prefix_attachments.size());
+        auto store_key = string("attachment:") + string(id);
         return store.find(store_key);
     }
 
@@ -893,7 +901,7 @@ private:
     const JsonImporter::ImportContext& ctx_;
 };
 
-void JsonImporter::process_attachments(const JsonValue& root, IStore& store, const ImportContext& ctx,
+void JsonImporter::process_attachments(const JsonValue& root, IStore& store, ImportContext& ctx,
                                        ImportResult& result) const
 {
     auto* attachments = root.find("attachments");
@@ -912,9 +920,25 @@ void JsonImporter::process_attachments(const JsonValue& root, IStore& store, con
             continue;
         }
 
+        // The id is optional. With one, the attachment is stored as "attachment:<id>" and
+        // references and bindings can name it like an object.
+        auto* id_val = entry.find("id");
+        if (id_val && id_val->type() != JsonType::String) {
+            add_error(result, "attachment 'id' must be a string");
+            continue;
+        }
+
         auto obj = create_object(entry, ctx, result);
         if (!obj) {
             continue;
+        }
+
+        if (id_val) {
+            if (failed(store.add(string("attachment:") + id_val->as_string(), obj))) {
+                add_error(result, string("attachment: duplicate id '") + id_val->as_string() + "'");
+            } else {
+                register_imported_object(ctx, obj, entry, result);
+            }
         }
 
         auto att = interface_pointer_cast<IInterface>(obj);

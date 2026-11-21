@@ -3,6 +3,7 @@
 
 #include <velk/interface/intf_object.h>
 #include <velk/interface/types.h>
+#include <velk/string.h>
 
 namespace velk {
 
@@ -23,6 +24,8 @@ public:
     virtual size_t object_count() const = 0;
     /** @brief Returns the object at the given index, or nullptr if out of range. */
     virtual IObject::Ptr object_at(size_t index) const = 0;
+    /** @brief Returns the id of the object at the given index, or an empty string if out of range. */
+    virtual string id_at(size_t index) const = 0;
     /** @brief Adds an object with the given id. Returns Fail if id already exists. */
     virtual ReturnValue add(string_view id, const IObject::Ptr& object) = 0;
 };
