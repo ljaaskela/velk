@@ -18,6 +18,18 @@ namespace velk::remote {
 
 class RemoteServer;
 
+/** @brief A call request whose reply waits for its results. */
+struct CallBatch
+{
+    std::shared_ptr<Connection> connection;
+    uint32_t id = 0;
+    vector<RemoteCallResult> results;
+    size_t outstanding = 0; ///< Calls still waiting for their future.
+};
+
+/** @brief Sends the reply of @p batch. */
+void send_call_reply(const CallBatch& batch);
+
 /** @brief Forwards property changes of subscribed objects to the server. */
 class ChangeObserver final : public ::velk::ext::ObjectCore<ChangeObserver, IMetadataObserver>
 {
@@ -64,6 +76,9 @@ public:
 
     /** @brief From the observer: a property, or with an empty name an interface's state, changed. */
     void changed(IMetadata& owner, string_view name, Uid interface_uid);
+
+    /** @brief Encodes what a function returned; null means it returns nothing. */
+    ReturnValue encode_result(const IAny* value, RemoteValue& out);
 
 private:
     struct Peer

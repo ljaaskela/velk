@@ -1,4 +1,5 @@
 #include <velk/api/event.h>
+#include <velk/api/future.h>
 #include <velk/api/hierarchy.h>
 #include <velk/api/state.h>
 #include <velk/api/velk.h>
@@ -25,7 +26,8 @@ public:
         (RPROP, int, version, 3),
         (ARR, float, samples, 1.f, 2.f, 3.f),
         (FN, float, scaled, (float, factor)),
-        (FN, vector<uint8_t>, bytes, (int, count))
+        (FN, vector<uint8_t>, bytes, (int, count)),
+        (FN, IFuture::Ptr, later)
     )
 };
 
@@ -48,6 +50,16 @@ public:
         }
         return out;
     }
+
+    /** @brief A result that arrives later: the test resolves it with pending.set_value(). */
+    IFuture::Ptr fn_later() override
+    {
+        auto future = instance().create_future();
+        pending = Promise(future);
+        return future;
+    }
+
+    Promise pending{IFuture::Ptr{}};
 };
 
 class RemoteTest : public ::testing::Test
@@ -429,6 +441,35 @@ TEST_F(RemoteTest, Call)
     }
 
     EXPECT_FALSE(succeeded(results.items[2].status));
+}
+
+TEST_F(RemoteTest, CallReturningFuture)
+{
+    connect_socket();
+    const RemoteHandle h = widget_handle();
+    const RemoteCall calls[] = {{h, "later", {}}, {h, "scaled", {make_remote_value(3.f)}}};
+    auto results = client_.call(calls);
+
+    // The reply waits for the future.
+    for (int i = 0; i < 20; ++i) {
+        instance().update();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    EXPECT_FALSE(results.is_ready());
+
+    auto* widget = static_cast<TestRemoteWidget*>(interface_cast<ITestRemoteWidget>(widget_));
+    ASSERT_TRUE(widget->pending);
+    widget->pending.set_value(7.5f);
+
+    auto done = wait(results);
+    ASSERT_EQ(2u, done.items.size());
+    float later = 0.f;
+    EXPECT_TRUE(succeeded(done.items[0].status));
+    EXPECT_TRUE(read_remote_value(done.items[0].value, later));
+    EXPECT_FLOAT_EQ(7.5f, later);
+    float scaled = 0.f;
+    EXPECT_TRUE(read_remote_value(done.items[1].value, scaled));
+    EXPECT_FLOAT_EQ(30.f, scaled);
 }
 
 TEST_F(RemoteTest, PackedArrays)

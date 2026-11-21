@@ -2,6 +2,7 @@
 
 #include "driver.h"
 
+#include <velk/api/future.h>
 #include <velk/api/velk.h>
 #include <velk/interface/intf_hierarchy.h>
 #include <velk/interface/intf_object_storage.h>
@@ -29,6 +30,27 @@ T* cast(const IObject::Ptr& object)
 }
 
 } // namespace
+
+void send_call_reply(const CallBatch& batch)
+{
+    Writer w({Kind::Reply, Op::Call, batch.id});
+    w.u32(static_cast<uint32_t>(batch.results.size()));
+    for (auto& r : batch.results) {
+        w.i32(static_cast<int32_t>(r.status));
+        w.value(r.value);
+    }
+    batch.connection->send(w.message());
+}
+
+ReturnValue RemoteServer::encode_result(const IAny* value, RemoteValue& out)
+{
+    out = {};
+    if (!value) {
+        return ReturnValue::Success; // the function returns nothing
+    }
+    const auto types = value->get_compatible_types();
+    return types.empty() ? ReturnValue::Fail : encode_value(*value, types[0], {}, handles_, out);
+}
 
 void ChangeObserver::on_state_changed(string_view name, IMetadata& owner, Uid interfaceId)
 {
@@ -717,8 +739,15 @@ void RemoteServer::run(Peer& peer, const Message& message)
         if (!r.ok()) {
             break;
         }
-        w.u32(static_cast<uint32_t>(calls.size()));
-        for (auto& c : calls) {
+        // The reply goes out when every call has a result; a call returning a future
+        // has one when the future resolves.
+        auto batch = std::make_shared<CallBatch>();
+        batch->connection = peer.connection;
+        batch->id = h.id;
+        batch->results.resize(calls.size());
+        vector<std::pair<size_t, IFuture::Ptr>> waiting;
+        for (size_t i = 0; i < calls.size(); ++i) {
+            auto& c = calls[i];
             const auto object = object_at(c.object);
             auto* meta = cast<IMetadata>(object);
             auto function = meta ? meta->get_function(c.function) : nullptr;
@@ -733,19 +762,39 @@ void RemoteServer::run(Peer& peer, const Message& message)
                 pointers.push_back(any.get());
                 args.push_back(std::move(any));
             }
-            RemoteValue result;
+            auto& result = batch->results[i];
+            result.status = status;
             if (succeeded(status)) {
                 auto value = function->invoke(FnArgs{pointers.data(), pointers.size()}, InvokeType::Immediate);
-                if (value) {
-                    const auto types = value->get_compatible_types();
-                    status = types.empty() ? ReturnValue::Fail
-                                           : encode_value(*value, types[0], {}, handles_, result);
+                IFuture::Ptr future;
+                if (value && is_compatible(*value, type_uid<IFuture::Ptr>())
+                    && succeeded(value->get_data(&future, sizeof(future), type_uid<IFuture::Ptr>())) && future) {
+                    waiting.push_back({i, future});
+                } else {
+                    result.status = encode_result(value.get(), result.value);
                 }
             }
-            w.i32(static_cast<int32_t>(status));
-            w.value(result);
         }
-        break;
+        batch->outstanding = waiting.size();
+        if (waiting.empty()) {
+            send_call_reply(*batch);
+            return;
+        }
+        IRemoteServer::WeakPtr weak = get_self<IRemoteServer>();
+        for (auto& [index, future] : waiting) {
+            const size_t i = index;
+            const IFuture::Ptr f = future;
+            Future<void>(f).then([weak, batch, i, f]() {
+                auto self = weak.lock();
+                auto* server = static_cast<RemoteServer*>(self.get());
+                auto& result = batch->results[i];
+                result.status = server ? server->encode_result(f->get_result(), result.value) : ReturnValue::Fail;
+                if (--batch->outstanding == 0) {
+                    send_call_reply(*batch);
+                }
+            });
+        }
+        return;
     }
     default:
         peer.connection->close();

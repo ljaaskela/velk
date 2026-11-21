@@ -20,6 +20,7 @@
 #include <velk/api/velk.h>
 #include <velk/ext/any.h>
 #include <velk/interface/hive/intf_hive.h>
+#include <velk/interface/intf_future.h>
 #include <velk/interface/intf_log.h>
 #include <velk/interface/intf_velk.h>
 #include <velk/string.h>
@@ -70,6 +71,8 @@ TypeRegistry::TypeRegistry(ILog& log) : log_(log)
     ITypeRegistry::register_type<ext::AnyValue<aabb>>();
     ITypeRegistry::register_type<ext::AnyValue<ReturnValue>>();
     ITypeRegistry::register_type<ext::AnyValue<HierarchyChange>>();
+    // Lets FN functions return a future, for results that arrive later.
+    ITypeRegistry::register_type<ext::AnyValue<IFuture::Ptr>>();
 
     ITypeRegistry::register_type<ext::ArrayAnyValue<float>>();
     ITypeRegistry::register_type<ext::ArrayAnyValue<double>>();
