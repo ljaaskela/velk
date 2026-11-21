@@ -31,7 +31,10 @@ public:
      * @param source Where @p text came from, usually the file's path. Recorded for each
      *               imported object while source tracking is on (IImporterPlugin::set_track_sources).
      */
-    virtual ImportResult import_from(string_view text, string_view source = {}) const = 0;
+    virtual ImportResult import_from(string_view text, string_view source) const = 0;
+
+    /** @brief Imports @p text with no source. */
+    ImportResult import_from(string_view text) const { return import_from(text, {}); }
 };
 
 /** @brief Where an imported object came from. Empty when the object was not tracked. */

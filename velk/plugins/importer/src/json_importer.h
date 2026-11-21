@@ -23,7 +23,7 @@ class JsonImporter : public ext::ObjectCore<JsonImporter, IStoreImporter, IJsonV
 public:
     VELK_CLASS_UID(ClassId::JsonImporter, "JsonImporter");
 
-    ImportResult import_from(string_view json, string_view source = {}) const override;
+    ImportResult import_from(string_view json, string_view source) const override;
 
     // IJsonValueCodec
     string to_json(const IAny& value, Uid type) const override;

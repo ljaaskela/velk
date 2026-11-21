@@ -21,7 +21,7 @@ public:
 
     TrackingJsonImporter();
 
-    ImportResult import_from(string_view text, string_view source = {}) const override;
+    ImportResult import_from(string_view text, string_view source) const override;
 
     // IJsonValueCodec
     string to_json(const IAny& value, Uid type) const override;
