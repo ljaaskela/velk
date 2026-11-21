@@ -36,6 +36,7 @@ enum class Op : uint8_t
     AddProperty,
     Insert,
     Remove,
+    Call,
 
     Changed = 64, ///< Notification: RemotePropertyValues.
     Released      ///< Notification: handles of objects that no longer exist.

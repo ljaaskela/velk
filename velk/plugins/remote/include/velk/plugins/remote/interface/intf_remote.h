@@ -121,6 +121,9 @@ public:
 
     /** @brief Removes nodes, with their subtrees, from hierarchies. Resolves to RemoteResults. */
     virtual IFuture::Ptr remove(array_view<RemoteNode> nodes) = 0;
+
+    /** @brief Calls functions on objects, in order, in one server update. Resolves to RemoteCallResults. */
+    virtual IFuture::Ptr call(array_view<RemoteCall> calls) = 0;
 };
 
 } // namespace velk

@@ -54,7 +54,7 @@ Values travel as `RemoteValue`:
 | `Bytes` | Numbers, bool, vectors, colors, matrices, enums | The value's memory |
 | `String` | `string` | UTF-8 |
 | `Object` | `ObjectRef` | The referenced object's handle |
-| `Array` | Array properties | The elements |
+| `Array` | Array properties and array results | Plain data elements packed in `data`; other elements one value each in `elements` |
 
 Because plain data travels as memory, the client and server must share the memory layout of those types: build them from the same source. Property types that hold pointers or heap memory other than `string`, `ObjectRef` and arrays are not supported.
 
@@ -89,3 +89,4 @@ Server and client belong to the thread that created them. The server runs reques
 | `add_property(values)` | Handle, name, value (typed by the value) | `RemoteResults` |
 | `insert(items)` | Hierarchy, parent (0 sets the root), index (past the end appends), child | `RemoteResults` |
 | `remove(nodes)` | Hierarchy and node; removes the subtree | `RemoteResults` |
+| `call(calls)` | Handle, function name (`FN` members), arguments | `RemoteCallResults`: status and returned value per call |

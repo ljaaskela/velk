@@ -28,6 +28,14 @@ public:
     virtual void clear_array() = 0;
     /** @brief Bulk-sets contents from a raw element buffer. */
     virtual ReturnValue set_from_buffer(const void* data, size_t count, Uid elementType) = 0;
+    /** @brief Returns the element type uid. */
+    virtual Uid element_type() const = 0;
+    /**
+     * @brief Bulk-reads the first @p count elements into a raw element buffer.
+     *
+     * For plain data element types; returns Fail for others, which are read with get_at().
+     */
+    virtual ReturnValue get_buffer(void* data, size_t count, Uid elementType) const = 0;
 };
 
 } // namespace velk

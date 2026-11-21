@@ -489,6 +489,23 @@ public:
         }
     }
 
+    Uid element_type() const override { return elem_uid_; }
+
+    ReturnValue get_buffer(void* data, size_t count, Uid elementType) const override
+    {
+        if constexpr (std::is_trivially_copyable_v<T>) {
+            if (elementType != elem_uid_ || count > vec().size() || (count && !data)) {
+                return ReturnValue::InvalidArgument;
+            }
+            if (count) {
+                std::memcpy(data, vec().data(), count * sizeof(T));
+            }
+            return ReturnValue::Success;
+        } else {
+            return ReturnValue::Fail;
+        }
+    }
+
 private:
     static bool is_valid_args(const void* from, size_t fromSize, Uid type) noexcept
     {

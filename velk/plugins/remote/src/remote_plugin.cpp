@@ -50,6 +50,7 @@ ReturnValue RemotePlugin::initialize(IVelk& velk, PluginConfig& config)
     rv &= register_type<::velk::ext::AnyValue<RemotePropertyValues>>(velk);
     rv &= register_type<::velk::ext::AnyValue<RemoteResults>>(velk);
     rv &= register_type<::velk::ext::AnyValue<RemoteHandles>>(velk);
+    rv &= register_type<::velk::ext::AnyValue<RemoteCallResults>>(velk);
     return rv;
 }
 

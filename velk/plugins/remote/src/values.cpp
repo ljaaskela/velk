@@ -95,11 +95,23 @@ ReturnValue encode_value(const IAny& any, Uid type, Uid element_type, HandleTabl
     }
     if (auto* array = interface_cast<IArrayAny>(&mutable_any)) {
         if (element_type == Uid{}) {
-            return ReturnValue::Fail;
+            element_type = array->element_type();
         }
         out.form = RemoteValue::Form::Array;
         out.element_type = element_type;
         const size_t n = array->array_size();
+        // Plain elements travel packed, in one copy.
+        if (element_type != type_uid<string>() && element_type != ClassId::ObjectRef) {
+            auto probe = instance().create_any(element_type);
+            const size_t element_size = probe ? probe->get_data_size(element_type) : 0;
+            if (element_size) {
+                out.data.resize(n * element_size);
+                if (n == 0 || succeeded(array->get_buffer(out.data.data(), n, element_type))) {
+                    return ReturnValue::Success;
+                }
+                out.data.clear();
+            }
+        }
         out.elements.resize(n);
         for (size_t i = 0; i < n; ++i) {
             auto element = instance().create_any(element_type);
@@ -157,6 +169,16 @@ IAny::Ptr decode_value(const RemoteValue& value, HandleTable& handles)
             return nullptr;
         }
         array->clear_array();
+        if (!value.data.empty()) {
+            auto probe = instance().create_any(value.element_type);
+            const size_t element_size = probe ? probe->get_data_size(value.element_type) : 0;
+            if (!element_size || value.data.size() % element_size != 0
+                || failed(array->set_from_buffer(value.data.data(), value.data.size() / element_size,
+                                                 value.element_type))) {
+                return nullptr;
+            }
+            return any;
+        }
         for (auto& e : value.elements) {
             auto element = decode_value(e, handles);
             if (!element || failed(array->push_back(*element))) {

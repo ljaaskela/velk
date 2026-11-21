@@ -36,10 +36,10 @@ struct RemoteValue
 
     Uid type;                     ///< The value's type uid.
     Form form = Form::None;
-    vector<uint8_t> data;
+    vector<uint8_t> data;         ///< Bytes, String; Array: the elements packed, when they are plain data.
     RemoteHandle object = 0;      ///< Form::Object: the referenced object, 0 for an empty reference.
     Uid element_type;             ///< Form::Array: the element type uid.
-    vector<RemoteValue> elements; ///< Form::Array: the elements.
+    vector<RemoteValue> elements; ///< Form::Array: the elements, when they are not packed in data.
 
     bool operator==(const RemoteValue& o) const
     {
@@ -254,6 +254,30 @@ struct RemoteInsert
     bool operator!=(const RemoteInsert& o) const { return !(*this == o); }
 };
 
+/** @brief A function call: call() input. */
+struct RemoteCall
+{
+    RemoteHandle object = 0;
+    string function;
+    vector<RemoteValue> args;
+
+    bool operator==(const RemoteCall& o) const
+    {
+        return object == o.object && function == o.function && args == o.args;
+    }
+    bool operator!=(const RemoteCall& o) const { return !(*this == o); }
+};
+
+/** @brief What a call returned. */
+struct RemoteCallResult
+{
+    ReturnValue status{}; ///< Fail when the object or function does not exist, or the result cannot be encoded.
+    RemoteValue value;    ///< Form::None when the function returns nothing.
+
+    bool operator==(const RemoteCallResult& o) const { return status == o.status && value == o.value; }
+    bool operator!=(const RemoteCallResult& o) const { return !(*this == o); }
+};
+
 /// @name Replies and event arguments, each one list wrapped in a struct.
 /// @{
 template <class T>
@@ -272,6 +296,7 @@ using RemoteChildrenList = RemoteList<RemoteChildren>;
 using RemotePropertyValues = RemoteList<RemotePropertyValue>;
 using RemoteResults = RemoteList<ReturnValue>; ///< One result per input item, in order.
 using RemoteHandles = RemoteList<RemoteHandle>;
+using RemoteCallResults = RemoteList<RemoteCallResult>;
 /// @}
 
 } // namespace velk

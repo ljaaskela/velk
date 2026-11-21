@@ -63,67 +63,71 @@ public:
     void disconnect() { with<IRemoteClient>([](auto& c) { c.disconnect(); }); }
     bool is_connected() const { return with<IRemoteClient>([](auto& c) { return c.is_connected(); }); }
 
-    Future<RemoteRoots> roots() { return call<RemoteRoots>([](auto& c) { return c.roots(); }); }
+    Future<RemoteRoots> roots() { return request<RemoteRoots>([](auto& c) { return c.roots(); }); }
     Future<RemoteObjects> instances(array_view<Uid> classes)
     {
-        return call<RemoteObjects>([&](auto& c) { return c.instances(classes); });
+        return request<RemoteObjects>([&](auto& c) { return c.instances(classes); });
     }
     Future<RemoteDescriptions> describe(array_view<RemoteHandle> objects)
     {
-        return call<RemoteDescriptions>([&](auto& c) { return c.describe(objects); });
+        return request<RemoteDescriptions>([&](auto& c) { return c.describe(objects); });
     }
     Future<RemoteChildrenList> children(array_view<RemoteNode> nodes)
     {
-        return call<RemoteChildrenList>([&](auto& c) { return c.children(nodes); });
+        return request<RemoteChildrenList>([&](auto& c) { return c.children(nodes); });
     }
     Future<RemotePropertyValues> get(array_view<RemotePropertyName> properties)
     {
-        return call<RemotePropertyValues>([&](auto& c) { return c.get(properties); });
+        return request<RemotePropertyValues>([&](auto& c) { return c.get(properties); });
     }
     Future<RemoteResults> set(array_view<RemotePropertyValue> values)
     {
-        return call<RemoteResults>([&](auto& c) { return c.set(values); });
+        return request<RemoteResults>([&](auto& c) { return c.set(values); });
     }
     Future<RemoteResults> subscribe(array_view<RemoteHandle> objects)
     {
-        return call<RemoteResults>([&](auto& c) { return c.subscribe(objects); });
+        return request<RemoteResults>([&](auto& c) { return c.subscribe(objects); });
     }
     Future<RemoteResults> unsubscribe(array_view<RemoteHandle> objects)
     {
-        return call<RemoteResults>([&](auto& c) { return c.unsubscribe(objects); });
+        return request<RemoteResults>([&](auto& c) { return c.unsubscribe(objects); });
     }
     Future<RemoteObjects> create(array_view<Uid> classes)
     {
-        return call<RemoteObjects>([&](auto& c) { return c.create(classes); });
+        return request<RemoteObjects>([&](auto& c) { return c.create(classes); });
     }
     Future<RemoteResults> release(array_view<RemoteHandle> objects)
     {
-        return call<RemoteResults>([&](auto& c) { return c.release(objects); });
+        return request<RemoteResults>([&](auto& c) { return c.release(objects); });
     }
     Future<RemoteResults> add_attachment(array_view<RemoteAttachment> attachments)
     {
-        return call<RemoteResults>([&](auto& c) { return c.add_attachment(attachments); });
+        return request<RemoteResults>([&](auto& c) { return c.add_attachment(attachments); });
     }
     Future<RemoteResults> remove_attachment(array_view<RemoteAttachment> attachments)
     {
-        return call<RemoteResults>([&](auto& c) { return c.remove_attachment(attachments); });
+        return request<RemoteResults>([&](auto& c) { return c.remove_attachment(attachments); });
     }
     Future<RemoteResults> add_property(array_view<RemotePropertyValue> properties)
     {
-        return call<RemoteResults>([&](auto& c) { return c.add_property(properties); });
+        return request<RemoteResults>([&](auto& c) { return c.add_property(properties); });
     }
     Future<RemoteResults> insert(array_view<RemoteInsert> inserts)
     {
-        return call<RemoteResults>([&](auto& c) { return c.insert(inserts); });
+        return request<RemoteResults>([&](auto& c) { return c.insert(inserts); });
     }
     Future<RemoteResults> remove(array_view<RemoteNode> nodes)
     {
-        return call<RemoteResults>([&](auto& c) { return c.remove(nodes); });
+        return request<RemoteResults>([&](auto& c) { return c.remove(nodes); });
+    }
+    Future<RemoteCallResults> call(array_view<RemoteCall> calls)
+    {
+        return request<RemoteCallResults>([&](auto& c) { return c.call(calls); });
     }
 
 private:
     template <class T, class F>
-    Future<T> call(F&& fn)
+    Future<T> request(F&& fn)
     {
         return Future<T>(with<IRemoteClient>([&](auto& c) { return fn(c); }));
     }

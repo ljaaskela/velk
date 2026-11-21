@@ -148,6 +148,9 @@ void resolve_empty(Op op, Promise& promise)
     case Op::Get:
         promise.set_value(RemotePropertyValues{});
         break;
+    case Op::Call:
+        promise.set_value(RemoteCallResults{});
+        break;
     default:
         promise.set_value(RemoteResults{});
         break;
@@ -348,6 +351,21 @@ IFuture::Ptr RemoteClient::remove(array_view<RemoteNode> nodes)
     return send(w);
 }
 
+IFuture::Ptr RemoteClient::call(array_view<RemoteCall> calls)
+{
+    Writer w = begin(Op::Call);
+    w.u32(static_cast<uint32_t>(calls.size()));
+    for (auto& c : calls) {
+        w.u64(c.object);
+        w.str(c.function);
+        w.u32(static_cast<uint32_t>(c.args.size()));
+        for (auto& a : c.args) {
+            w.value(a);
+        }
+    }
+    return send(w);
+}
+
 void RemoteClient::resolve(Reader& r, Pending& pending)
 {
     switch (pending.op) {
@@ -400,6 +418,17 @@ void RemoteClient::resolve(Reader& r, Pending& pending)
     case Op::Get:
         pending.promise.set_value(RemotePropertyValues{read_property_values(r)});
         return;
+    case Op::Call: {
+        RemoteCallResults out;
+        for (uint32_t n = r.count(), i = 0; i < n && r.ok(); ++i) {
+            RemoteCallResult c;
+            c.status = static_cast<ReturnValue>(r.i32());
+            r.value(c.value);
+            out.items.push_back(std::move(c));
+        }
+        pending.promise.set_value(out);
+        return;
+    }
     default:
         pending.promise.set_value(RemoteResults{read_results(r)});
         return;

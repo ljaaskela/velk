@@ -701,6 +701,52 @@ void RemoteServer::run(Peer& peer, const Message& message)
         write_results(w, results);
         break;
     }
+    case Op::Call: {
+        vector<RemoteCall> calls;
+        for (uint32_t n = r.count(), i = 0; i < n; ++i) {
+            RemoteCall c;
+            c.object = r.u64();
+            c.function = r.str();
+            for (uint32_t m = r.count(), j = 0; j < m; ++j) {
+                RemoteValue v;
+                r.value(v);
+                c.args.push_back(std::move(v));
+            }
+            calls.push_back(std::move(c));
+        }
+        if (!r.ok()) {
+            break;
+        }
+        w.u32(static_cast<uint32_t>(calls.size()));
+        for (auto& c : calls) {
+            const auto object = object_at(c.object);
+            auto* meta = cast<IMetadata>(object);
+            auto function = meta ? meta->get_function(c.function) : nullptr;
+            ReturnValue status = function ? ReturnValue::Success : ReturnValue::Fail;
+            vector<IAny::Ptr> args;
+            vector<const IAny*> pointers;
+            for (auto& a : c.args) {
+                auto any = decode_value(a, handles_);
+                if (!any) {
+                    status = ReturnValue::Fail;
+                }
+                pointers.push_back(any.get());
+                args.push_back(std::move(any));
+            }
+            RemoteValue result;
+            if (succeeded(status)) {
+                auto value = function->invoke(FnArgs{pointers.data(), pointers.size()}, InvokeType::Immediate);
+                if (value) {
+                    const auto types = value->get_compatible_types();
+                    status = types.empty() ? ReturnValue::Fail
+                                           : encode_value(*value, types[0], {}, handles_, result);
+                }
+            }
+            w.i32(static_cast<int32_t>(status));
+            w.value(result);
+        }
+        break;
+    }
     default:
         peer.connection->close();
         return;

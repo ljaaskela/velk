@@ -7,6 +7,7 @@
 #include <velk/plugins/remote/api/remote.h>
 
 #include <chrono>
+#include <cstring>
 #include <thread>
 
 #include <gtest/gtest.h>
@@ -21,7 +22,10 @@ public:
         (PROP, string, label, "start"),
         (PROP, int, count, 0),
         (PROP, ObjectRef, target, {}),
-        (RPROP, int, version, 3)
+        (RPROP, int, version, 3),
+        (ARR, float, samples, 1.f, 2.f, 3.f),
+        (FN, float, scaled, (float, factor)),
+        (FN, vector<uint8_t>, bytes, (int, count))
     )
 };
 
@@ -29,6 +33,21 @@ class TestRemoteWidget : public ext::Object<TestRemoteWidget, ITestRemoteWidget>
 {
 public:
     VELK_CLASS_UID("c0000000-0000-0000-0000-0000000000a1", "TestRemoteWidget");
+
+    float fn_scaled(float factor) override
+    {
+        auto state = read_state<ITestRemoteWidget>(this);
+        return state ? state->width * factor : 0.f;
+    }
+
+    vector<uint8_t> fn_bytes(int count) override
+    {
+        vector<uint8_t> out;
+        for (int i = 0; i < count; ++i) {
+            out.push_back(static_cast<uint8_t>(i));
+        }
+        return out;
+    }
 };
 
 class RemoteTest : public ::testing::Test
@@ -382,6 +401,62 @@ TEST_F(RemoteTest, AttachmentsAndDynamicProperties)
         has_extra = has_extra || (p.name == "extra" && read_remote_value(p.value, v) && v == 1.5f);
     }
     EXPECT_TRUE(has_extra);
+}
+
+TEST_F(RemoteTest, Call)
+{
+    connect_socket();
+    const RemoteHandle h = widget_handle();
+    const RemoteCall calls[] = {
+        {h, "scaled", {make_remote_value(2.f)}},
+        {h, "bytes", {make_remote_value(5)}},
+        {h, "missing", {}},
+    };
+    auto results = wait(client_.call(calls));
+    ASSERT_EQ(3u, results.items.size());
+
+    EXPECT_TRUE(succeeded(results.items[0].status));
+    float scaled = 0.f;
+    EXPECT_TRUE(read_remote_value(results.items[0].value, scaled));
+    EXPECT_FLOAT_EQ(20.f, scaled);
+
+    EXPECT_TRUE(succeeded(results.items[1].status));
+    const auto& bytes = results.items[1].value;
+    EXPECT_EQ(RemoteValue::Form::Array, bytes.form);
+    ASSERT_EQ(5u, bytes.data.size()); // packed
+    for (uint8_t i = 0; i < 5; ++i) {
+        EXPECT_EQ(i, bytes.data[i]);
+    }
+
+    EXPECT_FALSE(succeeded(results.items[2].status));
+}
+
+TEST_F(RemoteTest, PackedArrays)
+{
+    connect_socket();
+    const RemoteHandle h = widget_handle();
+    const RemotePropertyName names[] = {{h, "samples"}};
+    auto got = wait(client_.get(names));
+    ASSERT_EQ(1u, got.items.size());
+    const auto& samples = got.items[0].value;
+    EXPECT_EQ(RemoteValue::Form::Array, samples.form);
+    EXPECT_EQ(type_uid<float>(), samples.element_type);
+    ASSERT_EQ(3 * sizeof(float), samples.data.size());
+
+    RemoteValue next = samples;
+    const float values[] = {4.f, 5.f};
+    next.data.resize(sizeof(values));
+    std::memcpy(next.data.data(), values, sizeof(values));
+    const RemotePropertyValue writes[] = {{h, "samples", {}, next}};
+    auto results = wait(client_.set(writes));
+    ASSERT_EQ(1u, results.items.size());
+    EXPECT_TRUE(succeeded(results.items[0]));
+
+    auto state = read_state<ITestRemoteWidget>(widget_);
+    ASSERT_TRUE(state);
+    ASSERT_EQ(2u, state->samples.size());
+    EXPECT_FLOAT_EQ(4.f, state->samples[0]);
+    EXPECT_FLOAT_EQ(5.f, state->samples[1]);
 }
 
 TEST_F(RemoteTest, Disconnect)

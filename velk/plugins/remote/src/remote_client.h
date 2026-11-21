@@ -43,6 +43,7 @@ public:
     IFuture::Ptr add_property(array_view<RemotePropertyValue> properties) override;
     IFuture::Ptr insert(array_view<RemoteInsert> inserts) override;
     IFuture::Ptr remove(array_view<RemoteNode> nodes) override;
+    IFuture::Ptr call(array_view<RemoteCall> calls) override;
 
     /** @brief Resolves replies and fires events for the messages received. */
     void pump();

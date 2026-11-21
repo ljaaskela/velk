@@ -49,9 +49,16 @@ void Writer::value(const RemoteValue& v)
         break;
     case RemoteValue::Form::Array:
         uid(v.element_type);
-        u32(static_cast<uint32_t>(v.elements.size()));
-        for (auto& e : v.elements) {
-            value(e);
+        // Packed plain elements, or one value per element.
+        u8(v.data.empty() ? 0 : 1);
+        if (!v.data.empty()) {
+            u32(static_cast<uint32_t>(v.data.size()));
+            raw(v.data.data(), v.data.size());
+        } else {
+            u32(static_cast<uint32_t>(v.elements.size()));
+            for (auto& e : v.elements) {
+                value(e);
+            }
         }
         break;
     default:
@@ -170,6 +177,12 @@ bool Reader::value(RemoteValue& out, int depth)
         break;
     case RemoteValue::Form::Array: {
         out.element_type = uid();
+        if (u8() != 0) {
+            const uint32_t size = count();
+            out.data.resize(size);
+            raw(out.data.data(), size);
+            break;
+        }
         const uint32_t n = count();
         out.elements.resize(n);
         for (uint32_t i = 0; i < n && ok_; ++i) {
