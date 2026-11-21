@@ -39,13 +39,17 @@ typename T::Ptr get_or_load_plugin(Uid pluginId)
  * level names. Messages below the current threshold are discarded without
  * formatting.
  *
+ * Arguments are printf style. `string` and `string_view` print with `%s`.
+ * Arguments other than numbers, enums, pointers and those two strings do
+ * not compile.
+ *
  * @code
  * VELK_LOG(W, "connection lost: %s", reason);
  * VELK_LOG(Debug, "tick %d", frame);
  * @endcode
  */
 #define VELK_LOG(level, fmt, ...) \
-    ::velk::detail::velk_log(     \
+    ::velk::detail::log_message(  \
         ::velk::instance().log(), _VELK_LOG_##level, __FILE__, __LINE__, fmt, ##__VA_ARGS__)
 
 #endif // VELK_API_VELK_H
