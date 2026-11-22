@@ -44,6 +44,7 @@ add_executable(tests
     test_variant.cpp
     test_thread_context.cpp
     test_importer.cpp
+    test_json.cpp
     test_resource_store.cpp
     test_js.cpp
     test_remote.cpp

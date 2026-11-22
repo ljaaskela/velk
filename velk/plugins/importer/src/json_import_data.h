@@ -1,7 +1,7 @@
 #ifndef VELK_IMPORTER_JSON_IMPORT_DATA_H
 #define VELK_IMPORTER_JSON_IMPORT_DATA_H
 
-#include "json_parser.h"
+#include <velk/json.h>
 
 #include <velk/ext/interface_dispatch.h>
 #include <velk/interface/intf_importer_extension.h>

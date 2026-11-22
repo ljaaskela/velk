@@ -1,8 +1,6 @@
 add_library(velk_importer SHARED
     src/importer_plugin.h
     src/importer_plugin.cpp
-    src/json_parser.h
-    src/json_parser.cpp
     src/json_import_data.h
     src/json_importer.h
     src/json_importer.cpp

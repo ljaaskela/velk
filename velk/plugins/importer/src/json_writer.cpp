@@ -1,5 +1,7 @@
 #include "json_writer.h"
 
+#include <velk/json.h>
+
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -32,25 +34,7 @@ void JsonWriter::before_value()
 
 void JsonWriter::quoted(string_view value)
 {
-    out_ += "\"";
-    for (char c : value) {
-        switch (c) {
-        case '"': out_ += "\\\""; break;
-        case '\\': out_ += "\\\\"; break;
-        case '\n': out_ += "\\n"; break;
-        case '\r': out_ += "\\r"; break;
-        case '\t': out_ += "\\t"; break;
-        default:
-            if (static_cast<unsigned char>(c) < 0x20) {
-                char escaped[8];
-                std::snprintf(escaped, sizeof(escaped), "\\u%04x", static_cast<unsigned>(c));
-                out_ += text_of(escaped);
-            } else {
-                out_ += string_view(&c, 1);
-            }
-        }
-    }
-    out_ += "\"";
+    json_quote(out_, value);
 }
 
 void JsonWriter::null()

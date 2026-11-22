@@ -53,6 +53,7 @@ velk/
     vector.h             Owning resizable array (ABI-stable std::vector replacement)
     string_view.h        Non-owning string reference
     string.h             Owning string with SSO (ABI-stable std::string replacement)
+    json.h               JSON value, parser and writer (header-only, not for interfaces)
   src/                   Internal runtime implementations (compiled into DLL)
 ```
 
@@ -463,6 +464,7 @@ The `current_thread_id()` utility in `thread.h` is a thin inline wrapper. On Win
 | `string_view` | ABI-stable non-owning string reference (`{const char*, size_t}`); replaces `std::string_view` at DLL boundaries |
 | `string` | ABI-stable owning string with SSO (`union{heap, local}` = 24 bytes); up to 22 chars stored inline; implicitly converts to `string_view` |
 | `array_view<T>` | ABI-stable constexpr span-like view over contiguous const data (`{const T*, size_t}`); replaces `std::span` |
+| `JsonValue` | JSON value from `json.h`: parse with `json_parse`, edit members in place, write with `json_write`. Object members keep their order and parsed numbers their text. Header-only; never used in an interface |
 | `vector<T>` | ABI-stable owning resizable array (`{T*, size_t, size_t}` = 24 bytes); uses malloc/free with placement new; implicitly converts to `array_view<T>` |
 | `shared_ptr<T>` | ABI-stable shared ownership pointer (`{T*, control_block*}`); intrusive for IInterface types, external for others |
 | `weak_ptr<T>` | ABI-stable non-owning observer (`{T*, control_block*}`); locks to a `shared_ptr` if the object is still alive |
