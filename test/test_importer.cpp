@@ -1,4 +1,6 @@
 #include <velk/api/any.h>
+#include <velk/api/binding.h>
+#include <velk/api/state.h>
 #include <velk/api/hierarchy.h>
 #include <velk/api/math_types.h>
 #include <velk/api/object_ref.h>
@@ -699,6 +701,75 @@ TEST_F(ImporterTest, InlineBindCreatesBinding)
     // Changing source propagates
     src_w->width().set_value(99.0f);
     EXPECT_FLOAT_EQ(99.0f, dst_w->width().get_value());
+}
+
+TEST_F(ImporterTest, InlineBindingFollowsObjectRef)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "objects": [
+            { "id": "a", "class": "test.Widget", "properties": { "width": 10.0 } },
+            { "id": "b", "class": "test.Widget", "properties": { "width": 20.0 } },
+            { "id": "holder", "class": "test.Container", "properties": { "target": { "ref": "a" } } },
+            { "id": "dst", "class": "test.Widget", "properties": { "width": { "bind": "holder.target.width" } } }
+        ],
+        "bindings": [
+            { "source": "holder.target.width", "targets": ["dst.height"] }
+        ]
+    })");
+
+    ASSERT_TRUE(result.store);
+    EXPECT_TRUE(result.errors.empty()) << result.errors[0];
+
+    auto* dst = interface_cast<ITestImportWidget>(result.store->find("dst"));
+    auto* a = interface_cast<ITestImportWidget>(result.store->find("a"));
+    ASSERT_NE(nullptr, dst);
+    EXPECT_FLOAT_EQ(10.0f, dst->width().get_value());
+    EXPECT_FLOAT_EQ(10.0f, dst->height().get_value());
+
+    // The current target's property changes.
+    a->width().set_value(11.0f);
+    EXPECT_FLOAT_EQ(11.0f, dst->width().get_value());
+
+    // The reference moves to another object.
+    auto holder = result.store->find("holder");
+    write_state<ITestImportContainer>(holder, [&](ITestImportContainer::State& st) {
+        set_object_ref(st.target, result.store->find("b"));
+    });
+    EXPECT_FLOAT_EQ(20.0f, dst->width().get_value());
+    EXPECT_FLOAT_EQ(20.0f, dst->height().get_value());
+
+    // The old target no longer drives it.
+    a->width().set_value(12.0f);
+    EXPECT_FLOAT_EQ(20.0f, dst->width().get_value());
+}
+
+TEST_F(ImporterTest, PathBindingKeepsValueWhileRefIsEmpty)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({
+        "version": 1,
+        "objects": [
+            { "id": "holder", "class": "test.Container" },
+            { "id": "dst", "class": "test.Widget", "properties": { "label": "none" } }
+        ]
+    })");
+    ASSERT_TRUE(result.store);
+    auto holder = result.store->find("holder");
+    auto* dst = interface_cast<ITestImportWidget>(result.store->find("dst"));
+
+    auto binding = create_path_binding(holder, "target.label");
+    ASSERT_TRUE(binding);
+    binding.add_target(interface_cast<IMetadata>(result.store->find("dst"))->get_property("label"));
+    EXPECT_EQ(string("none"), dst->label().get_value());
+
+    auto w = ::velk::instance().create<IObject>(TestImportWidget::static_class_id());
+    interface_cast<ITestImportWidget>(w)->label().set_value(string("item"));
+    write_state<ITestImportContainer>(holder, [&](ITestImportContainer::State& st) { set_object_ref(st.target, w); });
+    EXPECT_EQ(string("item"), dst->label().get_value());
+
+    EXPECT_FALSE(create_path_binding(holder, "target..label"));
 }
 
 TEST_F(ImporterTest, BindingNonexistentSourceReportsError)

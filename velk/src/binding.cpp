@@ -5,6 +5,8 @@
 
 #include <velk/api/velk.h>
 #include <velk/interface/intf_any.h>
+#include <velk/interface/intf_object_storage.h>
+#include <velk/interface/intf_storage_owned.h>
 
 namespace velk::impl {
 
@@ -250,7 +252,35 @@ IFunction::ConstPtr Binding::get_source_function() const
 bool Binding::add_target(const IProperty::Ptr& target)
 {
     auto* pi = interface_cast<IPropertyInternal>(target.get());
-    return pi && pi->install_extension(get_self<IAnyExtension>());
+    if (!pi || !pi->install_extension(get_self<IAnyExtension>())) {
+        return false;
+    }
+    // The target's state now lags the binding until read; tell its owner.
+    mark_stale(target.get());
+    notify_target(target.get());
+    return true;
+}
+
+void Binding::mark_stale(IProperty* prop) const
+{
+    if (auto* owned = interface_cast<IStorageOwned>(prop)) {
+        if (auto* storage = owned->get_owner()) {
+            storage->mark_binding_stale(owned->get_storage_id());
+        }
+    }
+}
+
+void Binding::notify_target(IProperty* prop) const
+{
+    if (!prop) {
+        return;
+    }
+    if (auto* owned = interface_cast<IStorageOwned>(prop)) {
+        ::velk::invoke_property_changed(owned->get_owner(), owned->get_storage_id(), prop);
+    } else {
+        auto self = const_cast<Binding*>(this)->get_self<IAnyExtension>();
+        invoke_event(prop->on_changed(), interface_cast<IAny>(self));
+    }
 }
 
 bool Binding::remove_target(const IProperty::Ptr& target)
@@ -361,6 +391,11 @@ IAny::Ptr Binding::take_inner(IInterface& owner)
 
 array_view<Uid> Binding::get_compatible_types() const
 {
+    LoopGuard guard(this, tls_evaluating, tls_eval_depth);
+    if (guard.looped) {
+        auto inner = first_inner();
+        return inner ? inner->get_compatible_types() : array_view<Uid>{};
+    }
     auto source = evaluate();
     if (source) {
         return source->get_compatible_types();
@@ -371,6 +406,11 @@ array_view<Uid> Binding::get_compatible_types() const
 
 size_t Binding::get_data_size(Uid type) const
 {
+    LoopGuard guard(this, tls_evaluating, tls_eval_depth);
+    if (guard.looped) {
+        auto inner = first_inner();
+        return inner ? inner->get_data_size(type) : 0;
+    }
     auto source = evaluate();
     if (source) {
         return source->get_data_size(type);
@@ -539,23 +579,21 @@ void Binding::on_source_changed()
         data_->invalidate();
     }
 
-    auto self = get_self<IAnyExtension>();
-    const IAny* arg = interface_cast<IAny>(self);
-
-    for (auto& entry : targets_) {
+    // Nothing is evaluated here: each target's state is marked out of date and refreshed
+    // when read. Copy, as notifying can change targets_.
+    auto targets = targets_;
+    for (auto& entry : targets) {
         auto owner = entry.owner.lock();
         if (!owner) {
             continue;
         }
+        mark_stale(interface_cast<IProperty>(owner));
 
         if (invoke_type_ == Deferred && !from_writeback) {
             auto propWeak = IPropertyInternal::WeakPtr(interface_pointer_cast<IPropertyInternal>(owner));
             instance().queue_deferred_property({std::move(propWeak), nullptr});
         } else {
-            auto* prop = interface_cast<IProperty>(owner);
-            if (prop) {
-                invoke_event(prop->on_changed(), arg);
-            }
+            notify_target(interface_cast<IProperty>(owner));
         }
     }
 }

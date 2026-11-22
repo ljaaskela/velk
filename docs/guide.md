@@ -42,6 +42,7 @@ This guide covers topics beyond the basics shown in the [README](../README.md). 
     - [Property-to-property binding](#property-to-property-binding)
     - [Function binding](#function-binding)
     - [Auto-tracked binding](#auto-tracked-binding)
+    - [Path bindings](#path-bindings)
     - [Deferred bindings](#deferred-bindings)
     - [Two-way bindings](#two-way-bindings)
     - [Multiple targets](#multiple-targets)
@@ -1105,7 +1106,7 @@ storage->remove_observer(&myObserver);
 
 ### Bindings
 
-Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. By default (one-way), the target is read-only: reads return the source value, and writes are rejected. Two-way bindings forward writes from the target back to the source. When the source changes, the target's `on_changed` fires.
+Bindings connect properties so that a target property automatically reflects the value of a source property or a computed function result. By default (one-way), the target is read-only: reads return the source value, and writes are rejected. Two-way bindings forward writes from the target back to the source. When the source changes, the target's `on_changed` fires and its object's observers hear of it. Nothing is evaluated then: the target is marked out of date, and reading its object's state (`read_state`, `write_state`) evaluates the binding and copies the value in, once for any number of changes.
 
 ```cpp
 #include <velk/api/binding.h>
@@ -1208,6 +1209,15 @@ result.get_value();       // still 99
 ```
 
 Dependency tracking uses a thread-local pointer that is null when no binding is evaluating. The cost to normal (non-binding) property reads is a single null check.
+
+#### Path bindings
+
+`create_path_binding(root, "item.label")` binds to a property reached through `ObjectRef` properties: `item` on `root`, then `label` on the object `item` references. It follows the reference, so when `item` points elsewhere the targets read the new object's `label`. While a reference is empty, targets keep their own value. Path bindings are one way.
+
+```cpp
+auto b = create_path_binding(row, "item.label");
+b.add_target(text);
+```
 
 #### Deferred bindings
 

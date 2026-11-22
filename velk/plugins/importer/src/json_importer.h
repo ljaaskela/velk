@@ -3,6 +3,7 @@
 
 #include <velk/json.h>
 
+#include <velk/api/binding.h>
 #include <velk/ext/core_object.h>
 #include <velk/interface/intf_exporter_extension.h>
 #include <velk/interface/intf_importer_extension.h>
@@ -77,6 +78,13 @@ private:
                                         string_view path) const;
     IProperty::Ptr resolve_property(IStore& store, const ImportContext& ctx,
                                     string_view path) const;
+    /**
+     * @brief A binding source: the property at @p path, or a path through ObjectRef properties
+     *        ("row.item.label": object "row", then "item", then "label" on what it references).
+     * @return The binding, not installed on any target; empty when nothing resolves.
+     */
+    Binding resolve_binding_source(IStore& store, const ImportContext& ctx, string_view path,
+                                   InvokeType invoke, BindingMode mode) const;
     void process_attachments(const JsonValue& root, IStore& store, ImportContext& ctx,
                              ImportResult& result) const;
     void process_resource_protocols(const JsonValue& root, ImportResult& result) const;

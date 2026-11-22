@@ -1,4 +1,5 @@
 #include <velk/api/any.h>
+#include <velk/api/binding.h>
 #include <velk/api/callback.h>
 #include <velk/api/function_context.h>
 #include <velk/api/object.h>
@@ -1279,6 +1280,61 @@ TEST_F(MetadataObserverTest, OnStateChangedFiresOnWriteState)
     EXPECT_EQ(widget->change_count, 1);
     EXPECT_TRUE(widget->last_changed_name.empty());
     EXPECT_EQ(widget->last_changed_interface, IObservable::UID);
+}
+
+TEST_F(MetadataObserverTest, BoundValueIsEvaluatedWhenStateIsRead)
+{
+    auto obj = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto* widget = static_cast<ObservableWidget*>(interface_cast<IObservable>(obj));
+    auto source = create_property<float>(5.f);
+    int evaluations = 0;
+    auto binding = create_binding(Callback([&]() -> float {
+        ++evaluations;
+        return source.get_value() * 2.f;
+    }));
+    ASSERT_TRUE(binding.add_target(interface_cast<IMetadata>(obj)->get_property("value")));
+    EXPECT_FLOAT_EQ(read_state<IObservable>(obj)->value, 10.f);
+    const int after_install = evaluations;
+    const int changes = widget->change_count;
+
+    // Source changes only mark the state out of date and tell the owner.
+    source.set_value(6.f);
+    source.set_value(7.f);
+    source.set_value(8.f);
+    EXPECT_EQ(evaluations, after_install);
+    EXPECT_EQ(widget->change_count, changes + 3);
+    EXPECT_EQ(widget->last_changed_name, string_view("value"));
+
+    // One read evaluates once; the next read does not evaluate again.
+    EXPECT_FLOAT_EQ(read_state<IObservable>(obj)->value, 16.f);
+    EXPECT_EQ(evaluations, after_install + 1);
+    EXPECT_FLOAT_EQ(read_state<IObservable>(obj)->value, 16.f);
+    EXPECT_EQ(evaluations, after_install + 1);
+    EXPECT_EQ(obj->get_object_flags() & ObjectFlags::StaleBindings, 0u);
+}
+
+TEST_F(MetadataObserverTest, BoundTargetRejectsWritesAndCyclesEnd)
+{
+    auto a = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto b = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto pa = interface_cast<IMetadata>(a)->get_property("value");
+    auto pb = interface_cast<IMetadata>(b)->get_property("value");
+    auto ab = create_binding(pb);
+    ASSERT_TRUE(ab.add_target(pa));
+    auto ba = create_binding(pa);
+    ASSERT_TRUE(ba.add_target(pb));
+    // A cycle reads without overflowing.
+    (void)read_state<IObservable>(a)->value;
+    (void)read_state<IObservable>(b)->value;
+
+    // A one-way target still refuses writes through its property.
+    auto src = create_property<float>(1.f);
+    auto c = instance().create<IObject>(ObservableWidget::static_class_id());
+    auto pc = interface_cast<IMetadata>(c)->get_property("value");
+    auto bc = create_binding(src);
+    ASSERT_TRUE(bc.add_target(pc));
+    EXPECT_TRUE(failed(Property<float>(pc).set_value(3.f)));
+    EXPECT_FLOAT_EQ(read_state<IObservable>(c)->value, 1.f);
 }
 
 TEST_F(MetadataObserverTest, OnStateChangedFiresOnPropertySetValue)

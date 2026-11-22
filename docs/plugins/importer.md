@@ -214,6 +214,8 @@ Inline bindings can also be created in property values using `{ "bind": "source.
 "bindings": [{ "source": "widget_1.width", "targets": ["this_object.width"] }]
 ```
 
+A source can go through `ObjectRef` properties: in `"row.item.label"`, `item` is an `ObjectRef` property of `row`, and `label` is read from the object it references. The binding follows the reference: when `item` points to another object, it reads that object's `label`. While the reference is empty, the target keeps its own value. Such bindings are one way (`create_path_binding()` in code).
+
 ### Resource protocols
 
 The `resource-protocols` array registers custom URI schemes backed by the local filesystem. Each entry creates a `FileProtocol` instance with the given scheme and base path:

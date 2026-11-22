@@ -86,6 +86,11 @@ namespace ObjectFlags {
 inline constexpr uint32_t None = 0;
 inline constexpr uint32_t ReadOnly = 1 << 0;    ///< Property rejects writes via set_value/set_data.
 inline constexpr uint32_t HiveManaged = 1 << 1; ///< Object is managed by a Hive.
+
+// Internal flags, set and cleared by velk itself, allocated from the top bit down.
+
+/// A bound property's value in the object's state is out of date; reading the state refreshes it.
+inline constexpr uint32_t StaleBindings = 1u << 31;
 } // namespace ObjectFlags
 
 /** @brief Controls whether a lookup should create a new instances on miss.

@@ -44,6 +44,8 @@ public: // IStorageOwned (always standalone, no owner)
     uint16_t get_member_index() const override { return IStorageOwned::InvalidIndex; }
     uint16_t get_storage_id() const override { return 0; }
     void set_owner(IObjectStorage*, uint16_t, uint16_t) override {}
+    bool binding_stale() const override { return false; } // No owner, no state to refresh.
+    void set_binding_stale(bool) override {}
 
 public: // IProperty
     ReturnValue set_value(const IAny& from, InvokeType type = Auto) override;

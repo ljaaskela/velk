@@ -127,6 +127,12 @@ public:
         ptrdiff_t offset = compute_state_offset(*hive_, StateInterface::UID);
         if (offset > 0) {
             hive_->for_each_state(offset, &fn, [](void* ctx, IObject& obj, void* state) -> bool {
+                // A bound value whose source changed reaches the state through a state read.
+                if (obj.get_object_flags() & ObjectFlags::StaleBindings) {
+                    if (auto* ps = interface_cast<IPropertyState>(&obj)) {
+                        ps->get_property_state(StateInterface::UID);
+                    }
+                }
                 auto& f = *static_cast<std::decay_t<Fn>*>(ctx);
                 return f(obj, *static_cast<typename StateInterface::State*>(state));
             });

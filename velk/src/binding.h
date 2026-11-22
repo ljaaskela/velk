@@ -82,6 +82,10 @@ private:
     void on_source_changed();
     void queue_writeback(const IAny& value);
     IAny::Ptr first_inner() const;
+    /** @brief Tells @p prop's owner, or else its listeners, that its value changed. */
+    void notify_target(IProperty* prop) const;
+    /** @brief Marks @p prop's value in its owner's state as out of date. */
+    void mark_stale(IProperty* prop) const;
 
     std::unique_ptr<BindingData> data_;
     vector<TargetEntry> targets_;

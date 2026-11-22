@@ -27,6 +27,8 @@ public: // IStorageOwned
     IObjectStorage* get_owner() const override { return is_standalone() ? nullptr : owner_; }
     uint16_t get_member_index() const override { return member_index_; }
     uint16_t get_storage_id() const override { return storage_id_; }
+    bool binding_stale() const override { return binding_stale_; }
+    void set_binding_stale(bool stale) override { binding_stale_ = stale; }
     void set_owner(IObjectStorage* storage, uint16_t member_index, uint16_t storage_id) override
     {
         if (is_standalone() || owner_ == storage) {
@@ -71,7 +73,26 @@ private:
     };
     uint16_t member_index_{Standalone};
     uint16_t storage_id_{};
+    bool binding_stale_{}; ///< In the padding after the indices; see the assert below.
 };
+
+namespace metadata_item_layout {
+struct MetadataItemFieldsBefore
+{
+    void* owner;
+    uint16_t member_index;
+    uint16_t storage_id;
+};
+struct MetadataItemFields
+{
+    void* owner;
+    uint16_t member_index;
+    uint16_t storage_id;
+    bool binding_stale;
+};
+// The stale mark takes no extra memory.
+static_assert(sizeof(MetadataItemFields) == sizeof(MetadataItemFieldsBefore));
+} // namespace metadata_item_layout
 
 } // namespace velk::impl
 

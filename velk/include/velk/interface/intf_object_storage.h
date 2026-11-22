@@ -86,6 +86,17 @@ public:
      *        If nullptr, a property with @p storage_id is search from storage.
      */
     virtual void invoke_property_changed(size_t storage_id, IProperty* property) const = 0;
+    /**
+     * @brief Marks the bound property with @p storage_id as out of date in the object's state.
+     *        Internal: called by bindings when their source changes.
+     */
+    virtual void mark_binding_stale(size_t storage_id) = 0;
+    /**
+     * @brief Copies the bound values of @p interfaceUid's out-of-date properties into the state.
+     *        Internal: called when the state is read.
+     * @return True when properties of other interfaces are still out of date.
+     */
+    virtual bool refresh_stale_bindings(Uid interfaceUid) = 0;
     /** @brief Registers an observer for property change notifications on this object. */
     virtual void add_observer(IMetadataObserver* observer) = 0;
     /** @brief Removes a previously registered observer. */

@@ -1,9 +1,13 @@
 #ifndef VELK_API_BINDING_H
 #define VELK_API_BINDING_H
 
+#include <velk/api/callback.h>
 #include <velk/api/property.h>
 #include <velk/api/velk.h>
 #include <velk/interface/intf_binding.h>
+#include <velk/interface/intf_metadata.h>
+#include <velk/interface/intf_object_ref.h>
+#include <velk/string.h>
 #include <velk/interface/types.h>
 #include <velk/vector.h>
 
@@ -162,6 +166,57 @@ inline Binding create_binding(const IFunction::ConstPtr& fn, InvokeType type = A
         internal->set_invoke_type(type);
     }
     return b;
+}
+
+/**
+ * @brief Creates a binding to the property at @p path from @p root, following ObjectRef properties.
+ *
+ * @p path is property names separated by dots, such as "item.label": each name but the last
+ * is an ObjectRef property, and the next name is read from the object it references. The
+ * binding follows the references: when one points to another object, the binding reads from
+ * that object. While a reference is empty or a name is missing, targets keep their own value.
+ * @p root is held weakly.
+ *
+ * @return The binding (not yet installed on any target), or an empty one for an empty path.
+ */
+inline Binding create_path_binding(const IObject::Ptr& root, string_view path, InvokeType type = Auto)
+{
+    vector<string> names;
+    size_t start = 0;
+    while (start <= path.size()) {
+        size_t end = path.find('.', start);
+        if (end == string_view::npos) {
+            end = path.size();
+        }
+        if (end == start) {
+            return {};
+        }
+        names.push_back(string(path.substr(start, end - start)));
+        start = end + 1;
+    }
+    if (names.empty() || !root) {
+        return {};
+    }
+    IObject::WeakPtr weak(root);
+    Callback fn([weak, names = std::move(names)](FnArgs) -> IAny::Ptr {
+        IObject::Ptr object = weak.lock();
+        for (size_t i = 0; object && i < names.size(); ++i) {
+            auto* meta = interface_cast<IMetadata>(object);
+            auto prop = meta ? meta->get_property(names[i]) : nullptr;
+            if (!prop) {
+                return {};
+            }
+            // Reading records the property, so the binding follows it.
+            auto value = prop->get_value();
+            if (i + 1 == names.size()) {
+                return value ? value->clone() : nullptr;
+            }
+            auto* ref = interface_cast<IObjectRef>(value);
+            object = ref ? ref->get_object() : nullptr;
+        }
+        return {};
+    });
+    return create_binding(IFunction::ConstPtr(fn), type);
 }
 
 /** @brief Creates a property binding and installs it on a single target. */

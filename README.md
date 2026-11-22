@@ -99,6 +99,7 @@ Note: Claude Code skill for Velk usage can be found in `docs/claude-skill/velk`.
 | [Animator](docs/plugins/animator.md) | Implicit animations and transitions for properties |
 | [Scripting](docs/plugins/scripting.md) | JavaScript scripting via QuickJS-ng: expression bindings and event handlers |
 | [Remote](docs/plugins/remote.md) | Reading and editing a running program's objects from another process |
+| [Data](docs/plugins/data.md) | Item sources and containers with change notifications, for list and tree views |
 | [Tracy](docs/plugins/tracy.md) | Tracy profiler integration via the perf sink interface |
 
 ## Project structure

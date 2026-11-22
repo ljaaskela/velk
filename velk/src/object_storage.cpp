@@ -1,5 +1,7 @@
 #include "object_storage.h"
 
+#include <velk/interface/intf_any_extension.h>
+
 #include "array_property.h"
 #include "event.h"
 #include "function.h"
@@ -364,6 +366,63 @@ void ObjectStorage::invoke_property_changed(size_t storage_id, IProperty* proper
             notify_observers(m.name, m.interfaceInfo->uid);
         }
     }
+}
+
+void ObjectStorage::mark_binding_stale(size_t storage_id)
+{
+    if (storage_id >= metadata_.size()) {
+        return;
+    }
+    auto* owned = interface_cast<IStorageOwned>(slot(storage_id).instance);
+    if (!owned || owned->binding_stale()) {
+        return;
+    }
+    owned->set_binding_stale(true);
+    // The owning object keeps the bit its state reads test; it forwards here again, which
+    // returns above.
+    if (auto* owner = interface_cast<IObjectStorage>(owner_); owner && owner != this) {
+        owner->mark_binding_stale(storage_id);
+    }
+}
+
+bool ObjectStorage::refresh_stale_bindings(Uid interfaceUid)
+{
+    bool remaining = false;
+    for (auto& s : metadata_) {
+        if (!s.instance) {
+            continue;
+        }
+        auto* owned = interface_cast<IStorageOwned>(s.instance);
+        if (!owned || !owned->binding_stale()) {
+            continue;
+        }
+        auto index = owned->get_member_index();
+        if (index == IStorageOwned::InvalidIndex) {
+            continue;
+        }
+        auto& m = members_[index];
+        if (!m.interfaceInfo || m.interfaceInfo->uid != interfaceUid) {
+            remaining = true;
+            continue;
+        }
+        owned->set_binding_stale(false);
+        auto& pd = s.data.property;
+        // The value reads come from the head of the extension chain; the state is the any at
+        // its end. Copying writes the state member directly, without events.
+        const IAny::Ptr head = pd.data;
+        IAny::ConstPtr state = head;
+        while (auto* ext = interface_cast<IAnyExtension>(state)) {
+            auto inner = ext->get_inner();
+            if (!inner) {
+                break;
+            }
+            state = inner;
+        }
+        if (head && state && state != head) {
+            const_cast<IAny&>(*state).copy_from(*head);
+        }
+    }
+    return remaining;
 }
 
 void ObjectStorage::add_observer(IMetadataObserver* observer)

@@ -127,6 +127,14 @@ protected:
     {
         with_storage([&](auto& s) { s.invoke_property_changed(storage_id, property); });
     }
+    void storage_mark_binding_stale(size_t storage_id) const
+    {
+        with_storage([&](auto& s) { s.mark_binding_stale(storage_id); });
+    }
+    bool storage_refresh_stale_bindings(Uid interfaceUid) const
+    {
+        return with_storage([&](auto& s) { return s.refresh_stale_bindings(interfaceUid); }, false);
+    }
     void storage_add_observer(IMetadataObserver* observer)
     {
         with_storage([&](auto& s) { s.add_observer(observer); });
@@ -248,6 +256,19 @@ public: // IObjectStorage overrides
     {
         storage_invoke_property_changed(storage_id, property);
     }
+    void mark_binding_stale(size_t storage_id) override
+    {
+        this->get_object_data().flags |= ObjectFlags::StaleBindings;
+        storage_mark_binding_stale(storage_id);
+    }
+    bool refresh_stale_bindings(Uid interfaceUid) override
+    {
+        const bool remaining = storage_refresh_stale_bindings(interfaceUid);
+        if (!remaining) {
+            this->get_object_data().flags &= ~ObjectFlags::StaleBindings;
+        }
+        return remaining;
+    }
     void add_observer(IMetadataObserver* observer) override
     {
         ensure_object_storage();
@@ -257,7 +278,14 @@ public: // IObjectStorage overrides
 
 public: // IPropertyState override
     /** @brief Returns a pointer to the State struct for the given interface UID. */
-    void* get_property_state(Uid uid) override { return find_state<0>(uid); }
+    void* get_property_state(Uid uid) override
+    {
+        // A bound property whose source changed is copied into the state when it is read.
+        if (this->get_object_data().flags & ObjectFlags::StaleBindings) {
+            refresh_stale_bindings(uid);
+        }
+        return find_state<0>(uid);
+    }
 
     /** @brief Type-safe state access. Returns a typed pointer to T::State for a VELK_INTERFACE. */
     template <class T>

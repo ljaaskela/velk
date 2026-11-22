@@ -48,6 +48,7 @@ add_executable(tests
     test_resource_store.cpp
     test_js.cpp
     test_remote.cpp
+    test_data.cpp
 )
 
 target_link_libraries(tests PRIVATE velk velk_c GTest::gtest_main)
@@ -56,8 +57,9 @@ target_include_directories(tests PRIVATE
     $<TARGET_PROPERTY:velk_importer,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:velk_js,INTERFACE_INCLUDE_DIRECTORIES>
     $<TARGET_PROPERTY:velk_remote,INTERFACE_INCLUDE_DIRECTORIES>
+    $<TARGET_PROPERTY:velk_data,INTERFACE_INCLUDE_DIRECTORIES>
 )
-add_dependencies(tests velk_remote)
+add_dependencies(tests velk_remote velk_data)
 
 # Pass the test plugin DLL path as a compile definition so tests can find it.
 add_subdirectory(test_plugin_dll)
@@ -67,6 +69,7 @@ target_compile_definitions(tests PRIVATE
     TEST_IMPORTER_DLL_PATH="$<TARGET_FILE:velk_importer>"
     TEST_JS_DLL_PATH="$<TARGET_FILE:velk_js>"
     TEST_REMOTE_DLL_PATH="$<TARGET_FILE:velk_remote>"
+    TEST_DATA_DLL_PATH="$<TARGET_FILE:velk_data>"
 )
 
 # Stage test_plugin_dll under <tests_exe_dir>/plugins/ so the

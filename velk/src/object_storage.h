@@ -53,6 +53,11 @@ struct MemberSlot
     MemberData data{}; ///< Per-kind data: property value+event or function callback.
 };
 
+// Slot sizes are fixed; the bindings' stale mark lives in the property instance's padding.
+static_assert(sizeof(MemberData::property_t) <= sizeof(MemberData::callback_t));
+static_assert(sizeof(MemberData) == sizeof(MemberData::callback_t));
+static_assert(sizeof(MemberSlot) == sizeof(IInterface::Ptr) + sizeof(MemberData::callback_t));
+
 
 /**
  * @brief Runtime object storage that lazily creates property/event/function instances
@@ -109,6 +114,8 @@ public: // IObjectStorage (attachment operations)
 public: // IObjectStorage (property events + observers)
     IEvent::Ptr get_property_event(size_t storage_id, Resolve mode) const override;
     void invoke_property_changed(size_t storage_id, IProperty* property) const override;
+    void mark_binding_stale(size_t storage_id) override;
+    bool refresh_stale_bindings(Uid interfaceUid) override;
     void add_observer(IMetadataObserver* observer) override;
     void remove_observer(IMetadataObserver* observer) override;
 

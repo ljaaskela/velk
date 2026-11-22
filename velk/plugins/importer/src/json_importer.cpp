@@ -772,8 +772,8 @@ void JsonImporter::resolve_object_ref(IMetadata& meta, string_view name, const J
 void JsonImporter::resolve_inline_binding(IMetadata& meta, string_view name, string_view ref_path,
                                           IStore& store, const ImportContext& ctx, ImportResult& result) const
 {
-    auto source_prop = resolve_property(store, ctx, ref_path);
-    if (!source_prop) {
+    auto binding = resolve_binding_source(store, ctx, ref_path, Auto, BindingMode::OneWay);
+    if (!binding) {
         add_error(result, string("unresolved property reference '") + ref_path + "' on '" + name + "'");
         return;
     }
@@ -782,9 +782,27 @@ void JsonImporter::resolve_inline_binding(IMetadata& meta, string_view name, str
     if (!target_prop) {
         return;
     }
-
-    auto binding = ::velk::create_binding(source_prop);
     binding.add_target(target_prop);
+}
+
+Binding JsonImporter::resolve_binding_source(IStore& store, const ImportContext& ctx, string_view path,
+                                             InvokeType invoke, BindingMode mode) const
+{
+    if (auto source = resolve_property(store, ctx, path)) {
+        return ::velk::create_binding(source, invoke, mode);
+    }
+    // A path through ObjectRef properties: the shortest prefix that names an object, with at
+    // least two property names after it. Such a binding follows the references, one way only.
+    for (size_t dot = path.find('.'); dot != string_view::npos; dot = path.find('.', dot + 1)) {
+        auto rest = path.substr(dot + 1);
+        if (rest.find('.') == string_view::npos) {
+            break;
+        }
+        if (auto object = resolve_object(store, ctx, path.substr(0, dot))) {
+            return ::velk::create_path_binding(object, rest, invoke);
+        }
+    }
+    return {};
 }
 
 void JsonImporter::create_bindings(IStore& store, const JsonValue& root, const ImportContext& ctx,
@@ -818,11 +836,6 @@ void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store, c
         return;
     }
 
-    auto source_prop = resolve_property(store, ctx, source_val->as_string());
-    if (!source_prop) {
-        add_error(result, string("binding: unresolved source '") + source_val->as_string() + "'");
-        return;
-    }
 
     // Determine binding mode
     BindingMode mode = BindingMode::OneWay;
@@ -842,10 +855,9 @@ void JsonImporter::parse_binding(const JsonValue& binding_node, IStore& store, c
         }
     }
 
-    // Create the binding
-    auto binding = ::velk::create_binding(source_prop, invoke, mode);
+    auto binding = resolve_binding_source(store, ctx, source_val->as_string(), invoke, mode);
     if (!binding) {
-        add_error(result, "failed to create binding");
+        add_error(result, string("binding: unresolved source '") + source_val->as_string() + "'");
         return;
     }
 
