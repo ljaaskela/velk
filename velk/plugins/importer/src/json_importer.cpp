@@ -61,6 +61,10 @@ ImportResult JsonImporter::import_from(string_view json, string_view) const
         add_error(result, "root must be a JSON object");
         return result;
     }
+    if (root.find("app")) {
+        add_error(result, "an application config (app.velk), not a store file");
+        return result;
+    }
 
     result.store = ::velk::instance().create<IStore>(ClassId::Store);
     if (!result.store) {

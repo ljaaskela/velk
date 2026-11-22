@@ -66,6 +66,8 @@ A store file is a JSON object with a required `version` field and optional top-l
 
 Additional top-level keys are dispatched to [importer extensions](#importer-extensions).
 
+A top-level `app` key marks an application config (`app.velk`, see velk-ui's runtime docs). The importer rejects it with an error and a null store.
+
 ### Objects
 
 Objects are a flat array. Each entry has an `id` (unique within the store), a `class`, and optional `properties` and `name`:
@@ -293,7 +295,7 @@ struct ImportResult {
 };
 ```
 
-The importer is lenient: it continues past individual errors (unknown class, bad property, unresolved reference) and reports them in the `errors` vector. The store is still populated with everything that could be resolved. Only a complete parse failure (invalid JSON, root not an object) results in a null store.
+The importer is lenient: it continues past individual errors (unknown class, bad property, unresolved reference) and reports them in the `errors` vector. The store is still populated with everything that could be resolved. Only a complete parse failure (invalid JSON, root not an object, an application config) results in a null store.
 
 ## Importer extensions
 

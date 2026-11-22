@@ -358,6 +358,15 @@ TEST_F(ImporterTest, InvalidJsonReportsError)
     ASSERT_FALSE(result.errors.empty());
 }
 
+TEST_F(ImporterTest, AppConfigReportsError)
+{
+    load_importer();
+    auto result = importer_->import_from(R"({ "app": { "store": "scene.velk" } })");
+    EXPECT_FALSE(result.store);
+    ASSERT_EQ(1u, result.errors.size());
+    EXPECT_NE(::velk::string::npos, result.errors[0].find("app.velk"));
+}
+
 TEST_F(ImporterTest, UnknownPropertyReportsError)
 {
     load_importer();
